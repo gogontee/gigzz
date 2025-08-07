@@ -8,13 +8,14 @@ export default function LoginPage() {
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [errorMsg, setErrorMsg] = useState(null);
+  const [loading, setLoading] = useState(false); // NEW
   const router = useRouter();
 
   const handleLogin = async (e) => {
     e.preventDefault();
     setErrorMsg(null);
+    setLoading(true); // Start loading
 
-    // Step 1: Login via Supabase Auth
     const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
       email,
       password,
@@ -22,6 +23,7 @@ export default function LoginPage() {
 
     if (authError) {
       setErrorMsg(authError.message);
+      setLoading(false); // Stop loading
       return;
     }
 
@@ -29,10 +31,10 @@ export default function LoginPage() {
 
     if (!user) {
       setErrorMsg('Login failed. Please try again.');
+      setLoading(false);
       return;
     }
 
-    // Step 2: Fetch the user's profile from 'users' table
     const { data: userProfile, error: profileError } = await supabase
       .from('users')
       .select('role')
@@ -41,10 +43,10 @@ export default function LoginPage() {
 
     if (profileError || !userProfile) {
       setErrorMsg('No account found. Kindly sign up.');
+      setLoading(false);
       return;
     }
 
-    // Step 3: Redirect based on role
     const role = userProfile.role;
 
     if (role === 'applicant') {
@@ -54,6 +56,8 @@ export default function LoginPage() {
     } else {
       setErrorMsg('Invalid user role. Please contact support.');
     }
+
+    setLoading(false); // Done loading (in case of no redirect)
   };
 
   return (
@@ -104,9 +108,12 @@ export default function LoginPage() {
 
         <button
           type="submit"
-          className="w-full bg-black text-white py-2 rounded hover:bg-orange-600 transition"
+          disabled={loading}
+          className={`w-full py-2 rounded transition text-white ${
+            loading ? 'bg-gray-500 cursor-not-allowed' : 'bg-black hover:bg-orange-600'
+          }`}
         >
-          Login
+          {loading ? 'Loading...' : 'Login'}
         </button>
       </form>
 
