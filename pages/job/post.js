@@ -1,0 +1,1 @@
+export default function PostJob() { return <h1>Post a Job</h1>; }
