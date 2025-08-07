@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/router';
 import { supabase } from '../../../lib/supabaseClient';
-import ApplicantLayout from '../../../components/ApplicantLayout';
+import ApplicantLayout from '../../components/ApplicantLayout';
 import { motion } from 'framer-motion';
 import { Loader2 } from 'lucide-react';
 
