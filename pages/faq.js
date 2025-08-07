@@ -1,5 +1,6 @@
 import Head from "next/head";
 import Header from "../components/Header";
+import MobileHeader from "../components/MobileHeader";
 import Footer from "../components/Footer";
 import { useState } from "react";
 
@@ -46,9 +47,17 @@ export default function FAQPage() {
       </Head>
 
       <div className="min-h-screen flex flex-col bg-white text-black">
-        <Header />
+        {/* Desktop Header */}
+        <div className="hidden md:block">
+          <Header />
+        </div>
 
-        <main className="flex-grow px-6 py-12 max-w-4xl mx-auto">
+        {/* Mobile Header */}
+        <div className="block md:hidden">
+          <MobileHeader />
+        </div>
+
+        <main className="flex-grow px-6 py-12 max-w-4xl mx-auto pt-0 md:pt-20">
           <h1 className="text-4xl font-bold mb-8 border-b-4 border-orange-500 inline-block">
             Frequently Asked Questions
           </h1>

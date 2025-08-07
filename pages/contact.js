@@ -1,5 +1,6 @@
 import Head from "next/head";
 import Header from "../components/Header";
+import MobileHeader from "../components/MobileHeader";
 import Footer from "../components/Footer";
 
 export default function ContactPage() {
@@ -7,13 +8,24 @@ export default function ContactPage() {
     <>
       <Head>
         <title>Contact Us - Gigzz</title>
-        <meta name="description" content="Get in touch with the Gigzz team for support, partnerships, or general inquiries." />
+        <meta
+          name="description"
+          content="Get in touch with the Gigzz team for support, partnerships, or general inquiries."
+        />
       </Head>
 
       <div className="min-h-screen flex flex-col bg-white text-black">
-        <Header />
+        {/* Desktop Header */}
+        <div className="hidden md:block">
+          <Header />
+        </div>
 
-        <main className="flex-grow px-6 py-12 max-w-3xl mx-auto">
+        {/* Mobile Header */}
+        <div className="block md:hidden">
+          <MobileHeader />
+        </div>
+
+        <main className="flex-grow px-6 py-12 max-w-3xl mx-auto pt-0 md:pt-20">
           <h1 className="text-4xl font-bold mb-6 border-b-4 border-orange-500 inline-block">
             Contact Us
           </h1>
@@ -24,7 +36,9 @@ export default function ContactPage() {
 
           <form className="space-y-6">
             <div>
-              <label className="block text-sm font-medium text-gray-700">Your Name</label>
+              <label className="block text-sm font-medium text-gray-700">
+                Your Name
+              </label>
               <input
                 type="text"
                 required
@@ -33,7 +47,9 @@ export default function ContactPage() {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700">Email Address</label>
+              <label className="block text-sm font-medium text-gray-700">
+                Email Address
+              </label>
               <input
                 type="email"
                 required
@@ -42,7 +58,9 @@ export default function ContactPage() {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700">Message</label>
+              <label className="block text-sm font-medium text-gray-700">
+                Message
+              </label>
               <textarea
                 rows="5"
                 required
@@ -60,7 +78,10 @@ export default function ContactPage() {
 
           <div className="mt-10 text-sm text-gray-600">
             Or email us at{" "}
-            <a href="mailto:support@gigzz.com" className="text-orange-600 underline">
+            <a
+              href="mailto:support@gigzz.com"
+              className="text-orange-600 underline"
+            >
               support@gigzz.com
             </a>
           </div>
