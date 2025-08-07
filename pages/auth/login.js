@@ -14,6 +14,7 @@ export default function LoginPage() {
     e.preventDefault();
     setErrorMsg(null);
 
+    // Step 1: Login via Supabase Auth
     const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
       email,
       password,
@@ -24,20 +25,26 @@ export default function LoginPage() {
       return;
     }
 
-    const userId = authData.user.id;
+    const user = authData.user;
 
-    // Get user's role from users table
-    const { data: userProfile, error: profileError } = await supabase
-      .from('users')
-      .select('role')
-      .eq('id', userId)
-      .single();
-
-    if (profileError || !userProfile) {
-      setErrorMsg('User not found.');
+    if (!user) {
+      setErrorMsg('Login failed. Please try again.');
       return;
     }
 
+    // Step 2: Fetch the user's profile from 'users' table
+    const { data: userProfile, error: profileError } = await supabase
+      .from('users')
+      .select('role')
+      .eq('id', user.id)
+      .single();
+
+    if (profileError || !userProfile) {
+      setErrorMsg('No account found. Kindly sign up.');
+      return;
+    }
+
+    // Step 3: Redirect based on role
     const role = userProfile.role;
 
     if (role === 'applicant') {
@@ -45,7 +52,7 @@ export default function LoginPage() {
     } else if (role === 'employer') {
       router.push('/dashboard/employer');
     } else {
-      setErrorMsg('Invalid user role.');
+      setErrorMsg('Invalid user role. Please contact support.');
     }
   };
 
