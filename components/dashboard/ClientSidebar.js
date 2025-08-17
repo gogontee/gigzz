@@ -13,6 +13,7 @@ import {
   LogOut,
   ChevronLeft,
   ChevronRight,
+  ShieldCheck // ✅ added
 } from 'lucide-react';
 
 const supabase = createClient(
@@ -29,6 +30,7 @@ const items = [
   { key: 'chats', label: 'Chats', icon: <MessageCircle size={18} /> },
   { key: 'calls', label: 'Video Calls', icon: <Video size={18} /> },
   { key: 'profile', label: 'Profile', icon: <Settings size={18} /> },
+  { key: 'verify', label: 'Verification', icon: <ShieldCheck size={18} /> },
 ];
 
 export default function ClientSidebar({ active, onChange, employer }) {

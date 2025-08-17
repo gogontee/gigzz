@@ -1,14 +1,11 @@
 // pages/dashboard/employer/edit.js
+"use client";
+
 import { useEffect, useState } from "react";
 import { useRouter } from "next/router";
-import { createClient } from "@supabase/supabase-js";
 import { motion } from "framer-motion";
 import Image from "next/image";
-
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-);
+import { supabase } from "../../../utils/supabaseClient"; // single client
 
 export default function EditEmployerProfile() {
   const [employer, setEmployer] = useState(null);
@@ -18,55 +15,64 @@ export default function EditEmployerProfile() {
   const [updating, setUpdating] = useState(false);
   const router = useRouter();
 
+  // Fetch employer profile
   useEffect(() => {
     const fetchProfile = async () => {
-      const {
-        data: { user },
-        error: authError,
-      } = await supabase.auth.getUser();
+      try {
+        const { data: { user }, error: authError } = await supabase.auth.getUser();
+        if (authError || !user) return router.push("/auth/login");
 
-      if (authError || !user) return router.push("/auth/login");
+        const { data, error } = await supabase
+          .from("employers")
+          .select("*")
+          .eq("id", user.id)
+          .single();
 
-      const { data, error } = await supabase
-        .from("employers")
-        .select("*")
-        .eq("id", user.id)
-        .single();
-
-      if (!error) setEmployer(data);
-      setLoading(false);
+        if (error) {
+          console.error("Fetch employer error:", error.message);
+        } else {
+          setEmployer(data);
+        }
+      } catch (err) {
+        console.error("Unexpected fetch error:", err);
+      } finally {
+        setLoading(false);
+      }
     };
 
     fetchProfile();
-  }, []);
+  }, [router]);
 
-  const handleChange = (e) => {
-    setEmployer({ ...employer, [e.target.name]: e.target.value });
-  };
-
+  const handleChange = (e) => setEmployer({ ...employer, [e.target.name]: e.target.value });
   const handleAvatarChange = (e) => setAvatarFile(e.target.files[0]);
   const handleIdCardChange = (e) => setIdCardFile(e.target.files[0]);
 
-  const uploadFile = async (file, path) => {
-    const fileExt = file.name.split(".").pop();
-    const fileName = `${employer.id}.${fileExt}`;
-    const { error } = await supabase.storage
-      .from("employer_assets")
-      .upload(`${path}/${fileName}`, file, {
-        cacheControl: "3600",
-        upsert: true,
-      });
+  // Upload file to Supabase storage
+  const uploadFile = async (file) => {
+  if (!file || !employer) return null;
 
-    if (error) return null;
+  const fileExt = file.name.split(".").pop();
+  const fileName = `${employer.id}.${fileExt}`;
+  const filePath = `clients_asset/${fileName}`; // direct under clients_asset
 
-    const { data } = supabase.storage
-      .from("employer_assets")
-      .getPublicUrl(`${path}/${fileName}`);
-    return data.publicUrl;
-  };
+  const { error: uploadError } = await supabase.storage
+    .from("assets")
+    .upload(filePath, file, { cacheControl: "3600", upsert: true });
+
+  if (uploadError) {
+    console.error("Upload error:", uploadError.message);
+    return null;
+  }
+
+  const { data } = supabase.storage.from("assets").getPublicUrl(filePath);
+  return data.publicUrl;
+};
+
 
   const handleUpdate = async (e) => {
     e.preventDefault();
+    if (!employer) return;
+
     setUpdating(true);
 
     let avatar_url = employer.avatar_url;
@@ -82,7 +88,7 @@ export default function EditEmployerProfile() {
       if (url) id_card_url = url;
     }
 
-    const { error } = await supabase
+    const { data, error } = await supabase
       .from("employers")
       .update({
         name: employer.name,
@@ -93,15 +99,20 @@ export default function EditEmployerProfile() {
         avatar_url,
         id_card_url,
       })
-      .eq("id", employer.id);
+      .eq("id", employer.id)
+      .select(); // fetch updated row
 
     setUpdating(false);
 
-    if (!error) {
+    if (error) {
+      console.error("Update employer error:", error.message);
+      alert("Failed to update profile. Check console for details.");
+    } else if (data && data.length > 0) {
+      setEmployer(data[0]);
       alert("Profile updated successfully!");
       router.push("/dashboard/employer");
     } else {
-      console.error(error);
+      alert("Update failed: no rows affected (check RLS policies).");
     }
   };
 
