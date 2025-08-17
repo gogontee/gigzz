@@ -15,6 +15,7 @@ import VideoCallModal from '../../../components/client/VideoCallModal';
 import EmployerProfileEditor from '../../../components/client/EmployerProfileEditor';
 import PromotionPanel from '../../../components/client/PromotionPanel';
 import JobListCard from '../../../components/client/JobListCard';
+import Verify from '../../../components/Verify';
 import PortfolioModal from '../../../components/portfolio/PortfolioModal';
 
 const supabase = createClient(
@@ -46,6 +47,7 @@ export default function EmployerDashboard() {
     if (!isValidComponent(VideoCallModal)) errs.push('VideoCallModal');
     if (!isValidComponent(EmployerProfileEditor)) errs.push('EmployerProfileEditor');
     if (!isValidComponent(PromotionPanel)) errs.push('PromotionPanel');
+    if (!isValidComponent(Verify)) errs.push('Verify');
     if (!isValidComponent(JobListCard)) errs.push('JobListCard');
     setImportErrors(errs);
   }, []);
@@ -234,6 +236,10 @@ const handleViewPortfolio = (p) => {
 
           {activeSection === 'profile' && employer && (
             <EmployerProfileEditor employer={employer} onUpdated={fetchInitial} />
+          )}
+          
+          {activeSection === 'verify' && employer && (
+            <Verify employer={employer} onUpdated={fetchInitial} />
           )}
 
           {activeSection === 'chats' && employer && <ChatSidebar employer={employer} />}

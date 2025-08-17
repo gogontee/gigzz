@@ -1,8 +1,7 @@
-// components/client/EmployerProfileEditor.js
 'use client';
 import React, { useState, useEffect } from 'react';
-import { Camera, CheckCircle, X, FileText } from 'lucide-react';
-import { supabase } from '../../lib/supabaseClient'; // adjust path if necessary
+import { Camera, CheckCircle, X } from 'lucide-react';
+import { supabase } from '../../lib/supabaseClient';
 
 export default function EmployerProfileEditor({ employer, onUpdated }) {
   const [form, setForm] = useState({
@@ -13,9 +12,7 @@ export default function EmployerProfileEditor({ employer, onUpdated }) {
     bio: '',
   });
   const [avatarFile, setAvatarFile] = useState(null);
-  const [idCardFile, setIdCardFile] = useState(null);
   const [previewAvatar, setPreviewAvatar] = useState('');
-  const [previewIdCard, setPreviewIdCard] = useState('');
   const [loading, setLoading] = useState(false);
   const [statusMsg, setStatusMsg] = useState({ type: '', text: '' });
 
@@ -29,7 +26,6 @@ export default function EmployerProfileEditor({ employer, onUpdated }) {
       bio: employer.bio || '',
     });
     setPreviewAvatar(employer.avatar_url || '');
-    setPreviewIdCard(employer.id_card_url || '');
   }, [employer]);
 
   const handleChange = (e) => {
@@ -43,26 +39,23 @@ export default function EmployerProfileEditor({ employer, onUpdated }) {
     setPreviewAvatar(URL.createObjectURL(file));
   };
 
-  const handleIdCardSelect = (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
-    setIdCardFile(file);
-    setPreviewIdCard(URL.createObjectURL(file));
-  };
-
-  const uploadToStorage = async (file, folder, employerId) => {
+  // Upload file to Supabase storage under clients_asset/
+  const uploadToStorage = async (file, employerId) => {
     const ext = file.name.split('.').pop();
     const fileName = `${employerId}-${Date.now()}.${ext}`;
-    const filePath = `${folder}/${fileName}`;
+    const filePath = `clients_asset/${fileName}`;
 
     const { error: uploadErr } = await supabase.storage
-      .from('clients_asset')
-      .upload(filePath, file, { upsert: true });
+      .from('assets')
+      .upload(filePath, file, { cacheControl: '3600', upsert: false });
 
-    if (uploadErr) throw uploadErr;
+    if (uploadErr) {
+      console.error('Upload error:', uploadErr);
+      throw uploadErr;
+    }
 
     const { data } = supabase.storage
-      .from('clients_asset')
+      .from('assets')
       .getPublicUrl(filePath);
 
     return data.publicUrl;
@@ -71,43 +64,49 @@ export default function EmployerProfileEditor({ employer, onUpdated }) {
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!employer?.id) return;
+
     setLoading(true);
     setStatusMsg({ type: '', text: '' });
 
     try {
       let avatar_url = employer.avatar_url || null;
-      let id_card_url = employer.id_card_url || null;
 
+      // If user selected new avatar
       if (avatarFile) {
-        avatar_url = await uploadToStorage(avatarFile, 'avatars', employer.id);
+        try {
+          avatar_url = await uploadToStorage(avatarFile, employer.id);
+        } catch (uploadErr) {
+          setStatusMsg({ type: 'error', text: 'Avatar upload failed. Check storage policies.' });
+          setLoading(false);
+          return;
+        }
       }
 
-      if (idCardFile) {
-        id_card_url = await uploadToStorage(idCardFile, 'id-cards', employer.id);
+      // Build only fields that were filled (skip empty strings)
+      const updateData = {};
+      if (form.name.trim()) updateData.name = form.name;
+      if (form.company.trim()) updateData.company = form.company;
+      if (form.phone.trim()) updateData.phone = form.phone;
+      if (form.full_address.trim()) updateData.full_address = form.full_address;
+      if (form.bio.trim()) updateData.bio = form.bio;
+      if (avatarFile) updateData.avatar_url = avatar_url;
+
+      if (Object.keys(updateData).length === 0) {
+        setStatusMsg({ type: 'error', text: 'No changes to update.' });
+        setLoading(false);
+        return;
       }
 
-      const upsertObj = {
-        id: employer.id, // primary key / user id
-        name: form.name,
-        company: form.company,
-        phone: form.phone,
-        full_address: form.full_address,
-        bio: form.bio,
-        avatar_url,
-        id_card_url,
-        // note: email is not touched
-      };
-
-      // Upsert: insert if not exists, update otherwise
-      const { error: upsertError } = await supabase
+      const { error: updateError } = await supabase
         .from('employers')
-        .upsert(upsertObj, { onConflict: 'id' });
+        .update(updateData)
+        .eq('id', employer.id);
 
-      if (upsertError) {
-        console.error(upsertError);
+      if (updateError) {
+        console.error(updateError);
         setStatusMsg({ type: 'error', text: 'Failed to save profile.' });
       } else {
-        setStatusMsg({ type: 'success', text: 'Profile saved successfully!' });
+        setStatusMsg({ type: 'success', text: 'Profile updated successfully!' });
         onUpdated?.();
       }
     } catch (err) {
@@ -121,64 +120,36 @@ export default function EmployerProfileEditor({ employer, onUpdated }) {
   return (
     <div className="max-w-3xl mx-auto bg-white rounded-2xl shadow-lg p-6 space-y-6">
       <div className="flex flex-col sm:flex-row gap-6 items-start">
-        {/* Avatar & ID card */}
-        <div className="flex gap-6">
-          <div className="relative flex flex-col items-center">
-            <div className="w-24 h-24 rounded-full overflow-hidden bg-gray-100 border-2 border-gray-200">
-              {previewAvatar ? (
-                <img
-                  src={previewAvatar}
-                  alt="Avatar"
-                  className="w-full h-full object-cover"
-                />
-              ) : (
-                <div className="flex items-center justify-center h-full text-gray-400">
-                  <Camera size={28} />
-                </div>
-              )}
-            </div>
-            <label className="mt-2 flex items-center gap-1 bg-black text-white px-3 py-1 rounded-full cursor-pointer hover:bg-orange-600 transition text-xs">
-              Change Avatar
-              <input
-                type="file"
-                accept="image/*"
-                className="hidden"
-                onChange={handleAvatarSelect}
+        {/* Avatar */}
+        <div className="relative flex flex-col items-center">
+          <div className="w-24 h-24 rounded-full overflow-hidden bg-gray-100 border-2 border-gray-200">
+            {previewAvatar ? (
+              <img
+                src={previewAvatar}
+                alt="Avatar"
+                className="w-full h-full object-cover"
               />
-            </label>
+            ) : (
+              <div className="flex items-center justify-center h-full text-gray-400">
+                <Camera size={28} />
+              </div>
+            )}
           </div>
-
-          <div className="relative flex flex-col items-center">
-            <div className="w-24 h-24 rounded-md overflow-hidden bg-gray-100 border-2 border-gray-200 flex items-center justify-center">
-              {previewIdCard ? (
-                <img
-                  src={previewIdCard}
-                  alt="ID Card"
-                  className="w-full h-full object-cover"
-                />
-              ) : (
-                <div className="flex flex-col items-center justify-center text-gray-400">
-                  <FileText size={26} />
-                  <div className="text-xs mt-1">ID Card</div>
-                </div>
-              )}
-            </div>
-            <label className="mt-2 flex items-center gap-1 bg-black text-white px-3 py-1 rounded-full cursor-pointer hover:bg-orange-600 transition text-xs">
-              Upload ID
-              <input
-                type="file"
-                accept="image/*,application/pdf"
-                className="hidden"
-                onChange={handleIdCardSelect}
-              />
-            </label>
-          </div>
+          <label className="mt-2 flex items-center gap-1 bg-black text-white px-3 py-1 rounded-full cursor-pointer hover:bg-orange-600 transition text-xs">
+            Change Avatar
+            <input
+              type="file"
+              accept="image/png, image/jpeg"
+              className="hidden"
+              onChange={handleAvatarSelect}
+            />
+          </label>
         </div>
 
         <div className="flex-1">
           <h2 className="text-2xl font-bold mb-1">Profile Details</h2>
           <p className="text-sm text-gray-600">
-            Update your information (email and user ID are fixed).
+            Update only the fields you want to change.
           </p>
         </div>
       </div>
@@ -191,7 +162,6 @@ export default function EmployerProfileEditor({ employer, onUpdated }) {
             value={form.name}
             onChange={handleChange}
             placeholder="Your name"
-            required
             className="w-full border border-gray-200 rounded px-4 py-2 focus:outline-none focus:ring-2 focus:ring-orange-500"
           />
         </div>
@@ -203,7 +173,6 @@ export default function EmployerProfileEditor({ employer, onUpdated }) {
             value={form.company}
             onChange={handleChange}
             placeholder="Company or organization"
-            required
             className="w-full border border-gray-200 rounded px-4 py-2 focus:outline-none focus:ring-2 focus:ring-orange-500"
           />
         </div>
@@ -248,7 +217,7 @@ export default function EmployerProfileEditor({ employer, onUpdated }) {
             disabled={loading}
             className="flex items-center gap-2 bg-black text-white px-6 py-2 rounded-full hover:bg-orange-600 transition"
           >
-            {loading ? 'Saving...' : 'Save Profile'}
+            {loading ? 'Saving...' : 'Save Changes'}
             {!loading && <CheckCircle size={16} />}
           </button>
           {statusMsg.text && (

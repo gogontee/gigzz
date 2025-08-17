@@ -229,10 +229,10 @@ export default function DesktopHeader() {
           </div>
         ) : (
           <Link
-            href="/auth/signup"
+            href="/auth/login"
             className="bg-black border border-white px-4 py-1.5 rounded-full hover:ring-2 hover:ring-orange-500 hover:text-orange-500 transition flex items-center gap-1"
           >
-            <LogIn className="w-4 h-4" /> Sign Up
+            <LogIn className="w-4 h-4" /> Login
           </Link>
         )}
       </div>
