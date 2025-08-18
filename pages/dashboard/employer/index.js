@@ -15,8 +15,8 @@ import VideoCallModal from '../../../components/client/VideoCallModal';
 import EmployerProfileEditor from '../../../components/client/EmployerProfileEditor';
 import PromotionPanel from '../../../components/client/PromotionPanel';
 import JobListCard from '../../../components/client/JobListCard';
-import Verify from '../../../components/Verify';
 import PortfolioModal from '../../../components/portfolio/PortfolioModal';
+import Verify from '../../../components/Verify';
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL,
@@ -24,7 +24,8 @@ const supabase = createClient(
 );
 
 // Simple validation helper
-const isValidComponent = (Comp) => typeof Comp === 'function' || (typeof Comp === 'object' && Comp !== null);
+const isValidComponent = (Comp) =>
+  typeof Comp === 'function' || (typeof Comp === 'object' && Comp !== null);
 
 export default function EmployerDashboard() {
   const router = useRouter();
@@ -35,6 +36,14 @@ export default function EmployerDashboard() {
   const [activeSection, setActiveSection] = useState('overview');
   const [loading, setLoading] = useState(true);
   const [importErrors, setImportErrors] = useState([]);
+
+  const [selectedPortfolio, setSelectedPortfolio] = useState(null);
+  const [showPortfolioModal, setShowPortfolioModal] = useState(false);
+
+  const handleViewPortfolio = (p) => {
+    setSelectedPortfolio(p);
+    setShowPortfolioModal(true);
+  };
 
   // Validate imported components on mount
   useEffect(() => {
@@ -47,19 +56,10 @@ export default function EmployerDashboard() {
     if (!isValidComponent(VideoCallModal)) errs.push('VideoCallModal');
     if (!isValidComponent(EmployerProfileEditor)) errs.push('EmployerProfileEditor');
     if (!isValidComponent(PromotionPanel)) errs.push('PromotionPanel');
-    if (!isValidComponent(Verify)) errs.push('Verify');
     if (!isValidComponent(JobListCard)) errs.push('JobListCard');
+    if (!isValidComponent(Verify)) errs.push('Verify');
     setImportErrors(errs);
   }, []);
-
-  // Add these inside EmployerDashboard, alongside other useState declarations:
-const [selectedPortfolio, setSelectedPortfolio] = useState(null);
-const [showPortfolioModal, setShowPortfolioModal] = useState(false);
-
-const handleViewPortfolio = (p) => {
-  setSelectedPortfolio(p);
-  setShowPortfolioModal(true);
-};
 
   const fetchInitial = useCallback(async () => {
     setLoading(true);
@@ -150,19 +150,22 @@ const handleViewPortfolio = (p) => {
         {/* header */}
         <div className="flex items-center justify-between p-6 border-b border-gray-200 lg:pt-20">
           <div className="flex gap-4 items-center">
-            <h1 className="text-xl lg:text-2xl font-bold">
+            <h1 className="text-base lg:text-2xl font-bold">
   Welcome {employer?.name || 'Client'}
 </h1>
-
           </div>
           <div className="flex gap-4">
             <WalletSummary wallet={wallet} />
             <button
-              onClick={() => setActiveSection('post')}
-              className="bg-black text-white px-4 py-2 rounded-full hover:bg-orange-600 transition"
-            >
-              Post Job
-            </button>
+  onClick={() => setActiveSection('post')}
+  className="bg-black text-white 
+             px-3 py-1.5 text-sm rounded-lg 
+             hover:bg-orange-600 transition
+             lg:px-4 lg:py-2 lg:text-base lg:rounded-full"
+>
+  Post Job
+</button>
+
           </div>
         </div>
 
@@ -184,20 +187,20 @@ const handleViewPortfolio = (p) => {
                   )}
                 </div>
                 <div className="rounded-xl bg-white shadow p-6">
-  <h2 className="text-xl font-semibold mb-2">Featured Creatives</h2>
-  <PortfolioBrowser portfolios={portfolios} onView={handleViewPortfolio} />
-</div>
-{selectedPortfolio && (
-  <PortfolioModal
-    open={showPortfolioModal}
-    setOpen={setShowPortfolioModal}
-    portfolio={selectedPortfolio}
-    readOnly={true} // if you implement a prop to disable edits
-    onSuccess={() => {
-      setShowPortfolioModal(false);
-    }}
-  />
-)}
+                  <h2 className="text-xl font-semibold mb-2">Featured Creatives</h2>
+                  <PortfolioBrowser portfolios={portfolios} onView={handleViewPortfolio} />
+                </div>
+                {selectedPortfolio && (
+                  <PortfolioModal
+                    open={showPortfolioModal}
+                    setOpen={setShowPortfolioModal}
+                    portfolio={selectedPortfolio}
+                    readOnly={true}
+                    onSuccess={() => {
+                      setShowPortfolioModal(false);
+                    }}
+                  />
+                )}
               </div>
               <div className="space-y-6">
                 <PromotionPanel jobs={jobs} wallet={wallet} refresh={fetchInitial} />
@@ -237,10 +240,12 @@ const handleViewPortfolio = (p) => {
           {activeSection === 'profile' && employer && (
             <EmployerProfileEditor employer={employer} onUpdated={fetchInitial} />
           )}
-          
           {activeSection === 'verify' && employer && (
-            <Verify employer={employer} onUpdated={fetchInitial} />
-          )}
+  <div>
+    <h2 className="text-xl font-semibold mb-4">Verify Your Identity</h2>
+    <Verify employer={employer} />
+  </div>
+)}
 
           {activeSection === 'chats' && employer && <ChatSidebar employer={employer} />}
           {activeSection === 'calls' && <VideoCallModal />}

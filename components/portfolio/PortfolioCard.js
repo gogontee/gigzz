@@ -1,18 +1,12 @@
-// components/portfolio/PortfolioCard.js
 'use client';
 import React from 'react';
-import { ExternalLink, Edit3, Trash2, Eye } from 'lucide-react';
+import { Eye, ExternalLink } from 'lucide-react';
 
-export default function PortfolioCard({
-  portfolio,
-  onEdit,
-  onDelete,
-  onView,
-  isOwner = false,
-}) {
+export default function PortfolioCard({ portfolio, onView }) {
   return (
     <div
-      className="group bg-white border border-gray-100 rounded-2xl overflow-hidden shadow-sm hover:shadow-lg transition relative"
+      className="group bg-white border border-gray-100 rounded-2xl overflow-hidden shadow-sm hover:shadow-lg transition relative cursor-pointer"
+      onClick={() => onView && onView(portfolio.id)}
     >
       {/* Cover */}
       <div className="w-full h-40 bg-gray-100 overflow-hidden">
@@ -36,47 +30,17 @@ export default function PortfolioCard({
             <h2 className="text-lg font-semibold mb-1 truncate">{portfolio.title}</h2>
             <p className="text-sm text-gray-600 line-clamp-2">{portfolio.description}</p>
           </div>
-          {isOwner && (
-            <div className="flex flex-col items-end gap-1 ml-2">
-              <div className="flex gap-1">
-                {onView && (
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onView(portfolio);
-                    }}
-                    className="flex items-center gap-1 px-2 py-1 text-xs bg-gray-100 rounded-md hover:bg-gray-200"
-                    title="View Portfolio"
-                  >
-                    <Eye size={14} /> View
-                  </button>
-                )}
-                {onEdit && (
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onEdit(portfolio);
-                    }}
-                    className="flex items-center gap-1 px-2 py-1 text-xs bg-orange-100 rounded-md hover:bg-orange-200"
-                    title="Edit Portfolio"
-                  >
-                    <Edit3 size={14} /> Edit
-                  </button>
-                )}
-              </div>
-              {onDelete && (
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onDelete(portfolio.id);
-                  }}
-                  className="flex items-center gap-1 px-2 py-1 text-xs text-red-600 hover:text-red-800"
-                  title="Delete Portfolio"
-                >
-                  <Trash2 size={14} /> Delete
-                </button>
-              )}
-            </div>
+          {onView && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                onView(portfolio.id);
+              }}
+              className="text-xs flex items-center gap-1 border px-2 py-1 rounded-md hover:bg-gray-50"
+              title="View Details"
+            >
+              <Eye size={14} /> View
+            </button>
           )}
         </div>
 
@@ -125,18 +89,6 @@ export default function PortfolioCard({
               </a>
             )}
           </div>
-          {onView && (
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                onView(portfolio);
-              }}
-              className="text-xs flex items-center gap-1 border px-2 py-1 rounded-md hover:bg-gray-50"
-              title="View Details"
-            >
-              <Eye size={14} /> Details
-            </button>
-          )}
         </div>
       </div>
 

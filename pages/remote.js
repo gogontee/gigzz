@@ -130,17 +130,22 @@ export default function Remote() {
                 transition={{ duration: 0.3 }}
               >
                 <JobCard
-                  job={{
-                    id: job.id,
-                    title: job.title,
-                    location: job.location,
-                    type: job.type,
-                    pay: `${job.price_range} / ${job.price_frequency}`,
-                    tags: job.tags || [],
-                    description: job.description || '',
-                  }}
-                  viewMode={viewMode}
-                />
+  job={{
+    id: job.id,
+    title: job.title,
+    location: job.location,
+    type: job.type,
+    min_price: job.min_price,       // 👈 pass min_price
+    max_price: job.max_price,       // 👈 pass max_price
+    price_frequency: job.price_frequency, // 👈 pass frequency
+    tags: job.tags || [],
+    description: job.description || '',
+    avatar_url: job.avatar_url,
+  }}
+  viewMode={viewMode}
+/>
+
+
               </motion.div>
             ))}
           </AnimatePresence>

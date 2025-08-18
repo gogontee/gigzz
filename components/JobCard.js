@@ -13,6 +13,22 @@ export default function JobCard({ job, viewMode }) {
     router.push(`/job/${job.id}`);
   };
 
+  const avatarUrl =
+    job?.avatar_url && job.avatar_url.trim() !== ""
+      ? job.avatar_url
+      : "https://xatxjdsppcjgplmrtjcs.supabase.co/storage/v1/object/public/avatars/icon.png";
+
+  const formattedPay =
+    job.min_price && job.max_price
+      ? `₦${Number(job.min_price).toLocaleString()} - ₦${Number(
+          job.max_price
+        ).toLocaleString()}`
+      : job.min_price
+      ? `₦${Number(job.min_price).toLocaleString()}`
+      : job.max_price
+      ? `₦${Number(job.max_price).toLocaleString()}`
+      : "N/A";
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 30 }}
@@ -24,19 +40,31 @@ export default function JobCard({ job, viewMode }) {
         ${viewMode === "list" ? "flex flex-col" : ""}
         hover:border-black hover:ring-1 hover:ring-black hover:shadow-md`}
     >
-      {/* Header */}
-      <div className="flex justify-between items-center mb-1">
-        <h2 className="font-semibold text-lg">{job.title}</h2>
-        <span className="text-xs text-orange-500 font-medium">{job.pay}</span>
-      </div>
-
-      {/* Poster Avatar */}
-      <div className="flex items-center gap-2 mb-1">
+      {/* Mobile Layout: avatar at top, title, pay */}
+      <div className="flex flex-col items-start md:flex-row md:justify-between md:items-center mb-2">
+        {/* Avatar */}
         <img
-          src={job.poster_avatar || "https://i.pravatar.cc/32?img=5"}
+          src={avatarUrl}
           alt="Poster Avatar"
-          className="w-7 h-7 rounded-full object-cover"
+          className="w-12 h-12 rounded-full object-cover mb-3 md:mb-0"
         />
+
+        <div className="flex flex-col md:flex-row md:items-center md:ml-3 w-full md:w-auto">
+          {/* Job Title */}
+          <h2 className="font-semibold text-lg">{job.title}</h2>
+
+          {/* Pay */}
+          <div className="flex flex-col items-start md:items-end md:ml-4 mt-1 md:mt-0">
+            <span className="text-sm text-orange-500 font-medium">
+              {formattedPay}
+            </span>
+            {job.price_frequency && (
+              <span className="text-xs text-gray-400">
+                {job.price_frequency}
+              </span>
+            )}
+          </div>
+        </div>
       </div>
 
       {/* Meta Info */}
