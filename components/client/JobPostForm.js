@@ -18,7 +18,8 @@ export default function JobPostForm({ employerId, onPosted }) {
     title: '',
     category: JOB_CATEGORIES[0],
     type: JOB_TYPES[0],
-    price_range: '',
+    min_price: '',
+    max_price: '',
     price_frequency: PRICE_FREQUENCIES[0],
     application_deadline: '',
     description: '',
@@ -28,15 +29,6 @@ export default function JobPostForm({ employerId, onPosted }) {
     promotion_tag: '',
     tags: '',
   });
-
-  const formatPriceRange = (value) => {
-  const parts = value.split('-').map(p => p.trim().replace(/[₦#,]/g, ''));
-  if (parts.length === 2 && !isNaN(parts[0]) && !isNaN(parts[1])) {
-    const [min, max] = parts.map(Number);
-    return `₦${min.toLocaleString()} - ₦${max.toLocaleString()}`;
-  }
-  return value;
-};
 
   const [loading, setLoading] = useState(false);
   const [status, setStatus] = useState({ type: '', text: '' });
@@ -57,8 +49,16 @@ export default function JobPostForm({ employerId, onPosted }) {
       return;
     }
 
-    if (!form.title.trim() || !form.price_range.trim()) {
+    if (!form.title.trim() || !form.min_price || !form.max_price) {
       setStatus({ type: 'error', text: 'Job title and price range are required.' });
+      return;
+    }
+
+    // ✅ Validate numeric prices
+    const minPrice = Number(form.min_price);
+    const maxPrice = Number(form.max_price);
+    if (isNaN(minPrice) || isNaN(maxPrice) || minPrice <= 0 || maxPrice <= 0) {
+      setStatus({ type: 'error', text: 'Price range must be valid numbers.' });
       return;
     }
 
@@ -66,12 +66,29 @@ export default function JobPostForm({ employerId, onPosted }) {
     setStatus({ type: '', text: '' });
 
     try {
+      // ✅ Fetch employer avatar
+      const { data: employer, error: empErr } = await supabase
+        .from('employers')
+        .select('avatar_url')
+        .eq('id', employerId)
+        .single();
+
+      if (empErr) throw empErr;
+
+      if (!employer?.avatar_url) {
+        setStatus({ type: 'error', text: 'Please update your profile and add a profile picture before posting a job.' });
+        alert('Please update your profile and add a profile picture before posting a job.');
+        setLoading(false);
+        return;
+      }
+
       const insertObj = {
         employer_id: employerId,
         title: form.title.trim(),
         category: form.category,
         type: form.type,
-        price_range: form.price_range.trim(),
+        min_price: minPrice,
+        max_price: maxPrice,
         price_frequency: form.price_frequency,
         application_deadline: form.application_deadline
           ? dayjs(form.application_deadline).format('YYYY-MM-DD')
@@ -84,6 +101,7 @@ export default function JobPostForm({ employerId, onPosted }) {
         tags: form.tags
           ? form.tags.split(',').map((t) => t.trim()).filter((t) => t.length > 0)
           : [],
+        avatar_url: employer.avatar_url, // ✅ store employer avatar into jobs table
       };
 
       const { error } = await supabase.from('jobs').insert([insertObj]);
@@ -97,7 +115,8 @@ export default function JobPostForm({ employerId, onPosted }) {
           title: '',
           category: JOB_CATEGORIES[0],
           type: JOB_TYPES[0],
-          price_range: '',
+          min_price: '',
+          max_price: '',
           price_frequency: PRICE_FREQUENCIES[0],
           application_deadline: '',
           description: '',
@@ -115,7 +134,6 @@ export default function JobPostForm({ employerId, onPosted }) {
     } finally {
       setLoading(false);
     }
-
   };
 
   return (
@@ -176,38 +194,46 @@ export default function JobPostForm({ employerId, onPosted }) {
               ))}
             </select>
           </div>
-          <div>
-            <label className="text-sm font-medium mb-1">Price Range (₦)</label>
-            <input
-  name="price_range"
-  value={form.price_range}
-  onChange={handleChange}
-  onBlur={(e) =>
-    setForm((f) => ({
-      ...f,
-      price_range: formatPriceRange(e.target.value),
-    }))
-  }
-  placeholder="₦50,000 - ₦150,000"
-  className="w-full border border-gray-300 rounded px-4 py-2"
-/>
 
+          {/* ✅ Numeric Price Inputs */}
+          <div>
+            <label className="text-sm font-medium mb-1">Min Price (₦)</label>
+            <input
+              type="number"
+              name="min_price"
+              value={form.min_price}
+              onChange={handleChange}
+              placeholder="50000"
+              className="w-full border border-gray-300 rounded px-4 py-2"
+            />
           </div>
           <div>
-            <label className="text-sm font-medium mb-1">Price Frequency</label>
-            <select
-              name="price_frequency"
-              value={form.price_frequency}
+            <label className="text-sm font-medium mb-1">Max Price (₦)</label>
+            <input
+              type="number"
+              name="max_price"
+              value={form.max_price}
               onChange={handleChange}
+              placeholder="150000"
               className="w-full border border-gray-300 rounded px-4 py-2"
-            >
-              {PRICE_FREQUENCIES.map((freq) => (
-                <option key={freq} value={freq}>
-                  {freq}
-                </option>
-              ))}
-            </select>
+            />
           </div>
+        </div>
+
+        <div>
+          <label className="text-sm font-medium mb-1">Price Frequency</label>
+          <select
+            name="price_frequency"
+            value={form.price_frequency}
+            onChange={handleChange}
+            className="w-full border border-gray-300 rounded px-4 py-2"
+          >
+            {PRICE_FREQUENCIES.map((freq) => (
+              <option key={freq} value={freq}>
+                {freq}
+              </option>
+            ))}
+          </select>
         </div>
 
         {/* Row 3 */}

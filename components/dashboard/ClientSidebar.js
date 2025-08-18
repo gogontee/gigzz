@@ -1,5 +1,5 @@
 'use client';
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { createClient } from '@supabase/supabase-js';
 import {
   Briefcase,
@@ -13,7 +13,7 @@ import {
   LogOut,
   ChevronLeft,
   ChevronRight,
-  ShieldCheck // ✅ added
+  ShieldCheck
 } from 'lucide-react';
 
 const supabase = createClient(
@@ -30,89 +30,33 @@ const items = [
   { key: 'chats', label: 'Chats', icon: <MessageCircle size={18} /> },
   { key: 'calls', label: 'Video Calls', icon: <Video size={18} /> },
   { key: 'profile', label: 'Profile', icon: <Settings size={18} /> },
-  { key: 'verify', label: 'Verification', icon: <ShieldCheck size={18} /> },
+  { key: 'verify', label: 'Verification', icon: <ShieldCheck size={18} />, path: '/verification' },
 ];
 
 export default function ClientSidebar({ active, onChange, employer }) {
   const [expanded, setExpanded] = useState(false);
-  const idleTimer = useRef(null);
   const containerRef = useRef(null);
-  const fileInputRef = useRef(null);
+
+  // 👤 Fetch avatar from employers.avatar_url
   const [avatarUrl, setAvatarUrl] = useState(null);
 
-  const resetIdle = useCallback(() => {
-    if (idleTimer.current) clearTimeout(idleTimer.current);
-    idleTimer.current = setTimeout(() => {
-      setExpanded(false);
-    }, 10000);
-  }, []);
-
   useEffect(() => {
-    if (expanded) resetIdle();
-    return () => {
-      if (idleTimer.current) clearTimeout(idleTimer.current);
-    };
-  }, [expanded, resetIdle]);
-
-  useEffect(() => {
-    if (employer?.id) fetchAvatar();
-  }, [employer?.id]);
-
-  const fetchAvatar = async () => {
-    const extensions = ['jpg', 'jpeg', 'png', 'webp'];
-    for (const ext of extensions) {
-      const path = `clients_profile/${employer.id}.${ext}`;
-      const { data } = supabase.storage
-        .from('profilephoto')
-        .getPublicUrl(path);
-
-      try {
-        const res = await fetch(data.publicUrl);
-        if (res.ok) {
-          setAvatarUrl(`${data.publicUrl}?t=${Date.now()}`);
-          return;
-        }
-      } catch (e) {
-        // continue to next
-      }
-    }
-    setAvatarUrl(null);
-  };
-
-  const handleAvatarChange = async (e) => {
-    const file = e.target.files[0];
-    if (!file || !employer?.id) return;
-
-    const ext = file.name.split('.').pop();
-    const path = `clients_profile/${employer.id}.${ext}`;
-
-    // remove all existing versions (if any)
-    const oldPaths = ['jpg', 'jpeg', 'png', 'webp'].map(
-      (x) => `clients_profile/${employer.id}.${x}`
-    );
-    await supabase.storage.from('profilephoto').remove(oldPaths);
-
-    const { error } = await supabase.storage
-      .from('profilephoto')
-      .upload(path, file, {
-        cacheControl: '3600',
-        contentType: file.type,
-      });
-
-    if (error) {
-      console.error('Upload error:', error.message);
-      alert('Failed to upload profile photo.');
+    if (employer?.avatar_url) {
+      setAvatarUrl(employer.avatar_url);
     } else {
-      fetchAvatar();
+      setAvatarUrl(null);
     }
-  };
+  }, [employer?.avatar_url]);
 
-  const handleInteraction = () => {
-    if (!expanded) return;
-    resetIdle();
-  };
+  // 🖱 Hover handlers (desktop)
+  const handleMouseEnter = () => setExpanded(true);
+  const handleMouseLeave = () => setExpanded(false);
 
-  const toggle = () => setExpanded((e) => !e);
+  // 📱 Mobile: fold after button click
+  const handleItemClick = (key) => {
+    onChange(key);
+    setExpanded(false); // fold after click
+  };
 
   return (
     <aside
@@ -120,13 +64,13 @@ export default function ClientSidebar({ active, onChange, employer }) {
       className={`relative flex flex-col bg-black text-white transition-all duration-300 shadow-lg ${
         expanded ? 'w-64' : 'w-16'
       } min-h-screen`}
-      onMouseMove={handleInteraction}
-      onClick={handleInteraction}
+      onMouseEnter={handleMouseEnter}
+      onMouseLeave={handleMouseLeave}
     >
-      {/* Toggle Arrow */}
+      {/* Toggle (optional) */}
       <div className="absolute top-4 right-[-12px] z-10 flex items-center">
         <button
-          onClick={toggle}
+          onClick={() => setExpanded((e) => !e)}
           aria-label="Toggle sidebar"
           className="bg-white/10 p-1 rounded-full hover:bg-white/20 transition"
         >
@@ -159,11 +103,7 @@ export default function ClientSidebar({ active, onChange, employer }) {
           return (
             <button
               key={it.key}
-              onClick={() => {
-                onChange(it.key);
-                setExpanded(true);
-              }}
-              onMouseEnter={handleInteraction}
+              onClick={() => handleItemClick(it.key)}
               className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-left transition ${
                 isActive ? 'bg-orange-500 text-white' : 'text-white'
               } hover:bg-orange-600 focus:outline-none`}
@@ -188,26 +128,13 @@ export default function ClientSidebar({ active, onChange, employer }) {
       <div className="px-3 py-4 border-t border-gray-800">
         {employer && (
           <div className="flex items-center gap-3 mb-3">
-            {/* Avatar */}
-            <div
-              className="relative group"
-              onClick={() => fileInputRef.current?.click()}
-            >
+            {/* Avatar from employers.avatar_url */}
+            <div className="relative group">
               <img
                 src={avatarUrl || '/placeholder-user.png'}
                 alt="Profile"
-                className="w-9 h-9 rounded-full object-cover border-2 border-white cursor-pointer"
+                className="w-9 h-9 rounded-full object-cover border-2 border-white"
               />
-              <input
-                type="file"
-                accept="image/*"
-                className="hidden"
-                ref={fileInputRef}
-                onChange={handleAvatarChange}
-              />
-              <div className="absolute inset-0 rounded-full bg-black/50 opacity-0 group-hover:opacity-100 text-xs flex items-center justify-center text-white">
-                Edit
-              </div>
             </div>
 
             {expanded && (

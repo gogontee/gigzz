@@ -19,7 +19,7 @@ export default function OnsiteJobs() {
       setLoading(true);
       const { data, error } = await supabase
         .from("jobs")
-        .select("*")
+        .select("*") // includes price_range
         .eq("category", "Onsite")
         .order("created_at", { ascending: false })
         .range(offset, offset + limit - 1);
@@ -56,7 +56,8 @@ export default function OnsiteJobs() {
           job.title?.toLowerCase().includes(lower) ||
           job.company?.toLowerCase().includes(lower) ||
           job.location?.toLowerCase().includes(lower) ||
-          job.description?.toLowerCase().includes(lower)
+          job.description?.toLowerCase().includes(lower) ||
+          job.price_range?.toLowerCase().includes(lower) // ✅ allow search by price range
       );
       setFilteredJobs(filtered);
     }
