@@ -2,7 +2,7 @@ import Image from 'next/image';
 
 const MobileHeader = () => {
   return (
-    <div className="md:hidden flex justify-center items-center">
+    <div className="md:hidden flex justify-center items-center bg-transparent">
       <Image
         src="https://xatxjdsppcjgplmrtjcs.supabase.co/storage/v1/object/public/avatars//gigzzblack.png"
         alt="Gigzz Logo"
