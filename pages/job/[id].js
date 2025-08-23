@@ -18,6 +18,7 @@ export default function JobDetailPage() {
 
   const [job, setJob] = useState(null);
   const [poster, setPoster] = useState(null);
+  const [verifications, setVerifications] = useState(null);
   const [similarJobs, setSimilarJobs] = useState([]);
   const [isMobile, setIsMobile] = useState(false);
   const [showModal, setShowModal] = useState(false);
@@ -71,6 +72,14 @@ export default function JobDetailPage() {
 
         setPoster(posterData);
 
+        const { data: verif } = await supabase
+          .from('verifications')
+          .select('*')
+          .eq('user_id', posterData?.id)
+          .single();
+
+        setVerifications(verif);
+
         const { data: similar } = await supabase
           .from('jobs')
           .select('*')
@@ -108,22 +117,46 @@ export default function JobDetailPage() {
       .eq('id', user.id);
 
     setTokenBalance((prev) => prev - 1);
+
     const { error: appError } = await supabase
-  .from('applications')
-  .insert([{ applicant_id: user.id, job_id: job.id }]);
+      .from('applications')
+      .insert([{ applicant_id: user.id, job_id: job.id }]);
 
-if (appError) {
-  setModalMessage('❌ Failed to record your application. Please try again.');
-  setShowModal(true);
-  return;
-}
+    if (appError) {
+      setModalMessage('❌ Failed to record your application. Please try again.');
+      setShowModal(true);
+      return;
+    }
 
-setModalMessage('🎉 Application successful! 1 token has been deducted from your wallet. Good luck as you await a response from the client.');
-
+    setModalMessage(
+      '🎉 Application successful! 1 token has been deducted from your wallet. Good luck as you await a response from the client.'
+    );
     setShowModal(true);
   };
 
   if (!job) return <div className="p-4">Loading job details...</div>;
+
+  const formattedPay =
+    job.min_price && job.max_price
+      ? `₦${Number(job.min_price).toLocaleString()} - ₦${Number(job.max_price).toLocaleString()}`
+      : job.min_price
+      ? `₦${Number(job.min_price).toLocaleString()}`
+      : job.max_price
+      ? `₦${Number(job.max_price).toLocaleString()}`
+      : 'N/A';
+
+  const isVerified = verifications?.approved?.toLowerCase() === 'verified';
+  const getVerificationDot = () => {
+    if (!verifications?.approved) return 'black';
+    switch (verifications.approved.toLowerCase()) {
+      case 'pending':
+        return 'orange';
+      case 'unverified':
+      case 'unverify':
+      default:
+        return 'black';
+    }
+  };
 
   return (
     <div className="bg-white text-black min-h-screen">
@@ -137,19 +170,27 @@ setModalMessage('🎉 Application successful! 1 token has been deducted from you
         >
           {/* Poster Avatar */}
           <div className="flex items-center justify-between mb-6">
-            <div className="flex items-center gap-3">
-              <img
-                src={poster?.avatar_url || 'https://i.pravatar.cc/60?img=5'}
-                alt="Poster Avatar"
-                className="w-12 h-12 rounded-full object-cover"
-              />
-              <p className="text-sm text-gray-500">
-                {poster?.verified ? (
-                  <span className="text-green-600">✔ Verified Employer</span>
-                ) : (
-                  <span className="text-red-600">✖ Unverified Employer</span>
+            <div className="flex flex-col items-center gap-2 relative">
+              <div className="relative">
+                <img
+                  src={poster?.avatar_url || 'https://i.pravatar.cc/60?img=5'}
+                  alt="Poster Avatar"
+                  className="w-12 h-12 rounded-full object-cover"
+                />
+                {!isVerified && (
+                  <span
+                    className={`absolute w-3 h-3 rounded-full border-2 border-white`}
+                    style={{
+                      backgroundColor: getVerificationDot(),
+                      bottom: 0,
+                      right: 0
+                    }}
+                  ></span>
                 )}
-              </p>
+              </div>
+              {isVerified && (
+                <p className="text-[10px] text-green-600">✔ Verified</p>
+              )}
             </div>
           </div>
 
@@ -163,10 +204,13 @@ setModalMessage('🎉 Application successful! 1 token has been deducted from you
             </span>
           </div>
 
-          {/* Pay & Deadline */}
-          <p className="text-lg font-semibold mb-1">
-            ₦{job.price_range} ({job.price_frequency})
-          </p>
+          {/* Pay & Price Frequency */}
+          <p className="text-lg font-semibold mb-1">{formattedPay}</p>
+          {job.price_frequency && (
+            <p className="text-sm text-gray-600 mb-4">{job.price_frequency}</p>
+          )}
+
+          {/* Deadline */}
           <p className="text-sm text-gray-600 mb-4">
             Deadline: {job.application_deadline}
           </p>

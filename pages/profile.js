@@ -3,7 +3,6 @@
 import { useEffect, useState, useCallback } from 'react';
 import { createClient } from '@supabase/supabase-js';
 import { motion } from 'framer-motion';
-import PortfolioCard from '../components/portfolio/PortfolioCard';
 import PortfolioModal from '../components/portfolio/PortfolioModal';
 
 const supabase = createClient(
@@ -16,11 +15,11 @@ export default function ProfilePage() {
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  const [portfolios, setPortfolios] = useState([]);
+  const [projects, setProjects] = useState([]);
   const [showPortfolioModal, setShowPortfolioModal] = useState(false);
   const [selectedPortfolio, setSelectedPortfolio] = useState(null);
 
-  const loadProfileAndPortfolios = useCallback(async () => {
+  const loadProfileAndProjects = useCallback(async () => {
     setLoading(true);
 
     const {
@@ -34,8 +33,7 @@ export default function ProfilePage() {
     }
     setUser(authUser);
 
-    // Get role
-    const { data: userMeta, error: roleError } = await supabase
+    const { data: userMeta } = await supabase
       .from('users')
       .select('role')
       .eq('id', authUser.id)
@@ -44,35 +42,34 @@ export default function ProfilePage() {
 
     const table = role === 'employer' ? 'employers' : 'applicants';
 
-    const { data: profileData, error: profileError } = await supabase
+    const { data: profileData } = await supabase
       .from(table)
       .select('*')
       .eq('id', authUser.id)
       .single();
 
-    if (!profileError) {
+    if (profileData) {
       setProfile({ ...profileData, role });
     }
 
-    // Fetch portfolios owned by this user
-    const { data: portfolioData, error: portfolioError } = await supabase
-      .from('portfolios')
+    const { data: projectsData, error: projectsError } = await supabase
+      .from('projects')
       .select('*')
       .eq('user_id', authUser.id)
       .order('created_at', { ascending: false });
 
-    if (!portfolioError) {
-      setPortfolios(portfolioData || []);
+    if (!projectsError) {
+      setProjects(projectsData || []);
     } else {
-      console.error('Error fetching portfolios:', portfolioError);
+      console.error('Error fetching projects:', projectsError);
     }
 
     setLoading(false);
   }, []);
 
   useEffect(() => {
-    loadProfileAndPortfolios();
-  }, [loadProfileAndPortfolios]);
+    loadProfileAndProjects();
+  }, [loadProfileAndProjects]);
 
   if (loading) {
     return (
@@ -88,8 +85,8 @@ export default function ProfilePage() {
     );
   }
 
-  const handleViewPortfolio = (p) => {
-    setSelectedPortfolio(p);
+  const handleViewPortfolio = (project) => {
+    setSelectedPortfolio(project);
     setShowPortfolioModal(true);
   };
 
@@ -133,25 +130,27 @@ export default function ProfilePage() {
           </div>
         </div>
 
-        {/* Portfolios section */}
+        {/* Projects section */}
         <div className="mt-10">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-xl font-semibold">Portfolios</h2>
-          </div>
+          <h2 className="text-xl font-semibold mb-4">Projects</h2>
 
-          {portfolios.length === 0 ? (
+          {projects.length === 0 ? (
             <div className="flex flex-col items-center justify-center border border-dashed border-gray-300 rounded-2xl p-8 text-center">
-              <p className="text-gray-600 mb-2">No portfolios to show.</p>
+              <p className="text-gray-600 mb-2">No projects to show.</p>
             </div>
           ) : (
-            <div className="grid grid-cols-2 gap-4 sm:gap-6">
-              {portfolios.map((p) => (
-                <PortfolioCard
-                  key={p.id}
-                  portfolio={p}
-                  isOwner={false}
-                  onView={(portfolio) => handleViewPortfolio(portfolio)}
-                />
+            <div className="space-y-4">
+              {projects.map((project) => (
+                <button
+                  key={project.id}
+                  onClick={() => handleViewPortfolio(project)}
+                  className="w-full text-left p-4 rounded-xl border bg-white hover:shadow-lg transition"
+                >
+                  <h3 className="font-semibold">{project.title}</h3>
+                  <p className="text-sm text-gray-600 line-clamp-2">
+                    {project.details}
+                  </p>
+                </button>
               ))}
             </div>
           )}

@@ -35,9 +35,6 @@ const items = [
 
 export default function ClientSidebar({ active, onChange, employer }) {
   const [expanded, setExpanded] = useState(false);
-  const containerRef = useRef(null);
-
-  // 👤 Fetch avatar from employers.avatar_url
   const [avatarUrl, setAvatarUrl] = useState(null);
 
   useEffect(() => {
@@ -48,11 +45,9 @@ export default function ClientSidebar({ active, onChange, employer }) {
     }
   }, [employer?.avatar_url]);
 
-  // 🖱 Hover handlers (desktop)
   const handleMouseEnter = () => setExpanded(true);
   const handleMouseLeave = () => setExpanded(false);
 
-  // 📱 Mobile: fold after button click
   const handleItemClick = (key) => {
     onChange(key);
     setExpanded(false); // fold after click
@@ -60,15 +55,14 @@ export default function ClientSidebar({ active, onChange, employer }) {
 
   return (
     <aside
-      ref={containerRef}
       className={`relative flex flex-col bg-black text-white transition-all duration-300 shadow-lg ${
         expanded ? 'w-64' : 'w-16'
       } min-h-screen`}
       onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}
     >
-      {/* Toggle (optional) */}
-      <div className="absolute top-4 right-[-12px] z-10 flex items-center">
+      {/* Toggle Button */}
+      <div className="absolute top-4 right-[-12px] flex items-center z-10">
         <button
           onClick={() => setExpanded((e) => !e)}
           aria-label="Toggle sidebar"
@@ -83,21 +77,16 @@ export default function ClientSidebar({ active, onChange, employer }) {
       </div>
 
       {/* Header */}
-      <div className="px-4 py-5 border-b border-gray-800 flex items-center gap-3">
-        <div
-          className={`text-xl font-bold transition-all ${
-            expanded ? '' : 'opacity-0 w-0'
-          }`}
-        >
+      <div className="px-4 py-5 border-b border-gray-800 flex items-center gap-3 sticky top-0 bg-black z-0">
+        <div className={`text-xl font-bold transition-all ${expanded ? '' : 'opacity-0 w-0'}`}>
           Gigzz
         </div>
-        {expanded && (
-          <div className="flex-1 text-sm opacity-80">Client Dashboard</div>
-        )}
+        {expanded && <div className="flex-1 text-sm opacity-80">Client Dashboard</div>}
       </div>
 
-      {/* Nav Items */}
-      <div className="flex-1 overflow-y-auto px-1 py-4 space-y-1">
+      {/* Nav + Footer wrapper */}
+      <div className="flex flex-col px-1 py-4 space-y-1 sticky top-0">
+        {/* Nav Items */}
         {items.map((it) => {
           const isActive = active === it.key;
           return (
@@ -110,52 +99,45 @@ export default function ClientSidebar({ active, onChange, employer }) {
             >
               <div className="flex-shrink-0">{it.icon}</div>
               <div
-                className={`flex-1 text-sm font-medium truncate ${
-                  !expanded ? 'hidden' : ''
-                }`}
+                className={`flex-1 text-sm font-medium truncate ${!expanded ? 'hidden' : ''}`}
               >
                 {it.label}
               </div>
-              {isActive && expanded && (
-                <div className="w-2 h-2 bg-orange-300 rounded-full ml-1" />
-              )}
+              {isActive && expanded && <div className="w-2 h-2 bg-orange-300 rounded-full ml-1" />}
             </button>
           );
         })}
-      </div>
 
-      {/* Footer */}
-      <div className="px-3 py-4 border-t border-gray-800">
-        {employer && (
-          <div className="flex items-center gap-3 mb-3">
-            {/* Avatar from employers.avatar_url */}
-            <div className="relative group">
-              <img
-                src={avatarUrl || '/placeholder-user.png'}
-                alt="Profile"
-                className="w-9 h-9 rounded-full object-cover border-2 border-white"
-              />
-            </div>
-
-            {expanded && (
-              <div className="flex flex-col text-xs">
-                <div className="font-semibold">{employer.name || 'Client'}</div>
-                <div className="opacity-70">Employer</div>
+        {/* Footer: avatar + logout */}
+        <div className="mt-4 px-3 py-4 border-t border-gray-800 flex flex-col gap-3">
+          {employer && (
+            <div className="flex items-center gap-3">
+              <div className="relative">
+                <img
+                  src={avatarUrl || '/placeholder-user.png'}
+                  alt="Profile"
+                  className="w-9 h-9 rounded-full object-cover border-2 border-white"
+                />
               </div>
-            )}
-          </div>
-        )}
+              {expanded && (
+                <div className="flex flex-col text-xs">
+                  <div className="font-semibold">{employer.name || 'Client'}</div>
+                  <div className="opacity-70">Employer</div>
+                </div>
+              )}
+            </div>
+          )}
 
-        {/* Logout */}
-        <button
-          onClick={() => {
-            window.location.href = '/auth/login';
-          }}
-          className="w-full flex items-center gap-2 px-3 py-2 rounded-md text-sm hover:bg-white/10 transition"
-        >
-          <LogOut size={16} />
-          {expanded && <span>Logout</span>}
-        </button>
+          <button
+            onClick={() => {
+              window.location.href = '/auth/login';
+            }}
+            className="w-full flex items-center gap-2 px-3 py-2 rounded-md text-sm hover:bg-white/10 transition"
+          >
+            <LogOut size={16} />
+            {expanded && <span>Logout</span>}
+          </button>
+        </div>
       </div>
     </aside>
   );
