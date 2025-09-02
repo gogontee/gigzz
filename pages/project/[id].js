@@ -3,9 +3,11 @@ import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/router';
 import { supabase } from '../../utils/supabaseClient';
 import { MessageCircle, Pencil, Megaphone, Eye } from 'lucide-react';
+import { useUser } from "@supabase/auth-helpers-react";
 
 export default function ProjectPage() {
   const router = useRouter();
+  const user = useUser();
   const { id } = router.query;
   const [project, setProject] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -15,6 +17,7 @@ export default function ProjectPage() {
   const [promotionOpen, setPromotionOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [successMsg, setSuccessMsg] = useState('');
+  
 
   const [editData, setEditData] = useState({
     title: '',
@@ -293,22 +296,27 @@ export default function ProjectPage() {
           />
         )}
 
-        {/* Floating chat button */}
-        <button className="fixed md:absolute md:top-auto md:bottom-4 md:right-4 right-4 top-1/2 transform -translate-y-1/2 bg-black text-white p-2 md:p-3 rounded-full shadow-lg hover:bg-orange-400 transition z-20 breathe">
-          <MessageCircle className="w-3 h-3 md:w-6 md:h-6" />
-        </button>
 
         {/* User avatar */}
-        {project.avatar_url && (
-          <div className="absolute left-1/2 -bottom-14 transform -translate-x-1/2 flex flex-col items-center">
-            <img
-              src={project.avatar_url}
-              alt="User Avatar"
-              className="w-20 h-20 rounded-full border-4 border-white object-cover"
-            />
-            {fullName && <p className="mt-2 font-medium text-gray-800">{fullName}</p>}
-          </div>
-        )}
+{project.avatar_url && (
+  <div className="absolute left-1/2 top-full -translate-x-1/2 -translate-y-1/2 mt-4 flex flex-col items-center">
+    <a href={`/dashboard/profile/${project.user_id}`}>
+      <img
+        src={project.avatar_url}
+        alt="User Avatar"
+        className="w-20 h-20 rounded-full border-4 border-white object-cover hover:scale-105 transition"
+      />
+    </a>
+    {fullName && (
+  <a
+    href={`/dashboard/profile/${project.user_id}`}
+    className="mt-2 font-medium text-gray-800 hover:text-orange-500 transition"
+  >
+    {fullName}
+  </a>
+)}
+  </div>
+)}
 
         {/* Owner actions */}
         {isOwner && (
@@ -415,6 +423,18 @@ export default function ProjectPage() {
             ))}
         </div>
       </div>
+      {/* Show See Profile button only if viewer is NOT the owner */}
+      {user && user.id !== project.user_id && (
+        <div className="mt-6 flex justify-center">
+          <a
+            href={`/dashboard/profile/${project.user_id}`}
+            className="text-sm text-white bg-orange-500 px-4 py-2 rounded-full hover:bg-orange-600 transition"
+          >
+            See Profile
+          </a>
+        </div>
+      )}
+
 
       {/* Save buttons */}
       {isEditing && (

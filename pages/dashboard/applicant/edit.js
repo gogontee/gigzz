@@ -2,16 +2,25 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/router';
 import { supabase } from '../../../lib/supabaseClient';
 import ApplicantsLayout from '../../../components/dashboard/ApplicantLayout';
+import PhoneInput from 'react-phone-input-2';
+import 'react-phone-input-2/lib/style.css';
 
 export default function EditApplicantProfile() {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [form, setForm] = useState({
     full_name: '',
-    phone: '',
+    phone: '', // full phone including country code
     full_address: '',
     bio: '',
-    specialties: [],
+    specialties: '',
+    educational_qualification: '',
+    institutions: '',
+    country: '',
+    state: '',
+    city: '',
+    date_of_birth: '',
+    tags: [],
   });
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
@@ -41,7 +50,14 @@ export default function EditApplicantProfile() {
           phone: data.phone || '',
           full_address: data.full_address || '',
           bio: data.bio || '',
-          specialties: data.specialties || [],
+          specialties: data.specialties || '',
+          educational_qualification: data.educational_qualification || '',
+          institutions: data.institutions || '',
+          country: data.country || '',
+          state: data.state || '',
+          city: data.city || '',
+          date_of_birth: data.date_of_birth || '',
+          tags: data.tags || [],
         });
       }
       setLoading(false);
@@ -58,6 +74,27 @@ export default function EditApplicantProfile() {
     }));
   };
 
+  // Format phone: replace leading zero with selected country code
+  const handlePhoneChange = (value, country) => {
+    let formatted = value;
+
+    // ensure "+" prefix
+    if (!formatted.startsWith('+')) {
+      formatted = `+${formatted}`;
+    }
+
+    // Remove leading 0 after the country code
+    const dialCode = `+${country.dialCode}`;
+    if (formatted.startsWith(dialCode + '0')) {
+      formatted = dialCode + formatted.substring(dialCode.length + 1);
+    }
+
+    setForm((prev) => ({
+      ...prev,
+      phone: formatted,
+    }));
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
@@ -70,14 +107,24 @@ export default function EditApplicantProfile() {
 
     const { error } = await supabase
       .from('applicants')
-      .update({
-        full_name: form.full_name,
-        phone: form.phone,
-        full_address: form.full_address,
-        bio: form.bio,
-        specialties: form.specialties,
-      })
-      .eq('id', user.id);
+      .upsert(
+        {
+          id: user.id,
+          full_name: form.full_name,
+          phone: form.phone,
+          full_address: form.full_address,
+          bio: form.bio,
+          specialties: form.specialties,
+          educational_qualification: form.educational_qualification,
+          institutions: form.institutions,
+          country: form.country,
+          state: form.state,
+          city: form.city,
+          date_of_birth: form.date_of_birth || null,
+          tags: form.tags,
+        },
+        { onConflict: ['id'] }
+      );
 
     if (error) {
       console.error(error);
@@ -95,9 +142,9 @@ export default function EditApplicantProfile() {
         <h2 className="text-2xl font-bold mb-4 text-center">Edit Profile</h2>
 
         {error && <p className="text-red-600 mb-4">{error}</p>}
-        {success && <p className="text-green-600 mb-4">{success}</p>}
 
         <form onSubmit={handleSubmit} className="space-y-4">
+          {/* Full Name */}
           <div>
             <label className="block text-sm font-medium">Full Name</label>
             <input
@@ -110,17 +157,21 @@ export default function EditApplicantProfile() {
             />
           </div>
 
+          {/* Phone with Country Code */}
           <div>
             <label className="block text-sm font-medium">Phone</label>
-            <input
-              type="tel"
-              name="phone"
+            <PhoneInput
+              country={'ng'} // default Nigeria
               value={form.phone}
-              onChange={handleChange}
-              className="w-full border rounded-lg px-4 py-2"
+              onChange={handlePhoneChange}
+              inputClass="w-full border px-4 py-2 rounded"
+              containerClass="rounded"
+              buttonClass="rounded-l"
+              enableSearch={true}
             />
           </div>
 
+          {/* Full Address */}
           <div>
             <label className="block text-sm font-medium">Full Address</label>
             <input
@@ -132,6 +183,7 @@ export default function EditApplicantProfile() {
             />
           </div>
 
+          {/* Bio */}
           <div>
             <label className="block text-sm font-medium">Bio</label>
             <textarea
@@ -143,31 +195,130 @@ export default function EditApplicantProfile() {
             />
           </div>
 
+          {/* Specialties */}
           <div>
-            <label className="block text-sm font-medium">
-              Specialties (comma-separated)
-            </label>
+            <label className="block text-sm font-medium">Specialties</label>
             <input
               type="text"
               name="specialties"
-              value={form.specialties.join(', ')}
-              onChange={(e) =>
-                setForm({
-                  ...form,
-                  specialties: e.target.value.split(',').map((s) => s.trim()),
-                })
-              }
+              value={form.specialties}
+              onChange={handleChange}
+              className="w-full border rounded-lg px-4 py-2"
+              placeholder="e.g., Full Stack Developer"
+            />
+          </div>
+
+          {/* Educational Qualification */}
+          <div>
+            <label className="block text-sm font-medium">
+              Educational Qualification
+            </label>
+            <input
+              type="text"
+              name="educational_qualification"
+              value={form.educational_qualification}
+              onChange={handleChange}
+              className="w-full border rounded-lg px-4 py-2"
+              placeholder="e.g., B.Sc. Computer Science"
+            />
+          </div>
+
+          {/* Institutions */}
+          <div>
+            <label className="block text-sm font-medium">Institutions</label>
+            <input
+              type="text"
+              name="institutions"
+              value={form.institutions}
+              onChange={handleChange}
+              className="w-full border rounded-lg px-4 py-2"
+              placeholder="e.g., Harvard University"
+            />
+          </div>
+
+          {/* Country */}
+          <div>
+            <label className="block text-sm font-medium">Country</label>
+            <input
+              type="text"
+              name="country"
+              value={form.country}
+              onChange={handleChange}
+              className="w-full border rounded-lg px-4 py-2"
+              placeholder="Country you are currently located"
+              required
+            />
+          </div>
+
+          {/* State */}
+          <div>
+            <label className="block text-sm font-medium">State</label>
+            <input
+              type="text"
+              name="state"
+              value={form.state}
+              onChange={handleChange}
+              className="w-full border rounded-lg px-4 py-2"
+              placeholder="Lagos"
+              required
+            />
+          </div>
+
+          {/* City */}
+          <div>
+            <label className="block text-sm font-medium">City</label>
+            <input
+              type="text"
+              name="city"
+              value={form.city}
+              onChange={handleChange}
+              className="w-full border rounded-lg px-4 py-2"
+              placeholder="Lekki"
+              required
+            />
+          </div>
+
+          {/* Date of Birth */}
+          <div>
+            <label className="block text-sm font-medium">Date of Birth</label>
+            <input
+              type="date"
+              name="date_of_birth"
+              value={form.date_of_birth || ''}
+              onChange={handleChange}
               className="w-full border rounded-lg px-4 py-2"
             />
           </div>
 
-          <button
-            type="submit"
-            disabled={loading}
-            className="bg-orange-600 text-white px-4 py-2 rounded-lg hover:bg-orange-700 transition"
-          >
-            {loading ? 'Saving...' : 'Save Changes'}
-          </button>
+          {/* Tags */}
+          <div>
+            <label className="block text-sm font-medium">Tags</label>
+            <input
+              type="text"
+              name="tags"
+              value={form.tags.join(', ')}
+              onChange={(e) =>
+                setForm({
+                  ...form,
+                  tags: e.target.value.split(',').map((t) => t.trim()),
+                })
+              }
+              className="w-full border rounded-lg px-4 py-2"
+              placeholder="e.g., marketing, branding, multimedia"
+            />
+          </div>
+
+          {/* Submit + Success message */}
+          <div className="flex flex-col items-center space-y-2">
+            <button
+              type="submit"
+              disabled={loading}
+              className="bg-orange-600 text-white px-4 py-2 rounded-lg hover:bg-orange-700 transition"
+            >
+              {loading ? 'Saving...' : 'Save Changes'}
+            </button>
+            {success && <p className="text-green-600">{success}</p>}
+          </div>
         </form>
       </div>
     </ApplicantsLayout>

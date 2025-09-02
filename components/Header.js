@@ -18,34 +18,52 @@ export default function DesktopHeader() {
   const [userDropdownOpen, setUserDropdownOpen] = useState(false);
   const [onsiteModal, setOnsiteModal] = useState(false);
 
+  // Load user + avatar
+  const fetchUserAndAvatar = async () => {
+    const { data } = await supabase.auth.getUser();
+    const currentUser = data?.user;
+
+    if (!currentUser) {
+      setUser(null);
+      setAvatarUrl(null);
+      return;
+    }
+
+    setUser(currentUser);
+
+    const role = currentUser.user_metadata?.role || "applicant";
+    const table = role === "employer" ? "employers" : "applicants";
+
+    const { data: profile } = await supabase
+      .from(table)
+      .select("avatar_url")
+      .eq("id", currentUser.id)
+      .single();
+
+    if (profile?.avatar_url) {
+      setAvatarUrl(profile.avatar_url);
+    } else {
+      setAvatarUrl(null);
+    }
+  };
+
   useEffect(() => {
-    const fetchUserAndAvatar = async () => {
-      const { data } = await supabase.auth.getUser();
-      const currentUser = data?.user;
-
-      if (!currentUser) return;
-
-      setUser(currentUser);
-
-      const role = currentUser.user_metadata?.role || "applicant";
-      const table = role === "employer" ? "employers" : "applicants";
-
-      const { data: profile } = await supabase
-        .from(table)
-        .select("avatar_url")
-        .eq("id", currentUser.id)
-        .single();
-
-      if (profile?.avatar_url) {
-        setAvatarUrl(profile.avatar_url);
-      }
-    };
-
     fetchUserAndAvatar();
+
+    // 🔥 Listen for login/logout changes
+    const { data: listener } = supabase.auth.onAuthStateChange(() => {
+      fetchUserAndAvatar();
+    });
+
+    return () => {
+      listener.subscription.unsubscribe();
+    };
   }, []);
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
+    setUser(null);
+    setAvatarUrl(null);
     router.reload();
   };
 
@@ -62,131 +80,173 @@ export default function DesktopHeader() {
         />
 
         {/* Navigation */}
-<nav className="flex-1 flex justify-center gap-6 items-center relative">
-  <Link href="/" className={`transition hover:text-orange-500 ${isActive("/") ? "text-orange-500" : ""}`}>
-    Home
-  </Link>
-
-  {/* Find Jobs Dropdown */}
-  <div
-    className="relative"
-    onMouseEnter={() => setNavDropdownOpen('find')}
-    onMouseLeave={() => setNavDropdownOpen(null)}
-  >
-    <button className="transition hover:text-orange-500 flex items-center gap-1">
-      Find Jobs
-      <svg className="w-4 h-4 mt-0.5 text-white transition" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
-      </svg>
-    </button>
-
-    <AnimatePresence>
-      {navDropdownOpen === 'find' && (
-        <motion.div
-          initial={{ opacity: 0, y: -10 }}
-          animate={{ opacity: 1, y: 0 }}
-          exit={{ opacity: 0, y: -10 }}
-          className="absolute top-10 bg-white text-black rounded shadow p-3 space-y-2 min-w-[160px] z-50"
-        >
-          <Link href="/remote" className="block hover:text-orange-500 transition">
-            Remote Jobs
+        <nav className="flex-1 flex justify-center gap-6 items-center relative">
+          <Link
+            href="/"
+            className={`transition hover:text-orange-500 ${
+              isActive("/") ? "text-orange-500" : ""
+            }`}
+          >
+            Home
           </Link>
-          <Link href="/hybrid" className="block hover:text-orange-500 transition">
-            Hybrid Jobs
+
+          {/* Find Jobs Dropdown */}
+          <div
+            className="relative"
+            onMouseEnter={() => setNavDropdownOpen("find")}
+            onMouseLeave={() => setNavDropdownOpen(null)}
+          >
+            <button className="transition hover:text-orange-500 flex items-center gap-1">
+              Find Jobs
+              <svg
+                className="w-4 h-4 mt-0.5 text-white transition"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth="2"
+                  d="M19 9l-7 7-7-7"
+                />
+              </svg>
+            </button>
+
+            <AnimatePresence>
+              {navDropdownOpen === "find" && (
+                <motion.div
+                  initial={{ opacity: 0, y: -10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -10 }}
+                  className="absolute top-10 bg-white text-black rounded shadow p-3 space-y-2 min-w-[160px] z-50"
+                >
+                  <Link href="/remote" className="block hover:text-orange-500 transition">
+                    Remote Jobs
+                  </Link>
+                  <Link href="/hybrid" className="block hover:text-orange-500 transition">
+                    Hybrid Jobs
+                  </Link>
+                  <Link href="/onsite" className="block hover:text-orange-500 transition">
+                    Onsite Jobs
+                  </Link>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
+
+          {/* Other links */}
+          <Link href="/employerlanding" className="transition hover:text-orange-500">
+            Post Your Job
           </Link>
-          <Link href="/onsite" className="block hover:text-orange-500 transition">
-            Onsite Jobs
+
+          {/* Gigzzstars Dropdown */}
+          <div
+            className="relative"
+            onMouseEnter={() => setNavDropdownOpen("gigzzstars")}
+            onMouseLeave={() => setNavDropdownOpen(null)}
+          >
+            <button className="transition hover:text-orange-500 flex items-center gap-1">
+              Gigzzstars
+              <svg
+                className="w-4 h-4 mt-0.5 text-white transition"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth="2"
+                  d="M19 9l-7 7-7-7"
+                />
+              </svg>
+            </button>
+
+            <AnimatePresence>
+              {navDropdownOpen === "gigzzstars" && (
+                <motion.div
+                  initial={{ opacity: 0, y: -6 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -6 }}
+                  className="absolute top-10 left-0 bg-white/95 backdrop-blur-md text-black rounded-xl shadow-lg p-4 grid grid-cols-1 sm:grid-cols-2 gap-3 min-w-[220px] z-50"
+                >
+                  <Link href="/gigzzstar" className="px-3 py-2 rounded-md text-sm font-medium hover:text-orange-600">
+                    All Stars
+                  </Link>
+                  <Link href="/gigzzstars/development-it" className="px-3 py-2 rounded-md text-sm font-medium hover:text-orange-600">
+                    Design &amp; Creative
+                  </Link>
+                  <Link href="/gigzzstars/development-it" className="px-3 py-2 rounded-md text-sm font-medium hover:text-orange-600">
+                    Development &amp; IT
+                  </Link>
+                  <Link href="/gigzzstars/marketing-sales" className="px-3 py-2 rounded-md text-sm font-medium hover:text-orange-600">
+                    Marketing &amp; Sales
+                  </Link>
+                  <Link href="/gigzzstars/writing-translation" className="px-3 py-2 rounded-md text-sm font-medium hover:text-orange-600">
+                    Writing &amp; Translation
+                  </Link>
+                  <Link href="/gigzzstars/customer-support" className="px-3 py-2 rounded-md text-sm font-medium hover:text-orange-600">
+                    Customer Support
+                  </Link>
+                  <Link href="/gigzzstars/finance-accounting" className="px-3 py-2 rounded-md text-sm font-medium hover:text-orange-600">
+                    Finance &amp; Accounting
+                  </Link>
+                  <Link href="/gigzzstars/legal-services" className="px-3 py-2 rounded-md text-sm font-medium hover:text-orange-600">
+                    Legal Services
+                  </Link>
+                  <Link href="/gigzzstars/engineering-industry" className="px-3 py-2 rounded-md text-sm font-medium hover:text-orange-600">
+                    Engineering
+                  </Link>
+                  <Link href="/gigzzstars/entertainment" className="px-3 py-2 rounded-md text-sm font-medium hover:text-orange-600">
+                    Entertainment
+                  </Link>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
+
+          <Link
+            href="/news"
+            className={`transition hover:text-orange-500 ${
+              isActive("/news") ? "text-orange-500" : ""
+            }`}
+          >
+            News
           </Link>
-        </motion.div>
-      )}
-    </AnimatePresence>
-  </div>
-
-  {/* Other links */}
-  <Link href="/employerlanding" className="transition hover:text-orange-500">
-    Post Your Job
-  </Link>
-
-  {/* Gigzzstars dropdown inserted here */}
-  <div
-    className="relative"
-    onMouseEnter={() => setNavDropdownOpen('gigzzstars')}
-    onMouseLeave={() => setNavDropdownOpen(null)}
-  >
-    <button className="transition hover:text-orange-500 flex items-center gap-1">
-      Gigzzstars
-      <svg className="w-4 h-4 mt-0.5 text-white transition" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
-      </svg>
-    </button>
-
-    <AnimatePresence>
-  {navDropdownOpen === 'gigzzstars' && (
-    <motion.div
-      initial={{ opacity: 0, y: -6 }}
-      animate={{ opacity: 1, y: 0 }}
-      exit={{ opacity: 0, y: -6 }}
-      className="absolute top-10 left-0 bg-white/95 backdrop-blur-md text-black rounded-xl shadow-lg p-4 grid grid-cols-1 sm:grid-cols-2 gap-3 min-w-[220px] z-50"
-    >
-      <Link href="/gigzzstars/design-creative" className="px-3 py-2 rounded-md text-sm font-medium transition-all duration-150 ease-in-out  hover:text-orange-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-400 active:scale-95"
->
-        Design &amp; Creative
-      </Link>
-      <Link href="/gigzzstars/development-it" className="px-3 py-2 rounded-md text-sm font-medium transition-all duration-150 ease-in-out  hover:text-orange-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-400 active:scale-95"
->
-        Development &amp; IT
-      </Link>
-      <Link href="/gigzzstars/marketing-sales" className="px-3 py-2 rounded-md text-sm font-medium transition-all duration-150 ease-in-out hover:text-orange-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-400 active:scale-95"
->
-        Marketing &amp; Sales
-      </Link>
-      <Link href="/gigzzstars/writing-translation" className="px-3 py-2 rounded-md text-sm font-medium transition-all duration-150 ease-in-out  hover:text-orange-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-400 active:scale-95"
->
-        Writing &amp; Translation
-      </Link>
-      <Link href="/gigzzstars/customer-support" className="px-3 py-2 rounded-md text-sm font-medium transition-all duration-150 ease-in-out hover:text-orange-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-400 active:scale-95"
->
-        Customer Support
-      </Link>
-      <Link href="/gigzzstars/finance-accounting" className="px-3 py-2 rounded-md text-sm font-medium transition-all duration-150 ease-in-out  hover:text-orange-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-400 active:scale-95"
->
-        Finance &amp; Accounting
-      </Link>
-      <Link href="/gigzzstars/legal-services" className="px-3 py-2 rounded-md text-sm font-medium transition-all duration-150 ease-in-out  hover:text-orange-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-400 active:scale-95"
->
-        Legal Services
-      </Link>
-      <Link href="/gigzzstars/engineering-industry" className="px-3 py-2 rounded-md text-sm font-medium transition-all duration-150 ease-in-out  hover:text-orange-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-400 active:scale-95"
->
-        Engineering
-      </Link>
-      <Link href="/gigzzstars/entertainment" className="px-3 py-2 rounded-md text-sm font-medium transition-all duration-150 ease-in-out  hover:text-orange-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-400 active:scale-95"
->
-        Entertainment
-      </Link>
-    </motion.div>
-  )}
-</AnimatePresence>
-  </div>
-
-  <Link href="/news" className={`transition hover:text-orange-500 ${isActive("/news") ? "text-orange-500" : ""}`}>
-    News
-  </Link>
-  <Link href="/pricing" className={`transition hover:text-orange-500 ${isActive("/pricing") ? "text-orange-500" : ""}`}>
-    Pricing
-  </Link>
-  <Link href="/about" className={`transition hover:text-orange-500 ${isActive("/about") ? "text-orange-500" : ""}`}>
-    Why Gigzz
-  </Link>
-  <Link href="/faq" className={`transition hover:text-orange-500 ${isActive("/faq") ? "text-orange-500" : ""}`}>
-    FAQ
-  </Link>
-  <Link href="/contact" className={`transition hover:text-orange-500 ${isActive("/contact") ? "text-orange-500" : ""}`}>
-    Contact
-  </Link>
-</nav>
-
-
+          <Link
+            href="/pricing"
+            className={`transition hover:text-orange-500 ${
+              isActive("/pricing") ? "text-orange-500" : ""
+            }`}
+          >
+            Pricing
+          </Link>
+          <Link
+            href="/about"
+            className={`transition hover:text-orange-500 ${
+              isActive("/about") ? "text-orange-500" : ""
+            }`}
+          >
+            Why Gigzz
+          </Link>
+          <Link
+            href="/faq"
+            className={`transition hover:text-orange-500 ${
+              isActive("/faq") ? "text-orange-500" : ""
+            }`}
+          >
+            FAQ
+          </Link>
+          <Link
+            href="/contact"
+            className={`transition hover:text-orange-500 ${
+              isActive("/contact") ? "text-orange-500" : ""
+            }`}
+          >
+            Contact
+          </Link>
+        </nav>
 
         {/* Auth Section */}
         {user ? (
@@ -197,7 +257,11 @@ export default function DesktopHeader() {
           >
             <button className="hover:text-orange-500 transition flex items-center gap-2 px-4 py-1.5 rounded-full border border-white">
               {avatarUrl ? (
-                <img src={avatarUrl} alt="Profile" className="w-6 h-6 rounded-full object-cover" />
+                <img
+                  src={avatarUrl}
+                  alt="Profile"
+                  className="w-6 h-6 rounded-full object-cover"
+                />
               ) : (
                 <User className="w-5 h-5 text-white" />
               )}
@@ -212,7 +276,11 @@ export default function DesktopHeader() {
                   className="absolute right-0 mt-2 bg-white text-black rounded shadow-lg w-44 p-2 z-50"
                 >
                   <Link
-                    href={user.user_metadata?.role === "employer" ? "/dashboard/employer" : "/dashboard/applicant"}
+                    href={
+                      user.user_metadata?.role === "employer"
+                        ? "/dashboard/employer"
+                        : "/dashboard/applicant"
+                    }
                     className="flex items-center gap-2 px-3 py-2 rounded hover:bg-gray-100 transition"
                   >
                     <Briefcase className="w-4 h-4" /> Dashboard
@@ -242,7 +310,9 @@ export default function DesktopHeader() {
         <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-[999]">
           <div className="bg-white rounded-xl shadow p-6 w-full max-w-md text-center space-y-4">
             <h2 className="text-xl font-bold text-gray-800">Onsite Jobs</h2>
-            <p className="text-gray-600">Onsite jobs will be available soon. Stay tuned!</p>
+            <p className="text-gray-600">
+              Onsite jobs will be available soon. Stay tuned!
+            </p>
             <button
               onClick={() => setOnsiteModal(false)}
               className="mt-4 px-4 py-2 bg-black text-white rounded hover:bg-orange-500 transition"
