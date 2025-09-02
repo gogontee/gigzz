@@ -13,44 +13,58 @@ import {
 
 export default function ApplicantDashboard() {
   const [profile, setProfile] = useState(null);
-  const [applications, setApplications] = useState([]);
+  const [applicationsCount, setApplicationsCount] = useState(0);
   const [tokens, setTokens] = useState(0);
-  const [portfolioItems, setPortfolioItems] = useState([]);
+  const [projectsCount, setProjectsCount] = useState(0);
+  const [showPopup, setShowPopup] = useState(false);
   const fileInputRef = useRef(null);
 
   useEffect(() => {
     const fetchData = async () => {
+      // Get current user
       const { data: userData, error: userError } = await supabase.auth.getUser();
       if (userError || !userData?.user) return;
 
       const userId = userData.user.id;
 
+      // Fetch applicant profile
       const { data: profileData } = await supabase
         .from('applicants')
         .select('*')
         .eq('id', userId)
         .single();
 
+      // Fetch token balance from token_wallets
       const { data: tokenData } = await supabase
-        .from('token_balances')
+        .from('token_wallets')
         .select('balance')
         .eq('user_id', userId)
         .single();
 
-      const { data: applicationData } = await supabase
+      // Count applications
+      const { count: applicationsCount } = await supabase
         .from('applications')
-        .select('id')
+        .select('*', { count: 'exact', head: true })
         .eq('applicant_id', userId);
 
-      const { data: portfolioData } = await supabase
-        .from('portfolios')
-        .select('id')
+      // Count projects
+      const { count: projectsCount } = await supabase
+        .from('projects')
+        .select('*', { count: 'exact', head: true })
         .eq('user_id', userId);
 
+      // Update state
       setProfile(profileData);
       setTokens(tokenData?.balance || 0);
-      setApplications(applicationData || []);
-      setPortfolioItems(portfolioData || []);
+      setApplicationsCount(applicationsCount || 0);
+      setProjectsCount(projectsCount || 0);
+
+      // Show popup if first time applicant
+      const popupSeen = localStorage.getItem('profilePopupSeen');
+      if (!popupSeen && profileData) {
+        setShowPopup(true);
+        localStorage.setItem('profilePopupSeen', 'true');
+      }
     };
 
     fetchData();
@@ -66,9 +80,7 @@ export default function ApplicantDashboard() {
 
     const { error: uploadError } = await supabase.storage
       .from('avatars')
-      .upload(filePath, file, {
-        upsert: true,
-      });
+      .upload(filePath, file, { upsert: true });
 
     if (uploadError) {
       console.error('Upload failed:', uploadError.message);
@@ -96,21 +108,21 @@ export default function ApplicantDashboard() {
         initial={{ opacity: 0, y: 10 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.3 }}
-        className="space-y-6 md:pt-20"
+        className="space-y-6 md:pt-20 relative"
       >
         <div className="flex items-center justify-between flex-wrap gap-4">
           <div>
             <h2 className="text-2xl font-semibold">
-              Welcome back, {profile?.full_name || 'Creative'} 🎨
+              Welcome back, {profile?.full_name || 'Creative'}
             </h2>
             <p className="text-sm text-gray-500">
-              Let’s create something great today!
+              Let' start making money today!
             </p>
           </div>
           <div className="flex items-center gap-4">
-            <a href="/dashboard/applicant/messages" title="Messages">
-              <MessageSquare className="w-6 h-6 text-gray-700 hover:text-orange-600" />
-            </a>
+            <a href="/messages" title="Messages">
+  <MessageSquare className="w-6 h-6 text-gray-700 hover:text-orange-600" />
+</a>
             <a href="/dashboard/applicant/notifications" title="Notifications">
               <Bell className="w-6 h-6 text-gray-700 hover:text-orange-600" />
             </a>
@@ -138,6 +150,7 @@ export default function ApplicantDashboard() {
           </div>
         </div>
 
+        {/* Stats */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           <StatCard
             icon={<Coins className="text-orange-500" />}
@@ -147,19 +160,34 @@ export default function ApplicantDashboard() {
           <StatCard
             icon={<Briefcase className="text-orange-500" />}
             label="Applications"
-            value={applications.length}
+            value={applicationsCount}
           />
           <StatCard
             icon={<Layers className="text-orange-500" />}
-            label="Portfolio Items"
-            value={portfolioItems.length}
+            label="Portfolios"
+            value={projectsCount}
           />
         </div>
 
-        <div>
+        {/* Quick Actions */}
+        <div className="relative">
           <h3 className="text-lg font-semibold mb-2">Quick Actions</h3>
-          <div className="flex flex-wrap gap-4">
-            <ActionButton href="/dashboard/applicant/edit" label="Edit Profile" />
+          <div className="flex flex-wrap gap-4 relative">
+            <div className="relative inline-block">
+              <ActionButton href="/dashboard/applicant/edit" label="Edit Profile" />
+              {showPopup && (
+                <div className="absolute -top-20 left-1/2 -translate-x-1/2 bg-white shadow-lg rounded-lg p-3 w-64 text-sm text-gray-700 z-50">
+                  <div className="absolute bottom-[-6px] left-1/2 -translate-x-1/2 w-3 h-3 bg-white rotate-45 shadow-md"></div>
+                  👋 Please click here to update your profile before creating a portfolio.
+                  <button
+                    onClick={() => setShowPopup(false)}
+                    className="block mt-2 text-xs text-orange-600 font-medium hover:underline"
+                  >
+                    Got it
+                  </button>
+                </div>
+              )}
+            </div>
             <ActionButton href="/dashboard/applicant/portfolio" label="Manage Portfolio" />
             <ActionButton href="/dashboard/applicant/tokens" label="Buy Tokens" />
             <ActionButton href="/dashboard/applicant/applications" label="View Applications" />

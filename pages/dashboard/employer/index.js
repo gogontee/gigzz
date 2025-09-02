@@ -3,19 +3,15 @@
 import { useEffect, useState, useCallback } from 'react';
 import { createClient } from '@supabase/supabase-js';
 import { useRouter } from 'next/router';
-import { motion } from 'framer-motion';
-import Image from 'next/image';
 
 import Sidebar from '../../../components/dashboard/ClientSidebar';
 import JobPostForm from '../../../components/client/JobPostForm';
 import WalletSummary from '../../../components/client/WalletSummary';
-import PortfolioBrowser from '../../../components/client/PortfolioBrowser';
 import ChatSidebar from '../../../components/client/ChatSidebar';
 import VideoCallModal from '../../../components/client/VideoCallModal';
 import EmployerProfileEditor from '../../../components/client/EmployerProfileEditor';
 import PromotionPanel from '../../../components/client/PromotionPanel';
 import JobListCard from '../../../components/client/JobListCard';
-import PortfolioModal from '../../../components/portfolio/PortfolioModal';
 import Verify from '../../../components/Verify';
 
 const supabase = createClient(
@@ -23,7 +19,6 @@ const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
 );
 
-// Simple validation helper
 const isValidComponent = (Comp) =>
   typeof Comp === 'function' || (typeof Comp === 'object' && Comp !== null);
 
@@ -32,26 +27,15 @@ export default function EmployerDashboard() {
   const [employer, setEmployer] = useState(null);
   const [jobs, setJobs] = useState([]);
   const [wallet, setWallet] = useState(null);
-  const [portfolios, setPortfolios] = useState([]);
   const [activeSection, setActiveSection] = useState('overview');
   const [loading, setLoading] = useState(true);
   const [importErrors, setImportErrors] = useState([]);
 
-  const [selectedPortfolio, setSelectedPortfolio] = useState(null);
-  const [showPortfolioModal, setShowPortfolioModal] = useState(false);
-
-  const handleViewPortfolio = (p) => {
-    setSelectedPortfolio(p);
-    setShowPortfolioModal(true);
-  };
-
-  // Validate imported components on mount
   useEffect(() => {
     const errs = [];
     if (!isValidComponent(Sidebar)) errs.push('ClientSidebar');
     if (!isValidComponent(JobPostForm)) errs.push('JobPostForm');
     if (!isValidComponent(WalletSummary)) errs.push('WalletSummary');
-    if (!isValidComponent(PortfolioBrowser)) errs.push('PortfolioBrowser');
     if (!isValidComponent(ChatSidebar)) errs.push('ChatSidebar');
     if (!isValidComponent(VideoCallModal)) errs.push('VideoCallModal');
     if (!isValidComponent(EmployerProfileEditor)) errs.push('EmployerProfileEditor');
@@ -72,6 +56,7 @@ export default function EmployerDashboard() {
       return;
     }
 
+    // fetch employer
     const { data: employerData, error: empErr } = await supabase
       .from('employers')
       .select('*')
@@ -84,28 +69,23 @@ export default function EmployerDashboard() {
       return;
     }
 
+    // fetch jobs
     const { data: jobPosts } = await supabase
       .from('jobs')
       .select('*')
       .eq('employer_id', user.id)
       .order('created_at', { ascending: false });
 
+    // fetch wallet
     const { data: walletData } = await supabase
-      .from('client_wallets')
+      .from('token_wallets')
       .select('*')
-      .eq('employer_id', user.id)
+      .eq('user_id', user.id)
       .single();
-
-    const { data: portfolioData } = await supabase
-      .from('portfolios')
-      .select('*')
-      .limit(6)
-      .order('created_at', { ascending: false });
 
     setEmployer(employerData);
     setJobs(jobPosts || []);
     setWallet(walletData);
-    setPortfolios(portfolioData || []);
     setLoading(false);
   }, [router]);
 
@@ -115,27 +95,17 @@ export default function EmployerDashboard() {
 
   if (loading) return <div className="p-6">Loading...</div>;
 
-  // If any import errors, show them plainly
   if (importErrors.length > 0) {
     return (
       <div className="min-h-screen flex items-start p-8 bg-white text-black">
         <div className="max-w-xl mx-auto w-full">
           <div className="bg-red-50 border border-red-300 rounded-xl p-6 mb-6">
             <h2 className="text-xl font-semibold text-red-800 mb-2">Component Import Errors</h2>
-            <p className="text-sm text-red-700">
-              The following components failed to import properly or are not exported as defaults:
-            </p>
             <ul className="list-disc list-inside mt-2 text-red-700">
               {importErrors.map((e) => (
                 <li key={e}>{e}</li>
               ))}
             </ul>
-            <p className="mt-3 text-sm">
-              Check that each file does a default export, e.g. <code>export default function ComponentName()</code>, and that the import paths are correct.
-            </p>
-          </div>
-          <div className="rounded-xl bg-white shadow p-6">
-            <p className="text-gray-700">Dashboard cannot load fully until those issues are resolved.</p>
           </div>
         </div>
       </div>
@@ -151,21 +121,17 @@ export default function EmployerDashboard() {
         <div className="flex items-center justify-between p-6 border-b border-gray-200 lg:pt-20">
           <div className="flex gap-4 items-center">
             <h1 className="text-base lg:text-2xl font-bold">
-  Welcome {employer?.name || 'Client'}
-</h1>
+              Welcome {employer?.name || 'Client'}
+            </h1>
           </div>
           <div className="flex gap-4">
             <WalletSummary wallet={wallet} />
             <button
-  onClick={() => setActiveSection('post')}
-  className="bg-black text-white 
-             px-3 py-1.5 text-sm rounded-lg 
-             hover:bg-orange-600 transition
-             lg:px-4 lg:py-2 lg:text-base lg:rounded-full"
->
-  Post Job
-</button>
-
+              onClick={() => setActiveSection('post')}
+              className="bg-black text-white px-3 py-1.5 text-sm rounded-lg hover:bg-orange-600 transition lg:px-4 lg:py-2 lg:text-base lg:rounded-full"
+            >
+              Post Job
+            </button>
           </div>
         </div>
 
@@ -174,6 +140,7 @@ export default function EmployerDashboard() {
           {activeSection === 'overview' && (
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
               <div className="col-span-2 space-y-6">
+                {/* jobs */}
                 <div className="rounded-xl bg-white shadow p-6">
                   <h2 className="text-xl font-semibold mb-2">Your Jobs</h2>
                   {jobs.length === 0 ? (
@@ -186,21 +153,6 @@ export default function EmployerDashboard() {
                     </div>
                   )}
                 </div>
-                <div className="rounded-xl bg-white shadow p-6">
-                  <h2 className="text-xl font-semibold mb-2">Featured Creatives</h2>
-                  <PortfolioBrowser portfolios={portfolios} onView={handleViewPortfolio} />
-                </div>
-                {selectedPortfolio && (
-                  <PortfolioModal
-                    open={showPortfolioModal}
-                    setOpen={setShowPortfolioModal}
-                    portfolio={selectedPortfolio}
-                    readOnly={true}
-                    onSuccess={() => {
-                      setShowPortfolioModal(false);
-                    }}
-                  />
-                )}
               </div>
               <div className="space-y-6">
                 <PromotionPanel jobs={jobs} wallet={wallet} refresh={fetchInitial} />
@@ -226,14 +178,6 @@ export default function EmployerDashboard() {
           {activeSection === 'wallet' && (
             <div>
               <WalletSummary wallet={wallet} />
-              <div className="mt-4">{/* fund / promote UI */}</div>
-            </div>
-          )}
-
-          {activeSection === 'portfolios' && (
-            <div>
-              <h2 className="text-xl font-semibold mb-4">Browse Portfolios</h2>
-              <PortfolioBrowser portfolios={portfolios} onView={() => {}} />
             </div>
           )}
 
@@ -241,11 +185,11 @@ export default function EmployerDashboard() {
             <EmployerProfileEditor employer={employer} onUpdated={fetchInitial} />
           )}
           {activeSection === 'verify' && employer && (
-  <div>
-    <h2 className="text-xl font-semibold mb-4">Verify Your Identity</h2>
-    <Verify employer={employer} />
-  </div>
-)}
+            <div>
+              <h2 className="text-xl font-semibold mb-4">Verify Your Identity</h2>
+              <Verify employer={employer} />
+            </div>
+          )}
 
           {activeSection === 'chats' && employer && <ChatSidebar employer={employer} />}
           {activeSection === 'calls' && <VideoCallModal />}
