@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/router";
 import { createClient } from "@supabase/supabase-js";
 import ChatMessages from "../../components/ChatMessages";
-import ChatInput from "../../components/ChatInput";
+
 
 // Initialize Supabase client
 const supabase = createClient(
