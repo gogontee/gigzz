@@ -6,6 +6,10 @@ import { supabase } from '../lib/supabaseClient';
 import { useRouter } from 'next/navigation';
 import ChatModal from '../components/ChatModal';
 
+// ✅ Layouts
+import ApplicantLayout from '../components/dashboard/ApplicantLayout';
+import ClientSidebar from '../components/dashboard/ClientSidebar';
+
 // ✅ utility to mark messages as read
 async function markMessagesAsRead(chatId, currentUserId) {
   const { data, error } = await supabase
@@ -26,6 +30,8 @@ export default function MessagesInbox() {
   const [loading, setLoading] = useState(true);
   const [user, setUser] = useState(null);
   const [activeChat, setActiveChat] = useState(null);
+  const [role, setRole] = useState(null); // ✅ applicant or client
+  const [employer, setEmployer] = useState(null);
   const router = useRouter();
 
   useEffect(() => {
@@ -47,6 +53,31 @@ export default function MessagesInbox() {
 
       const authUser = session.user;
       setUser(authUser);
+
+      // ✅ fetch role from users table
+      const { data: userData, error: userError } = await supabase
+        .from('users')
+        .select('role')
+        .eq('id', authUser.id)
+        .maybeSingle();
+
+      if (userError) {
+        console.error('Error fetching user role:', userError.message);
+      } else {
+        setRole(userData?.role);
+      }
+
+      // ✅ if employer, fetch employer details for sidebar
+      if (userData?.role === 'employer') {
+        const { data: employerData } = await supabase
+          .from('employers')
+          .select('id, name, avatar_url')
+          .eq('id', authUser.id)
+          .maybeSingle();
+
+        setEmployer(employerData);
+      }
+
       await loadInbox(authUser);
 
       const { data: subscription } = supabase.auth.onAuthStateChange(
@@ -245,9 +276,9 @@ export default function MessagesInbox() {
     return <div className="p-6 text-center">Loading messages...</div>;
   }
 
-  return (
-    <div className="max-w-3xl mx-auto p-6">
-      <h1 className="text-2xl font-bold mb-6">Messages</h1>
+  const content = (
+    <div className="flex-1 px-4 sm:px-6">
+      <h1 className="text-2xl font-bold mb-6 pt-0 sm:pt-20">Messages</h1>
 
       {chats.length === 0 ? (
         <p className="text-gray-500">You have no messages yet.</p>
@@ -297,6 +328,19 @@ export default function MessagesInbox() {
           isOpen={true}
           onClose={() => setActiveChat(null)}
         />
+      )}
+    </div>
+  );
+
+  return (
+    <div className="flex min-h-screen">
+      {/* ✅ If applicant use layout, if client use sidebar */}
+      {role === 'applicant' && <ApplicantLayout>{content}</ApplicantLayout>}
+      {role === 'employer' && (
+        <>
+          <ClientSidebar active="chats" onChange={() => {}} employer={employer} />
+          <main className="flex-1">{content}</main>
+        </>
       )}
     </div>
   );

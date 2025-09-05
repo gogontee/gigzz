@@ -38,34 +38,52 @@ export default function ApplicantLayout({ children, applicant }) {
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
 
-  // Hover / touch behavior
+  // Desktop hover behavior only
   useEffect(() => {
-    const sidebar = sidebarRef.current;
+    if (isMobile) return; // skip on mobile
 
-    const handleMouseEnter = () => !isMobile && setExpanded(true);
-    const handleMouseLeave = () => !isMobile && setExpanded(false);
-    const handleTouch = () => isMobile && setExpanded(true);
+    const sidebar = sidebarRef.current;
+    const handleMouseEnter = () => setExpanded(true);
+    const handleMouseLeave = () => setExpanded(false);
 
     if (sidebar) {
       sidebar.addEventListener('mouseenter', handleMouseEnter);
       sidebar.addEventListener('mouseleave', handleMouseLeave);
-      sidebar.addEventListener('click', handleTouch);
-      sidebar.addEventListener('touchstart', handleTouch);
     }
 
     return () => {
       if (sidebar) {
         sidebar.removeEventListener('mouseenter', handleMouseEnter);
         sidebar.removeEventListener('mouseleave', handleMouseLeave);
-        sidebar.removeEventListener('click', handleTouch);
-        sidebar.removeEventListener('touchstart', handleTouch);
+      }
+    };
+  }, [isMobile]);
+
+  // Mobile: toggle expand/collapse on click anywhere inside sidebar
+  useEffect(() => {
+    if (!isMobile) return;
+
+    const sidebar = sidebarRef.current;
+    const handleClick = () => {
+      setExpanded((prev) => !prev); // toggle open/close
+    };
+
+    if (sidebar) {
+      sidebar.addEventListener('click', handleClick);
+    }
+
+    return () => {
+      if (sidebar) {
+        sidebar.removeEventListener('click', handleClick);
       }
     };
   }, [isMobile]);
 
   const handleNavClick = (href) => {
     router.push(href);
-    setExpanded(false); // fold sidebar after navigation
+    if (isMobile) {
+      setExpanded(false); // auto-fold after nav on mobile
+    }
   };
 
   return (
@@ -77,16 +95,18 @@ export default function ApplicantLayout({ children, applicant }) {
           expanded ? 'w-64' : 'w-16'
         } min-h-screen`}
       >
-        {/* Toggle Button */}
-        <div className="absolute top-4 right-[-12px] flex items-center z-10">
-          <button
-            onClick={() => setExpanded((e) => !e)}
-            aria-label="Toggle sidebar"
-            className="bg-white/10 p-1 rounded-full hover:bg-white/20 transition"
-          >
-            {expanded ? <ChevronLeft size={18} /> : <ChevronRight size={18} />}
-          </button>
-        </div>
+        {/* Toggle Button (desktop only) */}
+        {!isMobile && (
+          <div className="absolute top-4 right-[-12px] flex items-center z-10">
+            <button
+              onClick={() => setExpanded((e) => !e)}
+              aria-label="Toggle sidebar"
+              className="bg-white/10 p-1 rounded-full hover:bg-white/20 transition"
+            >
+              {expanded ? <ChevronLeft size={18} /> : <ChevronRight size={18} />}
+            </button>
+          </div>
+        )}
 
         {/* Header */}
         <div className="px-4 py-5 border-b border-gray-800 flex items-center gap-3 sticky top-0 bg-black z-0">
@@ -140,6 +160,7 @@ export default function ApplicantLayout({ children, applicant }) {
               onClick={async () => {
                 await supabase.auth.signOut();
                 router.push('/auth/login');
+                if (isMobile) setExpanded(false); // fold after logout on mobile
               }}
               className="w-full flex items-center gap-2 px-3 py-2 rounded-md text-sm hover:bg-white/10 transition"
             >
@@ -155,4 +176,3 @@ export default function ApplicantLayout({ children, applicant }) {
     </div>
   );
 }
-
