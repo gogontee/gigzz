@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import Image from "next/image";
+import Link from "next/link";
 import { supabase } from "../../../utils/supabaseClient";
 import Footer from "../../../components/Footer";
 import MobileHeader from "../../../components/MobileHeader";
@@ -22,6 +23,7 @@ export default function ProjectForm() {
     location: "",
   });
   const [message, setMessage] = useState({ text: "", type: "" });
+  const [createdProject, setCreatedProject] = useState(null); // 👈 store created project
 
   useEffect(() => {
     const getUser = async () => {
@@ -57,7 +59,13 @@ export default function ProjectForm() {
       showMessage("User not logged in!", "error");
       return;
     }
-    if (!formData.title || !profilePic || !formData.details || !formData.tags || !formData.location) {
+    if (
+      !formData.title ||
+      !profilePic ||
+      !formData.details ||
+      !formData.tags ||
+      !formData.location
+    ) {
       showMessage("Please fill in all required fields.", "error");
       return;
     }
@@ -75,13 +83,16 @@ export default function ProjectForm() {
             .upload(`user-${user.id}/projects/${fileName}`, gallery.file);
           if (uploadError) throw uploadError;
 
-          const { data: publicUrlData, error: urlError } = supabase.storage
-            .from("project-assets")
-            .getPublicUrl(`user-${user.id}/projects/${fileName}`);
+          const { data: publicUrlData, error: urlError } =
+            supabase.storage
+              .from("project-assets")
+              .getPublicUrl(`user-${user.id}/projects/${fileName}`);
           if (urlError) throw urlError;
 
-          galleryUploads[`gallery_image_${i + 1}`] = publicUrlData.publicUrl;
-          galleryUploads[`gallery_desc_${i + 1}`] = gallery.description || "";
+          galleryUploads[`gallery_image_${i + 1}`] =
+            publicUrlData.publicUrl;
+          galleryUploads[`gallery_desc_${i + 1}`] =
+            gallery.description || "";
         }
       }
 
@@ -120,8 +131,12 @@ export default function ProjectForm() {
         .single();
       if (projectError) throw projectError;
 
+      // ✅ Store created project for later
+      setCreatedProject(projectData);
+
       showMessage("✅ Project created successfully!", "success");
 
+      // Reset form
       setFormData({
         title: "",
         details: "",
@@ -131,7 +146,9 @@ export default function ProjectForm() {
       });
       setProfilePic(null);
       setProfilePreview(null);
-      setGalleries(Array(6).fill({ file: null, description: "", preview: null }));
+      setGalleries(
+        Array(6).fill({ file: null, description: "", preview: null })
+      );
     } catch (err) {
       console.error("Upload error:", err);
       showMessage(err.message || "Something went wrong", "error");
@@ -154,17 +171,32 @@ export default function ProjectForm() {
         {message.text && (
           <div
             className={`fixed top-8 left-1/2 transform -translate-x-1/2 px-6 py-4 rounded-lg shadow-lg text-white z-50 transition-all duration-500 ${
-              message.type === "success" ? "bg-green-600" : "bg-red-600"
+              message.type === "success"
+                ? "bg-green-600"
+                : "bg-red-600"
             }`}
           >
             {message.text}
+            {/* ✅ Go to Portfolio button after success */}
+            {message.type === "success" && createdProject && (
+              <div className="mt-3 text-center">
+                <Link
+                  href="/dashboard/applicant/portfolio"
+                  className="inline-block bg-black hover:bg-orange-600 text-white px-4 py-2 rounded-lg transition"
+                >
+                  Go to Portfolio
+                </Link>
+              </div>
+            )}
           </div>
         )}
 
         <form onSubmit={handleSubmit} className="space-y-8">
-          {/* Profile Banner */}
+          {/* Project Banner */}
           <div>
-            <label className="block font-semibold text-lg mb-2">Project Banner</label>
+            <label className="block font-semibold text-lg mb-2">
+              Project Banner
+            </label>
             <input
               type="file"
               accept="image/*"
@@ -174,19 +206,28 @@ export default function ProjectForm() {
             />
             {profilePreview && (
               <div className="mt-3 w-full h-48 relative rounded-xl overflow-hidden shadow-md">
-                <Image src={profilePreview} alt="Profile Banner" fill className="object-cover" />
+                <Image
+                  src={profilePreview}
+                  alt="Profile Banner"
+                  fill
+                  className="object-cover"
+                />
               </div>
             )}
           </div>
 
           {/* Project Title */}
           <div>
-            <label className="block font-semibold text-lg mb-2">Project Title</label>
+            <label className="block font-semibold text-lg mb-2">
+              Project Title
+            </label>
             <input
               type="text"
               placeholder="Enter project title"
               value={formData.title}
-              onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+              onChange={(e) =>
+                setFormData({ ...formData, title: e.target.value })
+              }
               className="w-full border p-3 rounded-xl"
               required
             />
@@ -194,11 +235,15 @@ export default function ProjectForm() {
 
           {/* Project Details */}
           <div>
-            <label className="block font-semibold text-lg mb-2">Project Details</label>
+            <label className="block font-semibold text-lg mb-2">
+              Project Details
+            </label>
             <textarea
               placeholder="Enter project details"
               value={formData.details}
-              onChange={(e) => setFormData({ ...formData, details: e.target.value })}
+              onChange={(e) =>
+                setFormData({ ...formData, details: e.target.value })
+              }
               className="w-full border p-3 rounded-xl"
               rows={5}
               required
@@ -211,14 +256,23 @@ export default function ProjectForm() {
               Gallery Images (Optional)
             </h3>
             <p className="text-sm text-gray-500 mb-3">
-              Gallery images optional. Add 1 or more to enhance your portfolio.
+              Gallery images optional. Add 1 or more to enhance your
+              portfolio.
             </p>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {galleries.map((gallery, idx) => (
-                <div key={idx} className="flex items-center space-x-4 border p-3 rounded-xl bg-gray-50">
+                <div
+                  key={idx}
+                  className="flex items-center space-x-4 border p-3 rounded-xl bg-gray-50"
+                >
                   <div className="w-24 h-24 relative rounded-lg overflow-hidden bg-gray-200">
                     {gallery.preview ? (
-                      <Image src={gallery.preview} alt={`Gallery ${idx + 1}`} fill className="object-cover" />
+                      <Image
+                        src={gallery.preview}
+                        alt={`Gallery ${idx + 1}`}
+                        fill
+                        className="object-cover"
+                      />
                     ) : (
                       <span className="text-gray-400 text-sm flex items-center justify-center h-full w-full">
                         Thumbnail
@@ -229,14 +283,18 @@ export default function ProjectForm() {
                     <input
                       type="file"
                       accept="image/*"
-                      onChange={(e) => handleGalleryChange(idx, "file", e.target.files[0])}
+                      onChange={(e) =>
+                        handleGalleryChange(idx, "file", e.target.files[0])
+                      }
                       className="w-full border p-2 rounded"
                     />
                     <input
                       type="text"
                       placeholder="Image description"
                       value={gallery.description}
-                      onChange={(e) => handleGalleryChange(idx, "description", e.target.value)}
+                      onChange={(e) =>
+                        handleGalleryChange(idx, "description", e.target.value)
+                      }
                       className="w-full border p-2 rounded"
                     />
                   </div>
@@ -247,12 +305,16 @@ export default function ProjectForm() {
 
           {/* Tags */}
           <div>
-            <label className="block font-semibold text-lg mb-2">Tags (comma separated)</label>
+            <label className="block font-semibold text-lg mb-2">
+              Tags (comma separated)
+            </label>
             <input
               type="text"
               placeholder="e.g. Design, Architecture, Photography"
               value={formData.tags}
-              onChange={(e) => setFormData({ ...formData, tags: e.target.value })}
+              onChange={(e) =>
+                setFormData({ ...formData, tags: e.target.value })
+              }
               className="w-full border p-3 rounded-xl"
               required
             />
@@ -260,10 +322,14 @@ export default function ProjectForm() {
 
           {/* Visibility */}
           <div>
-            <label className="block font-semibold text-lg mb-2">Visibility</label>
+            <label className="block font-semibold text-lg mb-2">
+              Visibility
+            </label>
             <select
               value={formData.visibility}
-              onChange={(e) => setFormData({ ...formData, visibility: e.target.value })}
+              onChange={(e) =>
+                setFormData({ ...formData, visibility: e.target.value })
+              }
               className="w-full border p-3 rounded-xl"
             >
               <option value="public">Public</option>
@@ -273,12 +339,16 @@ export default function ProjectForm() {
 
           {/* Location */}
           <div>
-            <label className="block font-semibold text-lg mb-2">Location</label>
+            <label className="block font-semibold text-lg mb-2">
+              Location
+            </label>
             <input
               type="text"
               placeholder="Country, State, City"
               value={formData.location}
-              onChange={(e) => setFormData({ ...formData, location: e.target.value })}
+              onChange={(e) =>
+                setFormData({ ...formData, location: e.target.value })
+              }
               className="w-full border p-3 rounded-xl"
               required
             />

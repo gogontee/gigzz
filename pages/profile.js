@@ -4,7 +4,15 @@ import { useEffect, useState, useCallback } from 'react';
 import { createClient } from '@supabase/supabase-js';
 import { motion } from 'framer-motion';
 import Link from 'next/link';
-import { Eye, MessageCircle, MapPin, GraduationCap, Calendar, AlertCircle } from 'lucide-react';
+import { useRouter } from 'next/router';
+import {
+  Eye,
+  MessageCircle,
+  MapPin,
+  GraduationCap,
+  Calendar,
+  EyeOff,
+} from 'lucide-react';
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL,
@@ -12,6 +20,7 @@ const supabase = createClient(
 );
 
 export default function ProfilePage() {
+  const router = useRouter();
   const [user, setUser] = useState(null);
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -28,11 +37,12 @@ export default function ProfilePage() {
       error: userError,
     } = await supabase.auth.getUser();
 
+    // 🚨 If no auth user, redirect to login
     if (userError || !authUser) {
-      console.error('Auth error:', userError);
-      setLoading(false);
+      router.push('/auth/login');
       return;
     }
+
     setUser(authUser);
 
     const { data: userMeta } = await supabase
@@ -51,7 +61,7 @@ export default function ProfilePage() {
       .single();
 
     if (profileData) {
-      setProfile({ ...profileData, role });
+      setProfile({ ...profileData, role, table });
     }
 
     const { data: projectsData } = await supabase
@@ -63,11 +73,31 @@ export default function ProfilePage() {
     if (projectsData) setProjects(projectsData);
 
     setLoading(false);
-  }, []);
+  }, [router]);
 
   useEffect(() => {
     loadProfileAndProjects();
   }, [loadProfileAndProjects]);
+
+  // 🔄 Toggle DOB visibility
+  const toggleDobVisibility = async () => {
+    if (!profile) return;
+
+    const updatedValue = !profile.show_date_of_birth;
+    const { error } = await supabase
+      .from(profile.table)
+      .update({ show_date_of_birth: updatedValue })
+      .eq('id', profile.id);
+
+    if (!error) {
+      setProfile((prev) => ({
+        ...prev,
+        show_date_of_birth: updatedValue,
+      }));
+    } else {
+      console.error('Error updating DOB visibility:', error.message);
+    }
+  };
 
   if (loading) {
     return <div className="p-6 text-center text-gray-500">Loading profile...</div>;
@@ -169,7 +199,9 @@ export default function ProfilePage() {
               <GraduationCap className="w-5 h-5 text-orange-500" /> Education
             </h3>
             {profile.educational_qualification && (
-              <p className="text-gray-700">Qualification: {profile.educational_qualification}</p>
+              <p className="text-gray-700">
+                Qualification: {profile.educational_qualification}
+              </p>
             )}
             {profile.institutions && (
               <p className="text-gray-700">Institution: {profile.institutions}</p>
@@ -187,6 +219,22 @@ export default function ProfilePage() {
               <p className="text-gray-700">{profile.date_of_birth}</p>
             ) : (
               <p className="text-gray-500 italic">Hidden</p>
+            )}
+            {user?.id === profile.id && (
+              <button
+                onClick={toggleDobVisibility}
+                className="mt-2 flex items-center gap-2 text-sm text-orange-600 hover:underline"
+              >
+                {profile.show_date_of_birth ? (
+                  <>
+                    <EyeOff className="w-4 h-4" /> Hide DOB
+                  </>
+                ) : (
+                  <>
+                    <Eye className="w-4 h-4" /> Show DOB
+                  </>
+                )}
+              </button>
             )}
           </div>
         )}
@@ -223,8 +271,12 @@ export default function ProfilePage() {
                   </Link>
                 </div>
                 <div className="p-4">
-                  <h3 className="font-semibold text-lg mb-1 line-clamp-1">{project.title}</h3>
-                  <p className="text-sm text-gray-600">{getPreview(project.details)}</p>
+                  <h3 className="font-semibold text-lg mb-1 line-clamp-1">
+                    {project.title}
+                  </h3>
+                  <p className="text-sm text-gray-600">
+                    {getPreview(project.details)}
+                  </p>
                 </div>
               </motion.div>
             ))}

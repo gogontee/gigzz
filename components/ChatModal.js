@@ -12,6 +12,7 @@ export default function ChatModal({ chatId, userId, isOpen, onClose }) {
   const messagesEndRef = useRef(null);
   const textareaRef = useRef(null);
   const fileInputRef = useRef(null);
+  const [isReceiverOnline, setIsReceiverOnline] = useState(false);
 
   // 🔹 Auto-resize textarea
   useEffect(() => {
@@ -39,6 +40,43 @@ export default function ChatModal({ chatId, userId, isOpen, onClose }) {
     full_name: profile.full_name,
     avatar_url: formatAvatarUrl(profile.avatar_url),
   });
+
+  // Listen for receiver’s status
+useEffect(() => {
+  if (!receiver?.id) return;
+
+  const channel = supabase
+    .channel(`status-${receiver.id}`)
+    .on(
+      "postgres_changes",
+      {
+        event: "*",
+        schema: "public",
+        table: "user_status",
+        filter: `user_id=eq.${receiver.id}`,
+      },
+      (payload) => {
+        const status = payload.new;
+        if (status) {
+          setIsReceiverOnline(status.is_online);
+        }
+      }
+    )
+    .subscribe();
+
+  // Initial fetch
+  (async () => {
+    const { data } = await supabase
+      .from("user_status")
+      .select("is_online")
+      .eq("user_id", receiver.id)
+      .single();
+
+    if (data) setIsReceiverOnline(data.is_online);
+  })();
+
+  return () => supabase.removeChannel(channel);
+}, [receiver?.id]);
 
   // 🔹 Fetch receiver
   useEffect(() => {
@@ -125,20 +163,28 @@ export default function ChatModal({ chatId, userId, isOpen, onClose }) {
     const channel = supabase
       .channel(`chat-${chatId}`)
       .on(
-        "postgres_changes",
-        {
-          event: "INSERT",
-          schema: "public",
-          table: "messages",
-          filter: `chat_id=eq.${chatId}`,
-        },
-        (payload) => {
-          const newMsg = payload.new;
-          setMessages((prev) =>
-            prev.some((m) => m.id === newMsg.id)
-              ? prev
-              : [...prev, { ...newMsg, temp_id: `db-${newMsg.id}` }]
-          );
+  "postgres_changes",
+  {
+    event: "INSERT",
+    schema: "public",
+    table: "messages",
+    filter: `chat_id=eq.${chatId}`,
+  },
+  (payload) => {
+    const newMsg = payload.new;
+    setMessages((prev) => {
+      // Replace optimistic temp message if sender & content match
+      const exists = prev.some(
+        (m) =>
+          m.id === newMsg.id ||
+          (m.sender_id === newMsg.sender_id &&
+           m.content === newMsg.content &&
+           !m.id)
+      );
+      if (exists) return prev;
+
+      return [...prev, { ...newMsg, temp_id: `db-${newMsg.id}` }];
+    });
         }
       )
       .subscribe();
@@ -295,112 +341,131 @@ export default function ChatModal({ chatId, userId, isOpen, onClose }) {
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 flex items-center justify-center bg-black/60 z-50 transition-opacity duration-300">
-      <div className="bg-white w-full max-w-md h-[85vh] rounded-3xl shadow-2xl flex flex-col border border-gray-200 overflow-hidden">
-        {/* Header */}
-        <div className="p-5 border-b border-gray-200 flex justify-between items-center bg-white">
-          <div className="flex items-center gap-3">
-            <img
-              src={receiver?.avatar_url || "/avatar-placeholder.png"}
-              alt="Avatar"
-              className="w-11 h-11 rounded-full object-cover border-2 border-green-400"
-              onError={(e) => {
-                e.target.src = "/avatar-placeholder.png";
-              }}
-            />
-            <div>
-              <h2 className="font-semibold text-gray-900">
-                {receiver?.full_name || "Chat"}
-              </h2>
-              <p className="text-xs text-green-500">Online</p>
-            </div>
+  <div className="fixed inset-0 flex items-center justify-center bg-black/60 z-50 transition-opacity duration-300">
+    <div className="bg-white w-full max-w-md h-[85vh] rounded-3xl shadow-2xl flex flex-col border border-gray-200 overflow-hidden">
+      
+      {/* Header */}
+      <div className="p-5 border-b border-gray-200 flex justify-between items-center bg-white">
+        <div className="flex items-center gap-3">
+          <img
+            src={receiver?.avatar_url || "/avatar-placeholder.png"}
+            alt="Avatar"
+            className="w-11 h-11 rounded-full object-cover border-2 border-green-400"
+            onError={(e) => {
+              e.target.src = "/avatar-placeholder.png";
+            }}
+          />
+          <div>
+            <h2 className="font-semibold text-gray-900">
+              {receiver?.full_name || "Chat"}
+            </h2>
+            <p className="text-xs text-gray-500">
+              {isReceiverOnline ? (
+                <span className="text-green-500">Online</span>
+              ) : (
+                <span className="text-gray-400">Offline</span>
+              )}
+            </p>
           </div>
-          <button onClick={onClose} className="text-gray-500 hover:text-gray-700">
-            ✕
-          </button>
         </div>
+        <button
+          onClick={onClose}
+          className="text-gray-500 hover:text-gray-700 text-lg font-bold"
+        >
+          ✕
+        </button>
+      </div>
 
-        {/* Messages */}
-        <div className="flex-1 overflow-y-auto p-4 space-y-3 bg-gray-50">
-          {loading ? (
-            <p className="text-gray-400 text-center">Loading messages...</p>
-          ) : messages.length === 0 ? (
-            <p className="text-gray-500 text-center">No messages yet 👋</p>
-          ) : (
-            messages.map((msg) => {
-              const isSent = msg.sender_id === userId;
-              const isImage = msg.type === "image";
-              return (
+      {/* Messages */}
+      <div className="flex-1 overflow-y-auto p-4 space-y-3 bg-gray-50">
+        {loading ? (
+          <p className="text-gray-400 text-center">Loading messages...</p>
+        ) : messages.length === 0 ? (
+          <p className="text-gray-500 text-center">No messages yet 👋</p>
+        ) : (
+          messages.map((msg) => {
+            const isSent = msg.sender_id === userId;
+            const isImage = msg.type === "image";
+            return (
+              <div
+                key={msg.id || msg.temp_id}
+                className={`flex ${isSent ? "justify-end" : "justify-start"}`}
+              >
                 <div
-                  key={msg.id || msg.temp_id}
-                  className={`flex ${isSent ? "justify-end" : "justify-start"}`}
+                  className={`px-3 py-2 rounded-2xl text-sm shadow max-w-[70%] ${
+                    isSent
+                      ? "bg-green-500 text-white rounded-br-none"
+                      : "bg-white text-gray-800 rounded-bl-none border"
+                  }`}
                 >
-                  <div
-                    className={`px-3 py-2 rounded-2xl text-sm shadow max-w-[70%] ${
-                      isSent
-                        ? "bg-green-500 text-white rounded-br-none"
-                        : "bg-white text-gray-800 rounded-bl-none border"
-                    }`}
-                  >
-                    {isImage ? (
-                      <img
-                        src={msg.content}
-                        alt="Shared"
-                        className="max-h-48 rounded-lg object-cover"
-                      />
-                    ) : msg.type === "file" ? (
-                      <a
-                        href={msg.content}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-blue-500 underline"
-                      >
-                        📎 View File
-                      </a>
-                    ) : (
-                      <p>{msg.content}</p>
-                    )}
-                    <span className="block text-xs mt-1 text-gray-400">
-                      {new Date(msg.created_at).toLocaleTimeString([], {
-                        hour: "2-digit",
-                        minute: "2-digit",
-                      })}
-                    </span>
-                  </div>
+                  {isImage ? (
+                    <img
+                      src={msg.content}
+                      alt="Shared"
+                      className="max-h-48 rounded-lg object-cover"
+                    />
+                  ) : msg.type === "file" ? (
+                    <a
+                      href={msg.content}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-blue-500 underline"
+                    >
+                      📎 View File
+                    </a>
+                  ) : (
+                    <p>{msg.content}</p>
+                  )}
+                  <span className="block text-xs mt-1 text-gray-400">
+                    {new Date(msg.created_at).toLocaleTimeString([], {
+                      hour: "2-digit",
+                      minute: "2-digit",
+                    })}
+                  </span>
                 </div>
-              );
-            })
-          )}
-          <div ref={messagesEndRef} />
-        </div>
+              </div>
+            );
+          })
+        )}
+        <div ref={messagesEndRef} />
+      </div>
 
-        {/* Input */}
-        <div className="p-4 border-t border-gray-200 flex items-end gap-2 bg-white">
-          <button onClick={() => fileInputRef.current?.click()} disabled={uploading}>
-            📎
-          </button>
-          <input
-            type="file"
-            ref={fileInputRef}
-            className="hidden"
-            accept="image/*,.pdf,.docx"
-            onChange={handleFileUpload}
-          />
-          <textarea
-            ref={textareaRef}
-            rows={1}
-            className="flex-1 resize-none border rounded-full px-4 py-2"
-            placeholder="Type a message..."
-            value={newMessage}
-            onChange={(e) => setNewMessage(e.target.value)}
-            onKeyDown={handleKeyDown}
-            disabled={uploading}
-          />
-          <button onClick={sendMessage} disabled={!newMessage.trim() || uploading}>
-            Send
-          </button>
-        </div>
+      {/* Input */}
+      <div className="p-4 border-t border-gray-200 flex items-end gap-2 bg-white">
+        <button
+          onClick={() => fileInputRef.current?.click()}
+          disabled={uploading}
+          className="text-gray-600 hover:text-gray-800"
+        >
+          📎
+        </button>
+        <input
+          type="file"
+          ref={fileInputRef}
+          className="hidden"
+          accept="image/*,.pdf,.docx"
+          onChange={handleFileUpload}
+        />
+        <textarea
+          ref={textareaRef}
+          rows={1}
+          className="flex-1 resize-none border rounded-full px-4 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-green-500"
+          placeholder="Type a message..."
+          value={newMessage}
+          onChange={(e) => setNewMessage(e.target.value)}
+          onKeyDown={handleKeyDown}
+          disabled={uploading}
+        />
+        <button
+          onClick={sendMessage}
+          disabled={!newMessage.trim() || uploading}
+          className="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-full text-sm font-medium disabled:opacity-50"
+        >
+          Send
+        </button>
       </div>
     </div>
-  );
+  </div>
+);
+
 }

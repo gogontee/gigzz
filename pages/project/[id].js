@@ -3,7 +3,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/router';
 import { supabase } from '../../utils/supabaseClient';
 import { MessageCircle, Pencil, Megaphone, Eye } from 'lucide-react';
-import { useUser } from "@supabase/auth-helpers-react";
+import { useUser } from '@supabase/auth-helpers-react';
 
 export default function ProjectPage() {
   const router = useRouter();
@@ -17,7 +17,9 @@ export default function ProjectPage() {
   const [promotionOpen, setPromotionOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [successMsg, setSuccessMsg] = useState('');
-  
+  const [expandedDesc, setExpandedDesc] = useState(false);
+  const [expandedGallery, setExpandedGallery] = useState({});
+  const [promoting, setPromoting] = useState(false); // ✅ Loading state for promotion
 
   const [editData, setEditData] = useState({
     title: '',
@@ -27,6 +29,25 @@ export default function ProjectPage() {
     profileFile: null,
     gallery: [],
   });
+
+  // ✅ Helper for read more
+  const renderWithReadMore = (text, expanded, toggle) => {
+    if (!text) return null;
+    const words = text.split(' ');
+    if (words.length <= 50) return text;
+
+    return (
+      <>
+        {expanded ? text : words.slice(0, 50).join(' ') + '...'}
+        <button
+          onClick={toggle}
+          className="ml-2 text-orange-600 text-sm hover:underline"
+        >
+          {expanded ? 'Read less' : 'Read more'}
+        </button>
+      </>
+    );
+  };
 
   // fetch project
   useEffect(() => {
@@ -247,18 +268,93 @@ export default function ProjectPage() {
     }
   };
 
-  const handlePromote = async (type) => {
-    const { error } = await supabase.from('projects').update({ promote: type }).eq('id', project.id);
-    if (error) console.error('Promotion failed:', error);
-    else {
-      setProject({ ...project, promote: type });
-      setPromotionOpen(false);
+  // ✅ Handle promotion: Deduct 5 tokens, log action, set promote to "Premium"
+  // ✅ Simplified Promotion Flow
+const handlePromote = async () => {
+  if (!project) {
+    alert('Project not loaded yet.');
+    return;
+  }
+
+  setPromoting(true);
+  try {
+    // 1. Fetch wallet
+    const { data: wallet, error: walletError } = await supabase
+      .from('token_wallets')
+      .select('id, balance')
+      .eq('user_id', project.user_id) // 👈 link wallet to the project owner
+      .single();
+
+    if (walletError || !wallet) {
+      console.error('Wallet fetch error:', walletError);
+      alert('Wallet not found.');
+      setPromoting(false);
+      return;
     }
-  };
+
+    if (wallet.balance < 5) {
+      alert('Not enough tokens. You need 5 tokens to promote.');
+      setPromoting(false);
+      return;
+    }
+
+    // 2. Deduct tokens + set last_action
+    const { error: walletUpdateError } = await supabase
+      .from('token_wallets')
+      .update({
+        balance: wallet.balance - 5,
+        last_action: 'Project promotion',
+      })
+      .eq('id', wallet.id);
+
+    if (walletUpdateError) {
+      console.error('Wallet update error:', walletUpdateError);
+      alert('Failed to update wallet.');
+      setPromoting(false);
+      return;
+    }
+
+    // 3. Promote project with expiry (7 days)
+    const now = new Date();
+    const expiresAt = new Date();
+    expiresAt.setDate(now.getDate() + 7);
+
+    const { error: projectUpdateError } = await supabase
+      .from('projects')
+      .update({
+        promote: 'Premium',
+        promote_expires_at: expiresAt.toISOString(),
+      })
+      .eq('id', project.id);
+
+    if (projectUpdateError) {
+      console.error('Project update error:', projectUpdateError);
+      alert('Failed to promote project.');
+      setPromoting(false);
+      return;
+    }
+
+    // 4. Success 🎉
+    setProject((prev) => ({
+      ...prev,
+      promote: 'Premium',
+      promote_expires_at: expiresAt.toISOString(),
+    }));
+    setSuccessMsg('🎉 Your portfolio has been promoted to Premium!');
+    setTimeout(() => setSuccessMsg(''), 4000);
+    setPromotionOpen(false);
+  } catch (e) {
+    console.error('Promotion error:', e.message);
+    alert('Unexpected error promoting project.');
+  } finally {
+    setPromoting(false);
+  }
+};
 
   // render
   if (loading) return <p className="text-center py-10">Loading project...</p>;
   if (!project) return <p className="text-center py-10 text-red-600">Project not found.</p>;
+  
 
   return (
     <div className="w-full max-w-5xl mx-auto px-4 md:px-0 pt-8 md:pt-20 relative">
@@ -296,27 +392,26 @@ export default function ProjectPage() {
           />
         )}
 
-
         {/* User avatar */}
-{project.avatar_url && (
-  <div className="absolute left-1/2 top-full -translate-x-1/2 -translate-y-1/2 mt-4 flex flex-col items-center">
-    <a href={`/dashboard/profile/${project.user_id}`}>
-      <img
-        src={project.avatar_url}
-        alt="User Avatar"
-        className="w-20 h-20 rounded-full border-4 border-white object-cover hover:scale-105 transition"
-      />
-    </a>
-    {fullName && (
-  <a
-    href={`/dashboard/profile/${project.user_id}`}
-    className="mt-2 font-medium text-gray-800 hover:text-orange-500 transition"
-  >
-    {fullName}
-  </a>
-)}
-  </div>
-)}
+        {project.avatar_url && (
+          <div className="absolute left-1/2 top-full -translate-x-1/2 -translate-y-1/2 mt-4 flex flex-col items-center">
+            <a href={`/dashboard/profile/${project.user_id}`}>
+              <img
+                src={project.avatar_url}
+                alt="User Avatar"
+                className="w-20 h-20 rounded-full border-4 border-white object-cover hover:scale-105 transition"
+              />
+            </a>
+            {fullName && (
+              <a
+                href={`/dashboard/profile/${project.user_id}`}
+                className="mt-2 font-medium text-gray-800 hover:text-orange-500 transition"
+              >
+                {fullName}
+              </a>
+            )}
+          </div>
+        )}
 
         {/* Owner actions */}
         {isOwner && (
@@ -341,10 +436,10 @@ export default function ProjectPage() {
             type="text"
             value={editData.title}
             onChange={(e) => setEditData((p) => ({ ...p, title: e.target.value }))}
-            className="text-3xl font-bold border-b p-2 w-full text-center"
+            className="text-xl font-bold border-b p-2 w-full text-center"
           />
         ) : (
-          <h1 className="text-3xl font-bold">{project.title}</h1>
+          <h1 className="text-xl font-bold">{project.title}</h1>
         )}
 
         {isEditing ? (
@@ -354,10 +449,20 @@ export default function ProjectPage() {
             className="mt-4 w-full border p-2 rounded"
           />
         ) : (
-          project.details && <p className="mt-4 text-gray-700">{project.details}</p>
+          project.details && (
+            <p className="mt-4 text-gray-700">
+              {renderWithReadMore(
+                project.details,
+                expandedDesc,
+                () => setExpandedDesc((prev) => !prev)
+              )}
+            </p>
+          )
         )}
 
-        {project.location && <p className="mt-2 text-gray-500 text-sm">📍 {project.location}</p>}
+        {project.location && (
+          <p className="mt-2 text-gray-500 text-sm">📍 {project.location}</p>
+        )}
       </div>
 
       {/* Gallery */}
@@ -416,13 +521,26 @@ export default function ProjectPage() {
                         className="w-full h-48 object-cover rounded-lg"
                       />
                     )}
-                    {item.desc && <p className="mt-2 text-gray-600 text-sm">{item.desc}</p>}
+                    {item.desc && (
+                      <p className="mt-2 text-gray-600 text-sm">
+                        {renderWithReadMore(
+                          item.desc,
+                          !!expandedGallery[item.index],
+                          () =>
+                            setExpandedGallery((prev) => ({
+                              ...prev,
+                              [item.index]: !prev[item.index],
+                            }))
+                        )}
+                      </p>
+                    )}
                   </>
                 )}
               </div>
             ))}
         </div>
       </div>
+
       {/* Show See Profile button only if viewer is NOT the owner */}
       {user && user.id !== project.user_id && (
         <div className="mt-6 flex justify-center">
@@ -434,7 +552,6 @@ export default function ProjectPage() {
           </a>
         </div>
       )}
-
 
       {/* Save buttons */}
       {isEditing && (
@@ -487,39 +604,41 @@ export default function ProjectPage() {
       {promotionOpen && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-30">
           <div className="bg-white p-6 rounded-lg shadow-lg w-80">
-            <h2 className="text-lg font-semibold mb-4">Promote Your portfolio</h2>
-            <ul className="space-y-3">
-              <li>
+            {project.promote?.toLowerCase() === 'premium' ? (
+              <>
+                <h2 className="text-lg font-semibold mb-4">Already Promoted</h2>
+                <p className="text-gray-700 mb-4">Your portfolio is already promoted as Premium.</p>
                 <button
-                  onClick={() => handlePromote('Premium')}
-                  className="w-full bg-orange-500 text-white p-2 rounded hover:bg-orange-600"
+                  onClick={() => setPromotionOpen(false)}
+                  className="w-full bg-gray-300 p-2 rounded hover:bg-gray-400"
                 >
-                  Premium – 10 Tokens
+                  Close
                 </button>
-              </li>
-              <li>
+              </>
+            ) : (
+              <>
+                <h2 className="text-lg font-semibold mb-4">Promote Your Portfolio</h2>
+                <p className="text-sm text-gray-600 mb-4">Promote your portfolio to Premium for 5 tokens.</p>
                 <button
-                  onClick={() => handlePromote('Top Add')}
-                  className="w-full bg-orange-500 text-white p-2 rounded hover:bg-orange-600"
+                  onClick={handlePromote}
+                  disabled={promoting}
+                  className={`w-full p-2 rounded ${
+                    promoting
+                      ? 'bg-gray-400 cursor-not-allowed'
+                      : 'bg-orange-500 hover:bg-orange-600 text-white'
+                  }`}
                 >
-                  Top Add – 5 Tokens
+                  {promoting ? 'Processing...' : 'Promote to Premium – 5 Tokens'}
                 </button>
-              </li>
-              <li>
                 <button
-                  onClick={() => handlePromote('Featured Add')}
-                  className="w-full bg-orange-500 text-white p-2 rounded hover:bg-orange-600"
+                  onClick={() => setPromotionOpen(false)}
+                  className="mt-4 w-full bg-gray-300 p-2 rounded hover:bg-gray-400"
+                  disabled={promoting}
                 >
-                  Featured Add – 3 Tokens
+                  Cancel
                 </button>
-              </li>
-            </ul>
-            <button
-              onClick={() => setPromotionOpen(false)}
-              className="mt-4 w-full bg-gray-300 p-2 rounded hover:bg-gray-400"
-            >
-              Cancel
-            </button>
+              </>
+            )}
           </div>
         </div>
       )}

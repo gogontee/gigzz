@@ -441,7 +441,7 @@ export default function JobDetailPage() {
               <div className="flex flex-col items-center gap-2 relative">
                 <div className="relative">
                   <img
-                    src={poster?.avatar_url || 'https://i.pravatar.cc/60?img=5'}
+                    src={poster?.avatar_url || 'https://xatxjdsppcjgplmrtjcs.supabase.co/storage/v1/object/public/avatars/icon.png'}
                     alt="Poster Avatar"
                     className="w-12 h-12 rounded-full object-cover"
                   />

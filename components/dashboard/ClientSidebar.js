@@ -1,5 +1,6 @@
 'use client';
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
+import Link from 'next/link'; // ✅ import Link
 import { createClient } from '@supabase/supabase-js';
 import {
   Briefcase,
@@ -26,8 +27,8 @@ const items = [
   { key: 'post', label: 'Post Job', icon: <PlusCircle size={18} /> },
   { key: 'jobs', label: 'My Jobs', icon: <Briefcase size={18} /> },
   { key: 'wallet', label: 'Wallet / Promotions', icon: <Wallet size={18} /> },
-  { key: 'portfolios', label: 'Portfolios', icon: <User size={18} /> },
-  { key: 'chats', label: 'Chats', icon: <MessageCircle size={18} /> },
+  { key: 'portfolios', label: 'Portfolios', icon: <User size={18} />, path: '/portfolio' }, // ✅ added path
+  { key: 'chats', label: 'Chats', icon: <MessageCircle size={18} /> , path: '/messages' },
   { key: 'calls', label: 'Video Calls', icon: <Video size={18} /> },
   { key: 'profile', label: 'Profile', icon: <Settings size={18} /> },
   { key: 'verify', label: 'Verification', icon: <ShieldCheck size={18} />, path: '/verification' },
@@ -47,11 +48,6 @@ export default function ClientSidebar({ active, onChange, employer }) {
 
   const handleMouseEnter = () => setExpanded(true);
   const handleMouseLeave = () => setExpanded(false);
-
-  const handleItemClick = (key) => {
-    onChange(key);
-    setExpanded(false); // fold after click
-  };
 
   return (
     <aside
@@ -84,18 +80,15 @@ export default function ClientSidebar({ active, onChange, employer }) {
         {expanded && <div className="flex-1 text-sm opacity-80">Client Dashboard</div>}
       </div>
 
-      {/* Nav + Footer wrapper */}
+      {/* Nav Items */}
       <div className="flex flex-col px-1 py-4 space-y-1 sticky top-0">
-        {/* Nav Items */}
         {items.map((it) => {
           const isActive = active === it.key;
-          return (
-            <button
-              key={it.key}
-              onClick={() => handleItemClick(it.key)}
+          const content = (
+            <div
               className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-left transition ${
                 isActive ? 'bg-orange-500 text-white' : 'text-white'
-              } hover:bg-orange-600 focus:outline-none`}
+              } hover:bg-orange-600`}
             >
               <div className="flex-shrink-0">{it.icon}</div>
               <div
@@ -104,21 +97,25 @@ export default function ClientSidebar({ active, onChange, employer }) {
                 {it.label}
               </div>
               {isActive && expanded && <div className="w-2 h-2 bg-orange-300 rounded-full ml-1" />}
-            </button>
+            </div>
+          );
+
+          return it.path ? (
+            <Link key={it.key} href={it.path}>{content}</Link> // ✅ Use Link for paths
+          ) : (
+            <button key={it.key} onClick={() => onChange(it.key)}>{content}</button>
           );
         })}
 
-        {/* Footer: avatar + logout */}
+        {/* Footer */}
         <div className="mt-4 px-3 py-4 border-t border-gray-800 flex flex-col gap-3">
           {employer && (
             <div className="flex items-center gap-3">
-              <div className="relative">
-                <img
-                  src={avatarUrl || '/placeholder-user.png'}
-                  alt="Profile"
-                  className="w-9 h-9 rounded-full object-cover border-2 border-white"
-                />
-              </div>
+              <img
+                src={avatarUrl || '/placeholder-user.png'}
+                alt="Profile"
+                className="w-9 h-9 rounded-full object-cover border-2 border-white"
+              />
               {expanded && (
                 <div className="flex flex-col text-xs">
                   <div className="font-semibold">{employer.name || 'Client'}</div>
@@ -129,9 +126,7 @@ export default function ClientSidebar({ active, onChange, employer }) {
           )}
 
           <button
-            onClick={() => {
-              window.location.href = '/auth/login';
-            }}
+            onClick={() => { window.location.href = '/auth/login'; }}
             className="w-full flex items-center gap-2 px-3 py-2 rounded-md text-sm hover:bg-white/10 transition"
           >
             <LogOut size={16} />
