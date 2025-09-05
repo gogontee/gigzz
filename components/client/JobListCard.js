@@ -15,11 +15,9 @@ export default function JobListCard({ job, onDelete, onUpdate }) {
   const router = useRouter();
   const [isEditing, setIsEditing] = useState(false);
   const [isDetailsOpen, setIsDetailsOpen] = useState(false);
-  const [isApplicantsOpen, setIsApplicantsOpen] = useState(false);
   const [formData, setFormData] = useState({});
-  const [loading, setLoading] = useState(false); // used for applicants modal loading
+  const [loading, setLoading] = useState(false); 
   const [applicantsCount, setApplicantsCount] = useState(0);
-  const [applicants, setApplicants] = useState([]); // array of { id, applicant_id }
 
   // ✅ Fetch applicants COUNT (accurate + fast)
   useEffect(() => {
@@ -41,28 +39,6 @@ export default function JobListCard({ job, onDelete, onUpdate }) {
 
     fetchApplicantsCount();
   }, [job?.id]);
-
-  // ✅ Fetch applicants LIST (IDs only; ProfileCard self-fetches full data by id)
-  const fetchApplicants = async () => {
-    if (!job?.id) return;
-    setLoading(true);
-
-    const { data, error } = await supabase
-      .from('applications')
-      .select('id, applicant_id')
-      .eq('job_id', job.id)
-      .order('id', { ascending: false });
-
-    if (error) {
-      console.error('Error fetching applicants:', error.message);
-      setApplicants([]);
-    } else {
-      setApplicants(data || []);
-    }
-
-    setIsApplicantsOpen(true);
-    setLoading(false);
-  };
 
   // ✅ Fetch latest job before editing
   const handleEditClick = async () => {
@@ -193,23 +169,26 @@ export default function JobListCard({ job, onDelete, onUpdate }) {
 
         <div className="text-sm text-gray-600">Applicants: {applicantsCount}</div>
 
-        <div className="flex justify-end gap-3 pt-2 mt-auto">
+        <div className="flex flex-wrap justify-end gap-3 pt-2 mt-auto">
           <button onClick={() => setIsDetailsOpen(true)} className="text-sm text-green-600 hover:text-green-800">
-            View Details
+            Details
           </button>
 
           {/* ✅ Updated: Link to Applicants Page */}
           <Link href={`/job/${job.id}/applicants`}>
             <span className="text-sm text-purple-600 hover:text-purple-800 cursor-pointer">
-              See Applicants
+              Applicants
             </span>
           </Link>
 
           <button onClick={handleEditClick} className="flex items-center gap-1 text-sm text-blue-600 hover:text-blue-800">
-            <Pencil size={16} /> Edit
+            <Pencil size={16} /> 
           </button>
-          <button onClick={onDelete} className="flex items-center gap-1 text-sm text-red-600 hover:text-red-800">
-            <Trash2 size={16} /> Delete
+          <button 
+            onClick={() => alert("You cannot delete your job at the moment.")} 
+            className="flex items-center gap-1 text-sm text-red-600 hover:text-red-800"
+          >
+            <Trash2 size={16} /> 
           </button>
         </div>
       </>
