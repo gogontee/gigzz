@@ -1,6 +1,6 @@
 // components/Token.js
 import { useEffect, useState } from "react";
-import { supabase } from "../lib/supabaseClient";
+import { supabase } from '../utils/supabaseClient';
 
 export default function Token() {
   const [balance, setBalance] = useState(0);
@@ -136,17 +136,17 @@ export default function Token() {
   };
 
   return (
-    <div className="space-y-6">
-    <h1 className="text-2xl sm:text-3xl font-bold">My Tokens</h1>
+    <div className="px-3 py-4 space-y-4 sm:px-4 sm:py-6 sm:space-y-6">
+      <h1 className="text-lg sm:text-2xl font-bold">My Tokens</h1>
 
       {/* Balance Card */}
-      <div className="bg-gradient-to-r from-orange-500 to-red-500 shadow-lg p-6 sm:p-8 rounded-2xl mb-8 text-white text-center">
-        <h2 className="text-lg sm:text-xl font-semibold mb-4">Token Balance</h2>
+      <div className="bg-gradient-to-r from-orange-500 to-red-500 shadow p-3 sm:p-6 rounded-lg sm:rounded-xl text-white text-center">
+        <h2 className="text-sm sm:text-lg font-semibold mb-2">Token Balance</h2>
 
         {loading ? (
-          <p className="text-base sm:text-lg">Loading...</p>
+          <p className="text-xs sm:text-base">Loading...</p>
         ) : (
-          <p className="text-4xl sm:text-5xl font-extrabold mb-6 flex items-center justify-center gap-2">
+          <p className="text-2xl sm:text-4xl font-extrabold mb-3 sm:mb-4 flex items-center justify-center gap-1 sm:gap-2">
             <span>{balance}</span> 🎟️
           </p>
         )}
@@ -154,31 +154,27 @@ export default function Token() {
         <button
           onClick={() => setShowPackages(true)}
           disabled={funding}
-          className="bg-white text-black hover:bg-gray-200 font-semibold px-4 sm:px-6 py-2 sm:py-3 rounded-lg transition duration-300 text-sm sm:text-base"
+          className="bg-white text-black hover:bg-gray-200 font-semibold px-3 py-1.5 sm:px-4 sm:py-2 rounded-md sm:rounded-lg transition text-xs sm:text-sm"
         >
           {funding ? "Processing..." : "Fund Tokens"}
         </button>
       </div>
 
       {/* Transaction History */}
-      <div className="bg-white shadow-md rounded-xl p-4 sm:p-6">
-        <h2 className="text-lg sm:text-xl font-semibold mb-4">
-          Transaction History
-        </h2>
+      <div className="bg-white shadow rounded-lg sm:rounded-xl p-3 sm:p-4">
+        <h2 className="text-sm sm:text-lg font-semibold mb-2 sm:mb-3">Transaction History</h2>
 
         {transactions.length === 0 ? (
-          <p className="text-gray-500 text-xs sm:text-sm">
-            No transactions yet
-          </p>
+          <p className="text-gray-500 text-xs sm:text-sm">No transactions yet</p>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-xs sm:text-sm text-left border-collapse">
               <thead className="bg-gray-100 text-gray-700">
                 <tr>
-                  <th className="py-2 px-3 sm:px-4">Date/Time</th>
-                  <th className="py-2 px-3 sm:px-4">Description</th>
-                  <th className="py-2 px-3 sm:px-4 text-green-600">Tokens In</th>
-                  <th className="py-2 px-3 sm:px-4 text-red-600">Tokens Out</th>
+                  <th className="py-1.5 px-2 sm:py-2 sm:px-3">Date/Time</th>
+                  <th className="py-1.5 px-2 sm:py-2 sm:px-3">Description</th>
+                  <th className="py-1.5 px-2 sm:py-2 sm:px-3 text-green-600">In</th>
+                  <th className="py-1.5 px-2 sm:py-2 sm:px-3 text-red-600">Out</th>
                 </tr>
               </thead>
               <tbody>
@@ -187,16 +183,16 @@ export default function Token() {
                     key={t.id}
                     className="border-b last:border-0 hover:bg-gray-50"
                   >
-                    <td className="py-2 px-3 sm:px-4 whitespace-nowrap">
+                    <td className="py-1.5 px-2 whitespace-nowrap">
                       {new Date(t.created_at).toLocaleString()}
                     </td>
-                    <td className="py-2 px-3 sm:px-4 break-words max-w-[150px] sm:max-w-none">
+                    <td className="py-1.5 px-2 break-words max-w-[100px] sm:max-w-none">
                       {t.description}
                     </td>
-                    <td className="py-2 px-3 sm:px-4 text-green-600 font-medium">
+                    <td className="py-1.5 px-2 text-green-600 font-medium">
                       {t.tokens_in || "-"}
                     </td>
-                    <td className="py-2 px-3 sm:px-4 text-red-600 font-medium">
+                    <td className="py-1.5 px-2 text-red-600 font-medium">
                       {t.tokens_out || "-"}
                     </td>
                   </tr>
@@ -209,51 +205,37 @@ export default function Token() {
 
       {/* Token Packages Modal */}
       {showPackages && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 px-2 sm:px-4">
-          <div className="bg-white rounded-xl shadow-lg max-w-xs sm:max-w-sm w-full p-3 sm:p-4 md:p-6 relative">
-            <h2 className="text-base sm:text-lg md:text-xl font-bold text-center mb-3 sm:mb-4 md:mb-6">
-              Choose a Token Package
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 px-3">
+          <div className="bg-white rounded-lg sm:rounded-xl shadow-lg max-w-xs w-full p-3 sm:p-4 relative">
+            <h2 className="text-base sm:text-lg font-bold text-center mb-3 sm:mb-4">
+              Choose a Package
             </h2>
-            <div className="grid gap-2 sm:gap-3 md:gap-4">
-              {/* Seeker Package */}
+            <div className="grid gap-2 sm:gap-3">
               <div
-                className="border rounded-lg p-2 sm:p-3 md:p-4 text-center cursor-pointer hover:bg-gray-100 transition"
+                className="border rounded-md sm:rounded-lg p-2 sm:p-3 text-center cursor-pointer hover:bg-gray-100 transition"
                 onClick={() =>
                   handlePurchase(10, "Purchased Seeker Package (₦5,000)")
                 }
               >
-                <h3 className="text-sm sm:text-base md:text-lg font-semibold">
-                  ⚡ Seeker
-                </h3>
-                <p className="mt-1 text-gray-600 text-xs sm:text-sm md:text-base">
-                  10 Tokens
-                </p>
-                <p className="mt-1 font-bold text-xs sm:text-sm md:text-lg">
-                  ₦5,000
-                </p>
+                <h3 className="text-sm sm:text-base font-semibold">⚡ Seeker</h3>
+                <p className="mt-0.5 text-gray-600 text-xs sm:text-sm">10 Tokens</p>
+                <p className="mt-0.5 font-bold text-xs sm:text-sm">₦5,000</p>
               </div>
 
-              {/* Titan Package */}
               <div
-                className="border rounded-lg p-2 sm:p-3 md:p-4 text-center cursor-pointer hover:bg-gray-100 transition"
+                className="border rounded-md sm:rounded-lg p-2 sm:p-3 text-center cursor-pointer hover:bg-gray-100 transition"
                 onClick={() =>
                   handlePurchase(20, "Purchased Titan Package (₦8,000)")
                 }
               >
-                <h3 className="text-sm sm:text-base md:text-lg font-semibold">
-                  🔥 Titan
-                </h3>
-                <p className="mt-1 text-gray-600 text-xs sm:text-sm md:text-base">
-                  20 Tokens
-                </p>
-                <p className="mt-1 font-bold text-xs sm:text-sm md:text-lg">
-                  ₦8,000
-                </p>
+                <h3 className="text-sm sm:text-base font-semibold">🔥 Titan</h3>
+                <p className="mt-0.5 text-gray-600 text-xs sm:text-sm">20 Tokens</p>
+                <p className="mt-0.5 font-bold text-xs sm:text-sm">₦8,000</p>
               </div>
             </div>
 
             <button
-              className="absolute top-2 right-2 sm:top-3 sm:right-3 text-gray-500 hover:text-black text-sm sm:text-base"
+              className="absolute top-2 right-2 text-gray-500 hover:text-black text-xs sm:text-sm"
               onClick={() => setShowPackages(false)}
             >
               ✖
