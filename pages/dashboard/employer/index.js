@@ -7,12 +7,13 @@ import { useRouter } from 'next/router';
 import Sidebar from '../../../components/dashboard/ClientSidebar';
 import JobPostForm from '../../../components/client/JobPostForm';
 import WalletSummary from '../../../components/client/WalletSummary';
-import ChatSidebar from '../../../components/client/ChatSidebar';
 import VideoCallModal from '../../../components/client/VideoCallModal';
 import EmployerProfileEditor from '../../../components/client/EmployerProfileEditor';
 import PromotionPanel from '../../../components/client/PromotionPanel';
 import JobListCard from '../../../components/client/JobListCard';
 import Verify from '../../../components/Verify';
+import Messages from '../../../components/Messages';
+import Portfolio from '../../../components/Portfolios'; // ✅ import Portfolio component
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL,
@@ -36,12 +37,13 @@ export default function EmployerDashboard() {
     if (!isValidComponent(Sidebar)) errs.push('ClientSidebar');
     if (!isValidComponent(JobPostForm)) errs.push('JobPostForm');
     if (!isValidComponent(WalletSummary)) errs.push('WalletSummary');
-    if (!isValidComponent(ChatSidebar)) errs.push('ChatSidebar');
     if (!isValidComponent(VideoCallModal)) errs.push('VideoCallModal');
     if (!isValidComponent(EmployerProfileEditor)) errs.push('EmployerProfileEditor');
     if (!isValidComponent(PromotionPanel)) errs.push('PromotionPanel');
     if (!isValidComponent(JobListCard)) errs.push('JobListCard');
     if (!isValidComponent(Verify)) errs.push('Verify');
+    if (!isValidComponent(Messages)) errs.push('Messages');
+    if (!isValidComponent(Portfolio)) errs.push('Portfolios');
     setImportErrors(errs);
   }, []);
 
@@ -184,6 +186,7 @@ export default function EmployerDashboard() {
           {activeSection === 'profile' && employer && (
             <EmployerProfileEditor employer={employer} onUpdated={fetchInitial} />
           )}
+
           {activeSection === 'verify' && employer && (
             <div>
               <h2 className="text-xl font-semibold mb-4">Verify Your Identity</h2>
@@ -191,7 +194,12 @@ export default function EmployerDashboard() {
             </div>
           )}
 
-          {activeSection === 'chats' && employer && <ChatSidebar employer={employer} />}
+          {/* ✅ Show Messages instead of ChatSidebar */}
+          {activeSection === 'chats' && <Messages />}
+
+          {/* ✅ Show Portfolio component */}
+          {activeSection === 'portfolios' && <Portfolio />}
+
           {activeSection === 'calls' && <VideoCallModal />}
         </div>
       </div>
