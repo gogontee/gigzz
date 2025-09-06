@@ -136,8 +136,8 @@ export default function Token() {
   };
 
   return (
-    <div className="w-full max-w-3xl mx-auto px-4 py-6">
-      <h1 className="text-2xl sm:text-3xl font-bold mb-6">My Tokens</h1>
+    <div className="space-y-6">
+    <h1 className="text-2xl sm:text-3xl font-bold">My Tokens</h1>
 
       {/* Balance Card */}
       <div className="bg-gradient-to-r from-orange-500 to-red-500 shadow-lg p-6 sm:p-8 rounded-2xl mb-8 text-white text-center">
