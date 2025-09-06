@@ -1,7 +1,8 @@
+// components/Token.js
 import { useEffect, useState } from "react";
-import { supabase } from '../utils/supabaseClient';
+import { supabase } from "../lib/supabaseClient";
 
-export default function TokensPage() {
+export default function Token() {
   const [balance, setBalance] = useState(0);
   const [loading, setLoading] = useState(true);
   const [funding, setFunding] = useState(false);
@@ -135,45 +136,33 @@ export default function TokensPage() {
   };
 
   return (
-    <div className="max-w-3xl mx-auto px-3 sm:px-4 py-6 sm:py-10 md:pt-20 md:pb-10">
-      <h1 className="text-xl sm:text-2xl md:text-3xl font-bold mb-4 sm:mb-6">
-        My Tokens
-      </h1>
+    <div className="w-full max-w-3xl mx-auto px-4 py-6">
+      <h1 className="text-2xl sm:text-3xl font-bold mb-6">My Tokens</h1>
 
       {/* Balance Card */}
-      <div
-        className="bg-gradient-to-r from-orange-500 to-red-500 shadow-lg 
-        p-3 sm:p-5 md:p-6 rounded-lg sm:rounded-xl mb-5 sm:mb-6 
-        text-white text-center"
-      >
-        <h2 className="text-sm sm:text-lg font-semibold mb-2 sm:mb-4">
-          Token Balance
-        </h2>
+      <div className="bg-gradient-to-r from-orange-500 to-red-500 shadow-lg p-6 sm:p-8 rounded-2xl mb-8 text-white text-center">
+        <h2 className="text-lg sm:text-xl font-semibold mb-4">Token Balance</h2>
 
         {loading ? (
-          <p className="text-sm sm:text-base">Loading...</p>
+          <p className="text-base sm:text-lg">Loading...</p>
         ) : (
-          <p
-            className="text-xl sm:text-3xl md:text-5xl font-extrabold mb-2 sm:mb-4 
-            flex items-center justify-center gap-1 sm:gap-2"
-          >
+          <p className="text-4xl sm:text-5xl font-extrabold mb-6 flex items-center justify-center gap-2">
             <span>{balance}</span> 🎟️
           </p>
         )}
 
         <button
           onClick={() => setShowPackages(true)}
-          className="bg-white text-black hover:bg-gray-200 font-semibold 
-          px-3 sm:px-5 py-1.5 sm:py-2.5 rounded-lg transition duration-300 
-          text-xs sm:text-sm md:text-base"
+          disabled={funding}
+          className="bg-white text-black hover:bg-gray-200 font-semibold px-4 sm:px-6 py-2 sm:py-3 rounded-lg transition duration-300 text-sm sm:text-base"
         >
-          Fund Tokens
+          {funding ? "Processing..." : "Fund Tokens"}
         </button>
       </div>
 
       {/* Transaction History */}
-      <div className="bg-white shadow-md rounded-lg sm:rounded-xl p-3 sm:p-5">
-        <h2 className="text-base sm:text-lg md:text-xl font-semibold mb-3 sm:mb-4">
+      <div className="bg-white shadow-md rounded-xl p-4 sm:p-6">
+        <h2 className="text-lg sm:text-xl font-semibold mb-4">
           Transaction History
         </h2>
 
@@ -183,17 +172,13 @@ export default function TokensPage() {
           </p>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full text-xs sm:text-sm md:text-base text-left border-collapse">
+            <table className="w-full text-xs sm:text-sm text-left border-collapse">
               <thead className="bg-gray-100 text-gray-700">
                 <tr>
-                  <th className="py-1.5 px-2 sm:py-2 sm:px-4">Date/Time</th>
-                  <th className="py-1.5 px-2 sm:py-2 sm:px-4">Description</th>
-                  <th className="py-1.5 px-2 sm:py-2 sm:px-4 text-green-600">
-                    Tokens In
-                  </th>
-                  <th className="py-1.5 px-2 sm:py-2 sm:px-4 text-red-600">
-                    Tokens Out
-                  </th>
+                  <th className="py-2 px-3 sm:px-4">Date/Time</th>
+                  <th className="py-2 px-3 sm:px-4">Description</th>
+                  <th className="py-2 px-3 sm:px-4 text-green-600">Tokens In</th>
+                  <th className="py-2 px-3 sm:px-4 text-red-600">Tokens Out</th>
                 </tr>
               </thead>
               <tbody>
@@ -202,16 +187,16 @@ export default function TokensPage() {
                     key={t.id}
                     className="border-b last:border-0 hover:bg-gray-50"
                   >
-                    <td className="py-1.5 px-2 sm:py-2 sm:px-4 whitespace-nowrap">
+                    <td className="py-2 px-3 sm:px-4 whitespace-nowrap">
                       {new Date(t.created_at).toLocaleString()}
                     </td>
-                    <td className="py-1.5 px-2 sm:py-2 sm:px-4 break-words max-w-[120px] sm:max-w-none">
+                    <td className="py-2 px-3 sm:px-4 break-words max-w-[150px] sm:max-w-none">
                       {t.description}
                     </td>
-                    <td className="py-1.5 px-2 sm:py-2 sm:px-4 text-green-600 font-medium">
+                    <td className="py-2 px-3 sm:px-4 text-green-600 font-medium">
                       {t.tokens_in || "-"}
                     </td>
-                    <td className="py-1.5 px-2 sm:py-2 sm:px-4 text-red-600 font-medium">
+                    <td className="py-2 px-3 sm:px-4 text-red-600 font-medium">
                       {t.tokens_out || "-"}
                     </td>
                   </tr>
@@ -225,8 +210,8 @@ export default function TokensPage() {
       {/* Token Packages Modal */}
       {showPackages && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 px-2 sm:px-4">
-          <div className="bg-white rounded-lg sm:rounded-xl shadow-lg max-w-[90%] sm:max-w-sm w-full p-3 sm:p-4 md:p-6 relative">
-            <h2 className="text-sm sm:text-lg md:text-xl font-bold text-center mb-3 sm:mb-4 md:mb-6">
+          <div className="bg-white rounded-xl shadow-lg max-w-xs sm:max-w-sm w-full p-3 sm:p-4 md:p-6 relative">
+            <h2 className="text-base sm:text-lg md:text-xl font-bold text-center mb-3 sm:mb-4 md:mb-6">
               Choose a Token Package
             </h2>
             <div className="grid gap-2 sm:gap-3 md:gap-4">
@@ -237,7 +222,7 @@ export default function TokensPage() {
                   handlePurchase(10, "Purchased Seeker Package (₦5,000)")
                 }
               >
-                <h3 className="text-xs sm:text-base md:text-lg font-semibold">
+                <h3 className="text-sm sm:text-base md:text-lg font-semibold">
                   ⚡ Seeker
                 </h3>
                 <p className="mt-1 text-gray-600 text-xs sm:text-sm md:text-base">
@@ -255,7 +240,7 @@ export default function TokensPage() {
                   handlePurchase(20, "Purchased Titan Package (₦8,000)")
                 }
               >
-                <h3 className="text-xs sm:text-base md:text-lg font-semibold">
+                <h3 className="text-sm sm:text-base md:text-lg font-semibold">
                   🔥 Titan
                 </h3>
                 <p className="mt-1 text-gray-600 text-xs sm:text-sm md:text-base">
