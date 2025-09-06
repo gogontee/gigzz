@@ -68,11 +68,11 @@ export default function Application({ userId }) {
       </h2>
 
       {/* Grid of Applications */}
-      <div className="grid grid-cols-2 md:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         {applications.map((app) => (
           <div
             key={app.id}
-            className="p-5 border rounded-xl shadow-sm bg-white hover:shadow-md transition"
+            className="p-1 sm:p-5 border rounded-xl shadow-sm bg-white hover:shadow-md transition"
           >
             {/* Job Card */}
             <JobCard job={app.job} viewMode="list" />
