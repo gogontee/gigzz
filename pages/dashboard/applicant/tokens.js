@@ -1,7 +1,8 @@
+// components/Token.js
 import { useEffect, useState } from "react";
-import { supabase } from "../../../lib/supabaseClient";
+import { supabase } from "../lib/supabaseClient";
 
-export default function TokensPage() {
+export default function Token() {
   const [balance, setBalance] = useState(0);
   const [loading, setLoading] = useState(true);
   const [funding, setFunding] = useState(false);
@@ -135,14 +136,12 @@ export default function TokensPage() {
   };
 
   return (
-    <div className="max-w-3xl mx-auto px-4 py-8 sm:py-10 md:pt-20 md:pb-10">
+    <div className="w-full max-w-3xl mx-auto px-4 py-6">
       <h1 className="text-2xl sm:text-3xl font-bold mb-6">My Tokens</h1>
 
       {/* Balance Card */}
       <div className="bg-gradient-to-r from-orange-500 to-red-500 shadow-lg p-6 sm:p-8 rounded-2xl mb-8 text-white text-center">
-        <h2 className="text-lg sm:text-xl font-semibold mb-4">
-          Token Balance
-        </h2>
+        <h2 className="text-lg sm:text-xl font-semibold mb-4">Token Balance</h2>
 
         {loading ? (
           <p className="text-base sm:text-lg">Loading...</p>
@@ -154,9 +153,10 @@ export default function TokensPage() {
 
         <button
           onClick={() => setShowPackages(true)}
+          disabled={funding}
           className="bg-white text-black hover:bg-gray-200 font-semibold px-4 sm:px-6 py-2 sm:py-3 rounded-lg transition duration-300 text-sm sm:text-base"
         >
-          Fund Tokens
+          {funding ? "Processing..." : "Fund Tokens"}
         </button>
       </div>
 
