@@ -1,4 +1,4 @@
-// components/portfolio/Portfolio.js
+// components/Portfolio.js
 'use client';
 import { useState, useEffect, useCallback } from 'react';
 import { createClient } from '@supabase/supabase-js';
@@ -82,7 +82,7 @@ export default function Portfolio() {
 
   return (
     <div className="flex-1 flex flex-col">
-      <div className="p-6 lg:pt-4">
+      <div className="p-1 lg:pt-4">
         <h1 className="text-2xl font-bold mb-4">Premium Portfolios</h1>
 
         {/* Search Bar */}
@@ -97,7 +97,7 @@ export default function Portfolio() {
         {filteredProjects.length === 0 && !loading ? (
           <p>No premium portfolios found.</p>
         ) : (
-          <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 gap-3">
             {filteredProjects.map((proj) => (
               <div
                 key={proj.id}
@@ -121,13 +121,13 @@ export default function Portfolio() {
                 )}
 
                 {/* Content */}
-                <div className="p-4 flex flex-col flex-1">
+                <div className="p-1 flex flex-col flex-1">
                   <h2 className="font-semibold text-lg truncate">{proj.title}</h2>
                   {proj.location && (
                     <p className="text-sm text-gray-500 mt-1">{proj.location}</p>
                   )}
                   {proj.details && (
-                    <p className="text-sm text-gray-700 mt-2">
+                    <p className="text-sm text-gray-700 mt-2 hidden lg:block">
                       {proj.details.length > 50
                         ? proj.details.substring(0, 50) + '...'
                         : proj.details}

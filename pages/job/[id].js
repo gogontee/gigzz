@@ -114,44 +114,61 @@ export default function JobDetailPage() {
   }, [id]);
 
   const handleApply = async () => {
-    if (!user) {
-      setModalMessage('❌ You must login to apply for this job.');
-      setShowModal(true);
-      return;
-    }
+  if (!user) {
+    setModalMessage('❌ You must login to apply for this job.');
+    setShowModal(true);
+    return;
+  }
 
-    if (alreadyApplied) {
-      setModalMessage('⚠️ You have already applied for this job.');
-      setShowModal(true);
-      return;
-    }
+  // Check user role first
+  const { data: employerCheck } = await supabase
+    .from('employers')
+    .select('id')
+    .eq('id', user.id)
+    .single();
 
-    if (!coverLetter.trim()) {
-      setModalMessage('⚠️ Please write a cover letter.');
-      setShowModal(true);
-      return;
-    }
+  if (employerCheck) {
+    setModalMessage(
+      '⚠️ You cannot apply to jobs using a Client account. Please signup as a Creative to apply.'
+    );
+    setShowModal(true);
+    return;
+  }
 
-    if (coverLetter.length > 1500) {
-      setModalMessage('⚠️ Cover letter cannot exceed 1500 characters.');
-      setShowModal(true);
-      return;
-    }
+  if (alreadyApplied) {
+    setModalMessage('⚠️ You have already applied for this job.');
+    setShowModal(true);
+    return;
+  }
 
-    setSubmitting(true);
+  if (!coverLetter.trim()) {
+    setModalMessage('⚠️ Please write a cover letter.');
+    setShowModal(true);
+    return;
+  }
 
-    // 1) Check tokens
-    const { data: wallet, error: walletErr } = await supabase
-      .from('token_wallets')
-      .select('balance')
-      .eq('user_id', user.id)
-      .single();
+  if (coverLetter.length > 1500) {
+    setModalMessage('⚠️ Cover letter cannot exceed 1500 characters.');
+    setShowModal(true);
+    return;
+  }
 
-    if (walletErr || !wallet || wallet.balance < 3) {
-      setSubmitting(false);
-      setModalMessage('⚠️ Insufficient token balance. Kindly fund your token and try again.');
-      setShowModal(true);
-      return;
+  setSubmitting(true);
+
+  // 1) Check tokens
+  const { data: wallet, error: walletErr } = await supabase
+    .from('token_wallets')
+    .select('balance')
+    .eq('user_id', user.id)
+    .single();
+
+  if (walletErr || !wallet || wallet.balance < 3) {
+    setSubmitting(false);
+    setModalMessage(
+      '⚠️ Insufficient token balance. Kindly fund your token and try again.'
+    );
+    setShowModal(true);
+    return;
     }
 
     // 2) Deduct 3 tokens

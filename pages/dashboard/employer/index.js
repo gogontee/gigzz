@@ -1,4 +1,3 @@
-// pages/dashboard/employer/index.js
 'use client';
 import { useEffect, useState, useCallback } from 'react';
 import { createClient } from '@supabase/supabase-js';
@@ -13,7 +12,8 @@ import PromotionPanel from '../../../components/client/PromotionPanel';
 import JobListCard from '../../../components/client/JobListCard';
 import Verify from '../../../components/Verify';
 import Messages from '../../../components/Messages';
-import Portfolio from '../../../components/Portfolios'; // ✅ import Portfolio component
+import Portfolio from '../../../components/Portfolios'; 
+import Token from '../../../components/Token'; // ✅ imported Token
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL,
@@ -44,6 +44,7 @@ export default function EmployerDashboard() {
     if (!isValidComponent(Verify)) errs.push('Verify');
     if (!isValidComponent(Messages)) errs.push('Messages');
     if (!isValidComponent(Portfolio)) errs.push('Portfolios');
+    if (!isValidComponent(Token)) errs.push('Token');
     setImportErrors(errs);
   }, []);
 
@@ -95,11 +96,11 @@ export default function EmployerDashboard() {
     fetchInitial();
   }, [fetchInitial]);
 
-  if (loading) return <div className="p-6">Loading...</div>;
+  if (loading) return <div className="p-4">Loading...</div>;
 
   if (importErrors.length > 0) {
     return (
-      <div className="min-h-screen flex items-start p-8 bg-white text-black">
+      <div className="min-h-screen flex items-start p-4 bg-white text-black">
         <div className="max-w-xl mx-auto w-full">
           <div className="bg-red-50 border border-red-300 rounded-xl p-6 mb-6">
             <h2 className="text-xl font-semibold text-red-800 mb-2">Component Import Errors</h2>
@@ -120,14 +121,15 @@ export default function EmployerDashboard() {
 
       <div className="flex-1 overflow-auto">
         {/* header */}
-        <div className="flex items-center justify-between p-6 border-b border-gray-200 lg:pt-20">
+        <div className="flex items-center justify-between px-2 lg:px-6 py-4 lg:pt-20 border-b border-gray-200">
           <div className="flex gap-4 items-center">
             <h1 className="text-base lg:text-2xl font-bold">
               Welcome {employer?.name || 'Client'}
             </h1>
           </div>
           <div className="flex gap-4">
-            <WalletSummary wallet={wallet} />
+            {/* Show Token component button in header only if section is wallet */}
+            {activeSection !== 'wallet' && <WalletSummary wallet={wallet} />}
             <button
               onClick={() => setActiveSection('post')}
               className="bg-black text-white px-3 py-1.5 text-sm rounded-lg hover:bg-orange-600 transition lg:px-4 lg:py-2 lg:text-base lg:rounded-full"
@@ -138,17 +140,17 @@ export default function EmployerDashboard() {
         </div>
 
         {/* content panel */}
-        <div className="p-6">
+        <div className="px-2 lg:px-6 py-6">
           {activeSection === 'overview' && (
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-              <div className="col-span-2 space-y-6">
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 lg:gap-6">
+              <div className="col-span-2 space-y-4 lg:space-y-6">
                 {/* jobs */}
-                <div className="rounded-xl bg-white shadow p-6">
+                <div className="rounded-xl bg-white shadow p-4 lg:p-6">
                   <h2 className="text-xl font-semibold mb-2">Your Jobs</h2>
                   {jobs.length === 0 ? (
                     <p className="text-gray-600">No jobs posted yet.</p>
                   ) : (
-                    <div className="space-y-4">
+                    <div className="space-y-2 lg:space-y-4">
                       {jobs.map((j) => (
                         <JobListCard key={j.id} job={j} onEdit={() => setActiveSection('jobs')} />
                       ))}
@@ -156,7 +158,7 @@ export default function EmployerDashboard() {
                   )}
                 </div>
               </div>
-              <div className="space-y-6">
+              <div className="space-y-4 lg:space-y-6">
                 <PromotionPanel jobs={jobs} wallet={wallet} refresh={fetchInitial} />
               </div>
             </div>
@@ -169,7 +171,7 @@ export default function EmployerDashboard() {
           {activeSection === 'jobs' && (
             <div>
               <h2 className="text-xl font-semibold mb-4">My Jobs</h2>
-              <div className="space-y-4">
+              <div className="space-y-2 lg:space-y-4">
                 {jobs.map((j) => (
                   <JobListCard key={j.id} job={j} onEdit={() => setActiveSection('post')} />
                 ))}
@@ -177,11 +179,7 @@ export default function EmployerDashboard() {
             </div>
           )}
 
-          {activeSection === 'wallet' && (
-            <div>
-              <WalletSummary wallet={wallet} />
-            </div>
-          )}
+          {activeSection === 'token' && <Token wallet={wallet} />} {/* ✅ Render Token */}
 
           {activeSection === 'profile' && employer && (
             <EmployerProfileEditor employer={employer} onUpdated={fetchInitial} />
@@ -194,10 +192,8 @@ export default function EmployerDashboard() {
             </div>
           )}
 
-          {/* ✅ Show Messages instead of ChatSidebar */}
           {activeSection === 'chats' && <Messages />}
 
-          {/* ✅ Show Portfolio component */}
           {activeSection === 'portfolios' && <Portfolio />}
 
           {activeSection === 'calls' && <VideoCallModal />}
@@ -206,3 +202,4 @@ export default function EmployerDashboard() {
     </div>
   );
 }
+

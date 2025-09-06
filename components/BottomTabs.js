@@ -1,31 +1,27 @@
-import Link from 'next/link';
 import { Home, Briefcase, MapPin, User, Plus } from 'lucide-react';
 import { useRouter } from 'next/router';
 import { useEffect, useState } from 'react';
-import { supabase } from '../utils/supabaseClient'; // adjust if needed
+import { supabase } from '../utils/supabaseClient';
 
 export default function BottomTabs() {
   const router = useRouter();
-  const [profilePath, setProfilePath] = useState('/auth/login');
+  const [dashboardPath, setDashboardPath] = useState(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const fetchUserRole = async () => {
       try {
-        const {
-          data: { session },
-          error: sessionError,
-        } = await supabase.auth.getSession();
+        const { data: { session } } = await supabase.auth.getSession();
 
-        if (sessionError || !session) {
-          setProfilePath('/auth/login');
+        if (!session) {
+          setDashboardPath('/auth/login');
           setLoading(false);
           return;
         }
 
         const userId = session.user.id;
 
-        // Check employer
+        // check if employer
         const { data: employer } = await supabase
           .from('employers')
           .select('id')
@@ -33,12 +29,12 @@ export default function BottomTabs() {
           .single();
 
         if (employer) {
-          setProfilePath('/dashboard/employer');
+          setDashboardPath('/dashboard/employer');
           setLoading(false);
           return;
         }
 
-        // Check applicant
+        // check if applicant
         const { data: applicant } = await supabase
           .from('applicants')
           .select('id')
@@ -46,16 +42,16 @@ export default function BottomTabs() {
           .single();
 
         if (applicant) {
-          setProfilePath('/dashboard/applicant');
+          setDashboardPath('/dashboard/applicant');
           setLoading(false);
           return;
         }
 
-        // Fallback if no role found
-        setProfilePath('/auth/login');
+        // fallback
+        setDashboardPath('/auth/login');
       } catch (err) {
-        console.error('Error fetching user role:', err);
-        setProfilePath('/auth/login');
+        console.error(err);
+        setDashboardPath('/auth/login');
       } finally {
         setLoading(false);
       }
@@ -64,20 +60,28 @@ export default function BottomTabs() {
     fetchUserRole();
   }, []);
 
+  // Only render tabs **after dashboard path is resolved**
+  if (loading || !dashboardPath) return null;
+
   const tabs = [
     { href: '/', label: 'Home', icon: <Home size={22} /> },
-    { href: '/profile', label: 'Profile', icon: <User size={22} /> },
+    { href: '/profile', label: 'Profile', icon: <User size={22} /> }, // Always /profile
     { href: '/more', label: 'More', icon: <MapPin size={22} /> },
     { href: '/employerlanding', label: 'Post', icon: <Plus size={22} /> },
-    { href: profilePath, label: 'Dashboard', icon: <Briefcase size={22} /> },
+    { href: dashboardPath, label: 'Dashboard', icon: <Briefcase size={22} /> },
   ];
+
+  const handleTabClick = (href) => {
+    if (!href || router.pathname === href) return;
+    router.push(href);
+  };
 
   return (
     <div className="fixed bottom-0 w-full bg-black border-t border-gray-800 flex justify-around py-2 md:hidden z-50">
       {tabs.map((tab) => (
-        <Link
-          href={tab.href}
-          key={tab.href}
+        <button
+          key={tab.label} // Use label as key to prevent duplicates
+          onClick={() => handleTabClick(tab.href)}
           className="flex flex-col items-center text-xs text-white group"
         >
           <div
@@ -87,10 +91,8 @@ export default function BottomTabs() {
           >
             {tab.icon}
           </div>
-          <span className="text-[10px] group-hover:text-orange-500">
-            {tab.label}
-          </span>
-        </Link>
+          <span className="text-[10px] group-hover:text-orange-500">{tab.label}</span>
+        </button>
       ))}
     </div>
   );

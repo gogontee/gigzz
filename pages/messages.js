@@ -6,10 +6,6 @@ import { supabase } from '../lib/supabaseClient';
 import { useRouter } from 'next/navigation';
 import ChatModal from '../components/ChatModal';
 
-// ✅ Layouts
-import ApplicantLayout from '../components/dashboard/ApplicantLayout';
-import ClientSidebar from '../components/dashboard/ClientSidebar';
-
 // ✅ utility to mark messages as read
 async function markMessagesAsRead(chatId, currentUserId) {
   const { data, error } = await supabase
@@ -67,7 +63,7 @@ export default function MessagesInbox() {
         setRole(userData?.role);
       }
 
-      // ✅ if employer, fetch employer details for sidebar
+      // ✅ if employer, fetch employer details
       if (userData?.role === 'employer') {
         const { data: employerData } = await supabase
           .from('employers')
@@ -120,10 +116,7 @@ export default function MessagesInbox() {
                 ? chat.applicant_id
                 : chat.client_id;
 
-            if (!receiverId) {
-              console.warn('Chat missing receiver:', chat);
-              return null;
-            }
+            if (!receiverId) return null;
 
             // Fetch employer
             let { data: receiverEmployer } = await supabase
@@ -165,7 +158,6 @@ export default function MessagesInbox() {
               .limit(1)
               .maybeSingle();
 
-            // Count unread messages
             const { count: unreadCount } = await supabase
               .from('messages')
               .select('*', { count: 'exact', head: true })
@@ -187,7 +179,6 @@ export default function MessagesInbox() {
 
         const validChats = chatData.filter(Boolean);
 
-        // Sort by latest activity
         validChats.sort(
           (a, b) =>
             new Date(b.lastMessageTime).getTime() -
@@ -239,7 +230,6 @@ export default function MessagesInbox() {
             const newChats = [...prevChats];
             newChats[idx] = updatedChat;
 
-            // Move updated chat to top
             newChats.sort(
               (a, b) =>
                 new Date(b.lastMessageTime).getTime() -
@@ -276,9 +266,9 @@ export default function MessagesInbox() {
     return <div className="p-6 text-center">Loading messages...</div>;
   }
 
-  const content = (
-    <div className="flex-1 px-4 sm:px-6">
-      <h1 className="text-2xl font-bold mb-6 pt-0 sm:pt-20">Messages</h1>
+  return (
+    <div className="min-h-screen bg-gray-50 px-4 sm:px-6 py-6">
+      <h1 className="text-2xl font-bold mb-6">Messages</h1>
 
       {chats.length === 0 ? (
         <p className="text-gray-500">You have no messages yet.</p>
@@ -288,7 +278,7 @@ export default function MessagesInbox() {
             <li
               key={chat.chatId}
               onClick={() => handleOpenChat(chat)}
-              className="flex items-center gap-4 p-4 border rounded-xl shadow-sm hover:shadow-md hover:bg-gray-50 cursor-pointer transition"
+              className="flex items-center gap-4 p-4 border rounded-xl shadow-sm hover:shadow-md hover:bg-white cursor-pointer transition"
             >
               <img
                 src={chat.avatar}
@@ -328,19 +318,6 @@ export default function MessagesInbox() {
           isOpen={true}
           onClose={() => setActiveChat(null)}
         />
-      )}
-    </div>
-  );
-
-  return (
-    <div className="flex min-h-screen">
-      {/* ✅ If applicant use layout, if client use sidebar */}
-      {role === 'applicant' && <ApplicantLayout>{content}</ApplicantLayout>}
-      {role === 'employer' && (
-        <>
-          <ClientSidebar active="chats" onChange={() => {}} employer={employer} />
-          <main className="flex-1">{content}</main>
-        </>
       )}
     </div>
   );

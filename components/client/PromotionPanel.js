@@ -1,26 +1,95 @@
 'use client';
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Megaphone } from 'lucide-react';
 import PromoteModal from '../promotion/PromoteModal';
+import { supabase } from '../../utils/supabaseClient';
 
-export default function PromotionPanel({ jobs, wallet, refresh }) {
+export default function PromotionPanel({ jobs, refresh }) {
   const [showModal, setShowModal] = useState(false);
+  const [wallet, setWallet] = useState({ balance: 0 });
+
+  // Fetch wallet balance
+  const fetchWallet = async () => {
+    const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+    if (sessionError || !session) return;
+
+    const userId = session.user.id;
+
+    const { data, error } = await supabase
+      .from('token_wallets')
+      .select('*')
+      .eq('user_id', userId)
+      .single();
+
+    if (!error && data) setWallet(data);
+  };
+
+  useEffect(() => {
+    fetchWallet();
+  }, []);
 
   const handlePromote = async ({ job_id, plan, tokens }) => {
-    // Make call to API
-    const res = await fetch('/api/promote-job', {
-      method: 'POST',
-      body: JSON.stringify({ job_id, plan, tokens }),
-    });
+    const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+    if (sessionError || !session) return alert('Not authenticated');
 
-    const data = await res.json();
-    if (data.success) {
-      alert('Job promoted!');
-      refresh?.();
-    } else {
-      alert(data.message || 'Failed to promote');
+    const userId = session.user.id;
+
+    // 1️⃣ Check wallet balance
+    if (wallet.balance < tokens) {
+      return alert('Insufficient tokens for this promotion plan.');
     }
-    setShowModal(false);
+
+    // 2️⃣ Check existing promotion
+    const { data: job, error: jobFetchError } = await supabase
+      .from('jobs')
+      .select('promotion_tag, promotion_expires_at')
+      .eq('id', job_id)
+      .single();
+
+    if (jobFetchError) return alert('Failed to fetch job info.');
+
+    if (job?.promotion_expires_at) {
+  const expiresAt = new Date(job.promotion_expires_at);
+  const now = new Date();
+
+  if (expiresAt > now) {
+    return alert(`This job is already promoted under the ${job.promotion_tag} plan until ${expiresAt.toLocaleDateString()}.`);
+  }
+}
+
+
+    // 3️⃣ Deduct tokens & update wallet
+    const { error: walletError } = await supabase
+      .from('token_wallets')
+      .update({
+        balance: wallet.balance - tokens,
+        last_action: 'Job promotion',
+      })
+      .eq('user_id', userId);
+
+    if (walletError) return alert('Failed to update wallet.');
+
+    // 4️⃣ Calculate expiry
+    let daysToExpire = plan === 'Silver' ? 3 : plan === 'Gold' ? 7 : 20;
+    const expires = new Date();
+    expires.setDate(expires.getDate() + daysToExpire);
+
+    // 5️⃣ Update job promotion_tag & expiry
+    const { error: jobUpdateError } = await supabase
+      .from('jobs')
+      .update({
+        promotion_tag: plan,
+        promotion_expires_at: expires.toISOString(),
+      })
+      .eq('id', job_id);
+
+    if (jobUpdateError) return alert('Failed to update job promotion.');
+
+    // 6️⃣ Refresh wallet and jobs
+    await fetchWallet();
+    refresh?.();
+
+    alert('Job promoted successfully!');
   };
 
   return (
@@ -42,8 +111,9 @@ export default function PromotionPanel({ jobs, wallet, refresh }) {
       {showModal && (
         <PromoteModal
           jobs={jobs}
-          onClose={() => setShowModal(false)}
+          userTokens={wallet.balance}
           onPromote={handlePromote}
+          onClose={() => setShowModal(false)}
         />
       )}
     </>

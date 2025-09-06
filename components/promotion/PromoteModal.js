@@ -7,7 +7,7 @@ const plans = [
   { name: 'Premium', cost: 20, color: 'bg-orange-600', badge: '🏆' },
 ];
 
-export default function PromoteModal({ jobs, onPromote, onClose, userTokens = 0 }) {
+export default function PromoteModal({ jobs, userTokens = 0, onPromote, onClose }) {
   const [selectedJobId, setSelectedJobId] = useState('');
   const [selectedPlan, setSelectedPlan] = useState(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -22,15 +22,18 @@ export default function PromoteModal({ jobs, onPromote, onClose, userTokens = 0 
     }
 
     setIsSubmitting(true);
+    setError('');
+
     try {
       await onPromote({
         job_id: selectedJobId,
-        plan: selectedPlan.name.toLowerCase(),
+        plan: selectedPlan.name,
         tokens: selectedPlan.cost,
       });
-      onClose(); // Close modal after successful promotion
+      onClose();
     } catch (err) {
-      setError('Failed to promote. Please try again.');
+      console.error(err);
+      setError('Failed to promote job. Try again.');
     } finally {
       setIsSubmitting(false);
     }
@@ -58,10 +61,7 @@ export default function PromoteModal({ jobs, onPromote, onClose, userTokens = 0 
           {plans.map((plan) => (
             <button
               key={plan.name}
-              onClick={() => {
-                setSelectedPlan(plan);
-                setError('');
-              }}
+              onClick={() => setSelectedPlan(plan)}
               className={`rounded py-2 px-3 text-white font-semibold flex flex-col items-center justify-center ${plan.color} ${
                 selectedPlan?.name === plan.name ? 'ring-2 ring-black' : ''
               }`}
@@ -73,9 +73,7 @@ export default function PromoteModal({ jobs, onPromote, onClose, userTokens = 0 
           ))}
         </div>
 
-        {error && (
-          <div className="text-red-600 text-sm mb-2 text-center">{error}</div>
-        )}
+        {error && <div className="text-red-600 text-sm mb-2 text-center">{error}</div>}
 
         <button
           disabled={!selectedJobId || !selectedPlan || isSubmitting}
@@ -84,7 +82,7 @@ export default function PromoteModal({ jobs, onPromote, onClose, userTokens = 0 
         >
           {isSubmitting
             ? 'Processing...'
-            : `Promote Now (${selectedPlan?.cost || '-'} tokens)`}
+            : `Promote Now (${selectedPlan?.cost || '-' } tokens)`}
         </button>
 
         <button
