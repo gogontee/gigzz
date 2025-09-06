@@ -1,4 +1,4 @@
-// components/Portfolio.js
+// components/portfolio/Portfolio.js
 'use client';
 import { useState, useEffect, useCallback } from 'react';
 import { createClient } from '@supabase/supabase-js';
@@ -81,8 +81,8 @@ export default function Portfolio() {
   );
 
   return (
-    <div className="flex-1 flex flex-col bg-white text-black">
-      <div className="p-6">
+    <div className="flex-1 flex flex-col">
+      <div className="p-6 lg:pt-4">
         <h1 className="text-2xl font-bold mb-4">Premium Portfolios</h1>
 
         {/* Search Bar */}

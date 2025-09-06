@@ -1,7 +1,6 @@
 'use client';
-import Link from 'next/link';
-import { useRouter } from 'next/router';
 import { useState, useEffect, useRef } from 'react';
+import { useRouter } from 'next/navigation';
 import {
   LogOut,
   Briefcase,
@@ -16,15 +15,15 @@ import {
 import { supabase } from '../../lib/supabaseClient';
 
 const navItems = [
-  { key: 'dashboard', label: 'Dashboard', href: '/dashboard/applicant', icon: <Home size={18} /> },
-  { key: 'profile', label: 'My Profile', href: '/profile', icon: <User size={18} /> },
-  { key: 'portfolio', label: 'Portfolio', href: '/dashboard/applicant/portfolio', icon: <Layers size={18} /> },
-  { key: 'applications', label: 'Applications', href: '/dashboard/applicant/applications', icon: <Briefcase size={18} /> },
-  { key: 'tokens', label: 'Tokens', href: '/dashboard/applicant/tokens', icon: <Coins size={18} /> },
-  { key: 'settings', label: 'Settings', href: '/dashboard/applicant/settings', icon: <Settings size={18} /> },
+  { key: 'dashboard', label: 'Dashboard', icon: <Home size={18} /> },
+  { key: 'profile', label: 'My Profile', icon: <User size={18} /> },
+  { key: 'portfolio', label: 'Portfolio', icon: <Layers size={18} /> },
+  { key: 'applications', label: 'Applications', icon: <Briefcase size={18} /> },
+  { key: 'tokens', label: 'Tokens', icon: <Coins size={18} /> },
+  { key: 'settings', label: 'Settings', icon: <Settings size={18} /> },
 ];
 
-export default function ApplicantLayout({ children, applicant }) {
+export default function ApplicantLayout({ children, applicant, activeTab, onTabChange }) {
   const router = useRouter();
   const [expanded, setExpanded] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
@@ -38,9 +37,9 @@ export default function ApplicantLayout({ children, applicant }) {
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
 
-  // Desktop hover behavior only
+  // Desktop hover behavior
   useEffect(() => {
-    if (isMobile) return; // skip on mobile
+    if (isMobile) return;
 
     const sidebar = sidebarRef.current;
     const handleMouseEnter = () => setExpanded(true);
@@ -59,31 +58,27 @@ export default function ApplicantLayout({ children, applicant }) {
     };
   }, [isMobile]);
 
-  // Mobile: toggle expand/collapse on click anywhere inside sidebar
+  // Mobile click toggle
   useEffect(() => {
     if (!isMobile) return;
 
     const sidebar = sidebarRef.current;
-    const handleClick = () => {
-      setExpanded((prev) => !prev); // toggle open/close
-    };
+    const handleClick = () => setExpanded((prev) => !prev);
 
-    if (sidebar) {
-      sidebar.addEventListener('click', handleClick);
-    }
-
+    if (sidebar) sidebar.addEventListener('click', handleClick);
     return () => {
-      if (sidebar) {
-        sidebar.removeEventListener('click', handleClick);
-      }
+      if (sidebar) sidebar.removeEventListener('click', handleClick);
     };
   }, [isMobile]);
 
-  const handleNavClick = (href) => {
-    router.push(href);
-    if (isMobile) {
-      setExpanded(false); // auto-fold after nav on mobile
+  const handleNavClick = (item) => {
+    if (item.href) {
+      router.push(item.href);
+    } else if (onTabChange) {
+      onTabChange(item.key);
     }
+
+    if (isMobile) setExpanded(false);
   };
 
   return (
@@ -95,7 +90,7 @@ export default function ApplicantLayout({ children, applicant }) {
           expanded ? 'w-64' : 'w-16'
         } min-h-screen`}
       >
-        {/* Toggle Button (desktop only) */}
+        {/* Toggle button (desktop only) */}
         {!isMobile && (
           <div className="absolute top-4 right-[-12px] flex items-center z-10">
             <button
@@ -119,11 +114,11 @@ export default function ApplicantLayout({ children, applicant }) {
         {/* Nav Items */}
         <div className="flex flex-col px-1 py-4 space-y-1 sticky top-0">
           {navItems.map((item) => {
-            const isActive = router.pathname === item.href;
+            const isActive = activeTab === item.key;
             return (
               <button
                 key={item.key}
-                onClick={() => handleNavClick(item.href)}
+                onClick={() => handleNavClick(item)}
                 className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-left transition ${
                   isActive ? 'bg-orange-500 text-white' : 'text-white'
                 } hover:bg-orange-600 focus:outline-none`}
@@ -160,7 +155,7 @@ export default function ApplicantLayout({ children, applicant }) {
               onClick={async () => {
                 await supabase.auth.signOut();
                 router.push('/auth/login');
-                if (isMobile) setExpanded(false); // fold after logout on mobile
+                if (isMobile) setExpanded(false);
               }}
               className="w-full flex items-center gap-2 px-3 py-2 rounded-md text-sm hover:bg-white/10 transition"
             >
