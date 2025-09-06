@@ -19,7 +19,7 @@ const navItems = [
   { key: 'profile', label: 'My Profile', icon: <User size={18} /> },
   { key: 'portfolio', label: 'Portfolio', icon: <Layers size={18} /> },
   { key: 'applications', label: 'Applications', icon: <Briefcase size={18} /> },
-  { key: 'tokens', label: 'Tokens', icon: <Coins size={18} /> },
+  { key: 'token', label: 'Tokens', icon: <Coins size={18} /> },
   { key: 'settings', label: 'Settings', icon: <Settings size={18} /> },
 ];
 
