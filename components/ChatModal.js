@@ -14,6 +14,29 @@ export default function ChatModal({ chatId, userId, isOpen, onClose }) {
   const fileInputRef = useRef(null);
   const [isReceiverOnline, setIsReceiverOnline] = useState(false);
 
+  // Update own online status
+useEffect(() => {
+  if (!userId || !isOpen) return;
+
+  const setOnline = async () => {
+    await supabase
+      .from('user_status')
+      .upsert({ user_id: userId, is_online: true, last_seen: new Date().toISOString() });
+  };
+
+  const setOffline = async () => {
+    await supabase
+      .from('user_status')
+      .update({ is_online: false, last_seen: new Date().toISOString() })
+      .eq('user_id', userId);
+  };
+
+  setOnline();
+
+  return () => setOffline(); // runs when modal closes/unmounts
+}, [userId, isOpen]);
+
+
   // 🔹 Auto-resize textarea
   useEffect(() => {
     if (textareaRef.current) {
@@ -329,14 +352,23 @@ useEffect(() => {
       if (fileInputRef.current) fileInputRef.current.value = "";
     }
   };
+  // Send typing event
+const sendTypingEvent = async () => {
+  if (!chatId || !userId) return;
+  await supabase.from('chat_typing').insert({ chat_id: chatId, sender_id: userId });
+};
 
-  // 🔹 Handle Enter key
-  const handleKeyDown = (e) => {
-    if (e.key === "Enter" && !e.shiftKey) {
-      e.preventDefault();
-      sendMessage();
-    }
-  };
+const handleChange = (e) => {
+  setNewMessage(e.target.value);
+  sendTypingEvent(); // Trigger typing event whenever user types
+};
+
+const handleKeyDown = (e) => {
+  if (e.key === "Enter" && !e.shiftKey) {
+    e.preventDefault();
+    sendMessage();
+  }
+};
 
   if (!isOpen) return null;
 
@@ -447,15 +479,16 @@ useEffect(() => {
           onChange={handleFileUpload}
         />
         <textarea
-          ref={textareaRef}
-          rows={1}
-          className="flex-1 resize-none border rounded-full px-4 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-green-500"
-          placeholder="Type a message..."
-          value={newMessage}
-          onChange={(e) => setNewMessage(e.target.value)}
-          onKeyDown={handleKeyDown}
-          disabled={uploading}
-        />
+  ref={textareaRef}
+  rows={1}
+  className="flex-1 resize-none border rounded-full px-4 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-green-500"
+  placeholder="Type a message..."
+  value={newMessage}
+  onChange={handleChange}
+  onKeyDown={handleKeyDown}
+  disabled={uploading}
+/>
+
         <button
           onClick={sendMessage}
           disabled={!newMessage.trim() || uploading}
