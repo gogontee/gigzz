@@ -2,21 +2,15 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { motion } from 'framer-motion';
-import { supabase } from '../../../utils/supabaseClient'; // ✅ fixed path
+import { supabase } from '../../../utils/supabaseClient';
 import ApplicantLayout from '../../../components/dashboard/ApplicantLayout';
 import Portfolio from '../../../components/portfolio/Portfolio';
 import Profile from '../../../components/Profile';
-import Application from '../../../components/Application'; 
+import Application from '../../../components/Application';
 import Settings from '../../../components/Settings';
-import Token from '../../../components/Token'; // ✅ new import
-import {
-  Briefcase,
-  Coins,
-  Layers,
-  Bell,
-  MessageSquare,
-  Pencil,
-} from 'lucide-react';
+import Token from '../../../components/Token';
+import { Briefcase, Coins, Layers, Bell, MessageSquare, Pencil } from 'lucide-react';
+import useUnreadMessages from '../../../hooks/useUnreadMessages'; // ✅ import the hook
 
 export default function ApplicantDashboard() {
   const [activeTab, setActiveTab] = useState('dashboard');
@@ -24,8 +18,11 @@ export default function ApplicantDashboard() {
   const [applicationsCount, setApplicationsCount] = useState(0);
   const [tokens, setTokens] = useState(0);
   const [projectsCount, setProjectsCount] = useState(0);
-  const [unreadCount, setUnreadCount] = useState(0);
+  const [unreadCountNotifications, setUnreadCountNotifications] = useState(0);
   const fileInputRef = useRef(null);
+
+  // ✅ use hook for unread messages
+  const unreadMessagesCount = useUnreadMessages();
 
   // Fetch profile and stats
   useEffect(() => {
@@ -79,9 +76,7 @@ export default function ApplicantDashboard() {
         .order('created_at', { ascending: false });
 
       if (error) console.error(error);
-      else {
-        setUnreadCount(data.filter((n) => !n.is_read).length);
-      }
+      else setUnreadCountNotifications(data.filter((n) => !n.is_read).length);
     };
 
     fetchNotifications();
@@ -112,10 +107,7 @@ export default function ApplicantDashboard() {
       .eq('id', profile.id);
 
     if (!updateError) {
-      setProfile((prev) => ({
-        ...prev,
-        avatar_url: data.publicUrl,
-      }));
+      setProfile((prev) => ({ ...prev, avatar_url: data.publicUrl }));
     }
   };
 
@@ -138,27 +130,34 @@ export default function ApplicantDashboard() {
               <h2 className="text-2xl font-semibold">
                 Welcome back, {profile?.full_name || 'Creative'}
               </h2>
-              <p className="text-sm text-gray-500">
-                Let's start making money today!
-              </p>
+              <p className="text-sm text-gray-500">Let's start making money today!</p>
             </div>
+
             <div className="flex items-center gap-4">
-              <a href="/messages" title="Messages">
+              {/* ✅ Messages icon with real-time unread badge */}
+              <a href="/messages" title="Messages" className="relative">
                 <MessageSquare className="w-6 h-6 text-gray-700 hover:text-orange-600" />
+                {unreadMessagesCount > 0 && (
+                  <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs w-4 h-4 flex items-center justify-center rounded-full">
+                    {unreadMessagesCount}
+                  </span>
+                )}
               </a>
+
               <a
                 href="/dashboard/applicant/notifications"
                 title="Notifications"
                 className="relative"
               >
                 <Bell className="w-6 h-6 text-gray-700 hover:text-orange-600" />
-                {unreadCount > 0 && (
+                {unreadCountNotifications > 0 && (
                   <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs w-4 h-4 flex items-center justify-center rounded-full">
-                    {unreadCount}
+                    {unreadCountNotifications}
                   </span>
                 )}
               </a>
 
+              {/* Avatar with edit */}
               <div className="relative group">
                 <img
                   src={profile?.avatar_url || '/default-avatar.png'}
@@ -184,21 +183,9 @@ export default function ApplicantDashboard() {
 
           {/* Stats */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <StatCard
-              icon={<Coins className="text-orange-500" />}
-              label="Token Balance"
-              value={tokens}
-            />
-            <StatCard
-              icon={<Briefcase className="text-orange-500" />}
-              label="Applications"
-              value={applicationsCount}
-            />
-            <StatCard
-              icon={<Layers className="text-orange-500" />}
-              label="Portfolios"
-              value={projectsCount}
-            />
+            <StatCard icon={<Coins className="text-orange-500" />} label="Token Balance" value={tokens} />
+            <StatCard icon={<Briefcase className="text-orange-500" />} label="Applications" value={applicationsCount} />
+            <StatCard icon={<Layers className="text-orange-500" />} label="Portfolios" value={projectsCount} />
           </div>
         </motion.div>
       )}
@@ -216,7 +203,7 @@ export default function ApplicantDashboard() {
       {activeTab === 'settings' && <Settings />}
 
       {/* Token tab */}
-      {activeTab === 'token' && <Token balance={tokens} />} {/* ✅ pass tokens */}
+      {activeTab === 'token' && <Token balance={tokens} />}
     </ApplicantLayout>
   );
 }

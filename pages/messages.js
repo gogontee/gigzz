@@ -7,12 +7,13 @@ import { useRouter } from 'next/navigation';
 import ChatModal from '../components/ChatModal';
 
 // ✅ utility to mark messages as read
-async function markMessagesAsRead(chatId, currentUserId) {
+async function markMessagesAsRead(chat, currentUserId) {
+  // Mark all messages in this chat where sender is NOT current user as read
   const { data, error } = await supabase
     .from('messages')
     .update({ is_read: true })
-    .eq('chat_id', chatId)
-    .eq('receiver_id', currentUserId);
+    .eq('chat_id', chat.chatId)
+    .neq('sender_id', currentUserId);
 
   if (error) {
     console.error('Error marking messages as read:', error);
@@ -26,7 +27,7 @@ export default function MessagesInbox() {
   const [loading, setLoading] = useState(true);
   const [user, setUser] = useState(null);
   const [activeChat, setActiveChat] = useState(null);
-  const [role, setRole] = useState(null); // ✅ applicant or client
+  const [role, setRole] = useState(null);
   const [employer, setEmployer] = useState(null);
   const router = useRouter();
 
@@ -37,40 +38,29 @@ export default function MessagesInbox() {
         error,
       } = await supabase.auth.getSession();
 
-      if (error) {
-        console.error('Error getting session:', error.message);
-        return;
-      }
-
-      if (!session || !session.user) {
-        router.replace('/auth/login');
-        return;
-      }
+      if (error) return console.error('Error getting session:', error.message);
+      if (!session?.user) return router.replace('/auth/login');
 
       const authUser = session.user;
       setUser(authUser);
 
-      // ✅ fetch role from users table
+      // fetch role
       const { data: userData, error: userError } = await supabase
         .from('users')
         .select('role')
         .eq('id', authUser.id)
         .maybeSingle();
 
-      if (userError) {
-        console.error('Error fetching user role:', userError.message);
-      } else {
-        setRole(userData?.role);
-      }
+      if (userError) console.error('Error fetching role:', userError.message);
+      else setRole(userData?.role);
 
-      // ✅ if employer, fetch employer details
+      // fetch employer details if role is employer
       if (userData?.role === 'employer') {
         const { data: employerData } = await supabase
           .from('employers')
           .select('id, name, avatar_url')
           .eq('id', authUser.id)
           .maybeSingle();
-
         setEmployer(employerData);
       }
 
@@ -78,18 +68,15 @@ export default function MessagesInbox() {
 
       const { data: subscription } = supabase.auth.onAuthStateChange(
         (event, newSession) => {
-          if (event === 'SIGNED_OUT') {
-            router.replace('/auth/login');
-          } else if (newSession?.user) {
+          if (event === 'SIGNED_OUT') router.replace('/auth/login');
+          else if (newSession?.user) {
             setUser(newSession.user);
             loadInbox(newSession.user);
           }
         }
       );
 
-      return () => {
-        subscription?.subscription.unsubscribe();
-      };
+      return () => subscription?.subscription.unsubscribe();
     };
 
     const loadInbox = async (authUser) => {
@@ -99,57 +86,41 @@ export default function MessagesInbox() {
           .select('id, client_id, applicant_id, created_at')
           .or(`client_id.eq.${authUser.id},applicant_id.eq.${authUser.id}`);
 
-        if (chatsError) {
-          console.error('Error fetching chats:', chatsError.message);
-          return;
-        }
-
-        if (!userChats || userChats.length === 0) {
-          setChats([]);
-          return;
-        }
+        if (chatsError) return console.error('Error fetching chats:', chatsError.message);
+        if (!userChats?.length) return setChats([]);
 
         const chatData = await Promise.all(
           userChats.map(async (chat) => {
             const receiverId =
-              chat.client_id === authUser.id
-                ? chat.applicant_id
-                : chat.client_id;
+              chat.client_id === authUser.id ? chat.applicant_id : chat.client_id;
 
             if (!receiverId) return null;
 
-            // Fetch employer
-            let { data: receiverEmployer } = await supabase
+            let receiver = null;
+
+            // Lookup employer
+            const { data: receiverEmployer } = await supabase
               .from('employers')
               .select('id, name, avatar_url')
               .eq('id', receiverId)
               .maybeSingle();
 
-            let receiver = null;
-            if (receiverEmployer) {
-              receiver = {
-                id: receiverEmployer.id,
-                name: receiverEmployer.name,
-                avatar_url: receiverEmployer.avatar_url,
-              };
-            } else {
-              // Fetch applicant
+            if (receiverEmployer) receiver = receiverEmployer;
+            else {
               const { data: receiverApplicant } = await supabase
                 .from('applicants')
                 .select('id, full_name, avatar_url')
                 .eq('id', receiverId)
                 .maybeSingle();
-
-              if (receiverApplicant) {
+              if (receiverApplicant)
                 receiver = {
                   id: receiverApplicant.id,
                   name: receiverApplicant.full_name,
                   avatar_url: receiverApplicant.avatar_url,
                 };
-              }
             }
 
-            // Fetch last message + unread count
+            // Last message
             const { data: lastMsg } = await supabase
               .from('messages')
               .select('id, content, created_at, is_read, sender_id')
@@ -158,12 +129,13 @@ export default function MessagesInbox() {
               .limit(1)
               .maybeSingle();
 
+            // Unread messages: sender != current user && is_read = false
             const { count: unreadCount } = await supabase
               .from('messages')
               .select('*', { count: 'exact', head: true })
               .eq('chat_id', chat.id)
-              .eq('is_read', false)
-              .eq('receiver_id', authUser.id);
+              .neq('sender_id', authUser.id)
+              .eq('is_read', false);
 
             return {
               chatId: chat.id,
@@ -173,18 +145,14 @@ export default function MessagesInbox() {
               lastMessageTime: lastMsg?.created_at || chat.created_at,
               receiver,
               unreadCount: unreadCount || 0,
+              client_id: chat.client_id,
+              applicant_id: chat.applicant_id,
             };
           })
         );
 
         const validChats = chatData.filter(Boolean);
-
-        validChats.sort(
-          (a, b) =>
-            new Date(b.lastMessageTime).getTime() -
-            new Date(a.lastMessageTime).getTime()
-        );
-
+        validChats.sort((a, b) => new Date(b.lastMessageTime) - new Date(a.lastMessageTime));
         setChats(validChats);
       } catch (err) {
         console.error('Error loading inbox:', err.message);
@@ -196,7 +164,7 @@ export default function MessagesInbox() {
     initAuth();
   }, [router]);
 
-  // ✅ real-time subscription with proper unread logic
+  // Real-time updates
   useEffect(() => {
     if (!user) return;
 
@@ -209,50 +177,38 @@ export default function MessagesInbox() {
           const newMessage = payload.new;
 
           setChats((prevChats) => {
-            const idx = prevChats.findIndex(
-              (chat) => chat.chatId === newMessage.chat_id
-            );
+            const idx = prevChats.findIndex((c) => c.chatId === newMessage.chat_id);
             if (idx === -1) return prevChats;
 
             const isFromMe = newMessage.sender_id === user.id;
-            const isForMe = newMessage.receiver_id === user.id;
 
             const updatedChat = {
               ...prevChats[idx],
               lastMessage: newMessage.content,
               lastMessageTime: newMessage.created_at,
-              unreadCount:
-                !isFromMe && isForMe
-                  ? (prevChats[idx].unreadCount || 0) + 1
-                  : prevChats[idx].unreadCount,
+              unreadCount: !isFromMe
+                ? (prevChats[idx].unreadCount || 0) + 1
+                : prevChats[idx].unreadCount,
             };
 
             const newChats = [...prevChats];
             newChats[idx] = updatedChat;
-
-            newChats.sort(
-              (a, b) =>
-                new Date(b.lastMessageTime).getTime() -
-                new Date(a.lastMessageTime).getTime()
-            );
-
+            newChats.sort((a, b) => new Date(b.lastMessageTime) - new Date(a.lastMessageTime));
             return newChats;
           });
         }
       )
       .subscribe();
 
-    return () => {
-      supabase.removeChannel(channel);
-    };
+    return () => supabase.removeChannel(channel);
   }, [user]);
 
-  // ✅ when user opens a chat
+  // Open chat: mark as read
   const handleOpenChat = async (chat) => {
     setActiveChat(chat);
 
     if (user) {
-      await markMessagesAsRead(chat.chatId, user.id);
+      await markMessagesAsRead(chat, user.id);
 
       setChats((prev) =>
         prev.map((c) =>
@@ -262,9 +218,7 @@ export default function MessagesInbox() {
     }
   };
 
-  if (loading) {
-    return <div className="p-6 text-center">Loading messages...</div>;
-  }
+  if (loading) return <div className="p-6 text-center">Loading messages...</div>;
 
   return (
     <div className="min-h-screen bg-gray-50 px-4 sm:px-6 py-6">
@@ -294,9 +248,7 @@ export default function MessagesInbox() {
                     </span>
                   )}
                 </h3>
-                <p className="text-sm text-gray-600 truncate">
-                  {chat.lastMessage}
-                </p>
+                <p className="text-sm text-gray-600 truncate">{chat.lastMessage}</p>
               </div>
               {chat.lastMessageTime && (
                 <small className="text-gray-500 whitespace-nowrap text-xs">

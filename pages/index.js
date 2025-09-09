@@ -4,8 +4,9 @@ import { useEffect, useState, useRef } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import Footer from "../components/Footer";
+import MobileHeader from "../components/MobileHeader"; // ✅ Import Mobile Header
 import { FaLaptopCode, FaBuilding, FaMapMarkerAlt, FaClock } from "react-icons/fa";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import FeatureTab from "../components/FeatureTab";
 import AllJobs from "../components/AllJobs";
 import TestimonialCard from "../components/TestimonialCard";
@@ -17,7 +18,7 @@ export default function Home() {
   const [currentIndex, setCurrentIndex] = useState(0);
   const videoRef = useRef(null);
 
-  // Fetch hero media from Supabase "header" bucket
+  // ✅ Fetch hero media from Supabase "header" bucket
   useEffect(() => {
     const fetchMedia = async () => {
       const { data, error } = await supabase.storage.from("header").list("", {
@@ -39,7 +40,7 @@ export default function Home() {
     fetchMedia();
   }, []);
 
-  // Handle slide change (image → 5s, video → wait till end)
+  // ✅ Handle slide change (image → 5s, video → wait till end)
   useEffect(() => {
     if (!media.length) return;
 
@@ -61,32 +62,53 @@ export default function Home() {
 
   return (
     <div className="flex flex-col min-h-screen text-black bg-white">
-      {/* ✅ Hero Section (edge-to-edge, no side spacing issue) */}
-      <div className="w-full relative overflow-hidden md:pt-80 aspect-[1920/480]">
-        {media.length > 0 && (
-          <>
-            {media[currentIndex].endsWith(".mp4") ||
-            media[currentIndex].endsWith(".webm") ? (
-              <video
-                key={media[currentIndex]}
-                ref={videoRef}
-                src={media[currentIndex]}
-                className="w-full h-full object-cover"
-                autoPlay
-                muted
-                playsInline
-              />
-            ) : (
-              <Image
-                key={media[currentIndex]}
-                src={media[currentIndex]}
-                alt="Hero Media"
-                fill
-                className="object-cover"
-              />
+      {/* ✅ Mobile Header */}
+      <div className="md:hidden">
+        <MobileHeader />
+      </div>
+
+      {/* ✅ Hero Section with thin spacing on mobile, large on desktop */}
+      <div className="w-full relative overflow-hidden mt-2 md:mt-20"> 
+        <div className="relative w-full aspect-[3/1] md:aspect-[1920/600]">
+          <AnimatePresence mode="wait">
+            {media.length > 0 && (
+              <>
+                {media[currentIndex].endsWith(".mp4") ||
+                media[currentIndex].endsWith(".webm") ? (
+                  <motion.video
+                    key={media[currentIndex]}
+                    ref={videoRef}
+                    src={media[currentIndex]}
+                    className="absolute inset-0 w-full h-full object-cover rounded-lg"
+                    autoPlay
+                    muted
+                    playsInline
+                    initial={{ opacity: 0, x: 50 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    exit={{ opacity: 0, x: -50 }}
+                    transition={{ duration: 0.8 }}
+                  />
+                ) : (
+                  <motion.div
+                    key={media[currentIndex]}
+                    className="absolute inset-0"
+                    initial={{ opacity: 0, x: 50 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    exit={{ opacity: 0, x: -50 }}
+                    transition={{ duration: 0.8 }}
+                  >
+                    <Image
+                      src={media[currentIndex]}
+                      alt="Hero Media"
+                      fill
+                      className="object-cover rounded-lg"
+                    />
+                  </motion.div>
+                )}
+              </>
             )}
-          </>
-        )}
+          </AnimatePresence>
+        </div>
       </div>
 
       {/* ✅ Tagline under hero */}
@@ -96,7 +118,7 @@ export default function Home() {
 
       {/* ✅ Mobile → job type icons */}
       <div className="mt-8 flex justify-center gap-12 md:hidden">
-        {[ 
+        {[
           { icon: <FaLaptopCode />, label: "Remote", href: "/remote" },
           { icon: <FaBuilding />, label: "Hybrid", href: "/hybrid" },
           { icon: <FaMapMarkerAlt />, label: "Onsite", href: "/onsite" },
@@ -117,14 +139,14 @@ export default function Home() {
       </div>
 
       {/* ✅ Desktop → feature tabs with icons + text */}
-      <div className="hidden md:grid mt-8 grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-6">
-        <FeatureTab icon={<FaLaptopCode />} title="Remote Jobs" href="/remote" />
-        <FeatureTab icon={<FaBuilding />} title="Hybrid Jobs" href="/hybrid" />
-        <FeatureTab icon={<FaMapMarkerAlt />} title="Onsite Jobs" href="/onsite" />
-        <FeatureTab icon={<FaClock />} title="Contract" href="/contract" />
-      </div>
+<div className="hidden md:flex justify-center gap-8 mt-8 flex-wrap">
+  <FeatureTab icon={<FaLaptopCode />} title="Remote Jobs" href="/remote" className="max-w-xs w-full" />
+  <FeatureTab icon={<FaBuilding />} title="Hybrid Jobs" href="/hybrid" className="max-w-xs w-full" />
+  <FeatureTab icon={<FaMapMarkerAlt />} title="Onsite Jobs" href="/onsite" className="max-w-xs w-full" />
+  <FeatureTab icon={<FaClock />} title="Contract" href="/contract" className="max-w-xs w-full" />
+</div>
 
-      {/* ✅ Insert AllJobs (toggle removed, spacing reduced) */}
+      {/* ✅ Insert AllJobs */}
       <div className="mt-8">
         <AllJobs />
       </div>

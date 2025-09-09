@@ -7,12 +7,18 @@ import { useRouter } from 'next/navigation';
 import ChatModal from './ChatModal';
 
 // ✅ utility to mark messages as read
-async function markMessagesAsRead(chatId, currentUserId) {
+async function markMessagesAsRead(chat, currentUserId) {
+  // Determine the receiver in this chat (the other participant)
+  const receiverId =
+    chat.receiver?.id || (chat.client_id === currentUserId ? chat.applicant_id : chat.client_id);
+
+  if (!receiverId) return;
+
   const { error } = await supabase
     .from('messages')
     .update({ is_read: true })
-    .eq('chat_id', chatId)
-    .eq('receiver_id', currentUserId);
+    .eq('chat_id', chat.chatId)
+    .neq('sender_id', currentUserId); // mark as read where sender is NOT current user
 
   if (error) console.error('Error marking messages as read:', error);
 }
@@ -32,48 +38,35 @@ export default function Messages() {
         error,
       } = await supabase.auth.getSession();
 
-      if (error) {
-        console.error('Error getting session:', error.message);
-        return;
-      }
-
-      if (!session || !session.user) {
-        router.replace('/auth/login');
-        return;
-      }
+      if (error) return console.error(error.message);
+      if (!session?.user) return router.replace('/auth/login');
 
       const authUser = session.user;
       setUser(authUser);
 
-      // ✅ fetch role
+      // fetch role
       const { data: userData, error: userError } = await supabase
         .from('users')
         .select('role')
         .eq('id', authUser.id)
         .maybeSingle();
 
-      if (userError) {
-        console.error('Error fetching role:', userError.message);
-      } else {
-        setRole(userData?.role);
-      }
+      if (userError) console.error('Error fetching role:', userError.message);
+      else setRole(userData?.role);
 
       await loadInbox(authUser);
 
       const { data: subscription } = supabase.auth.onAuthStateChange(
         (event, newSession) => {
-          if (event === 'SIGNED_OUT') {
-            router.replace('/auth/login');
-          } else if (newSession?.user) {
+          if (event === 'SIGNED_OUT') router.replace('/auth/login');
+          else if (newSession?.user) {
             setUser(newSession.user);
             loadInbox(newSession.user);
           }
         }
       );
 
-      return () => {
-        subscription?.subscription.unsubscribe();
-      };
+      return () => subscription?.subscription.unsubscribe();
     };
 
     const loadInbox = async (authUser) => {
@@ -83,54 +76,32 @@ export default function Messages() {
           .select('id, client_id, applicant_id, created_at')
           .or(`client_id.eq.${authUser.id},applicant_id.eq.${authUser.id}`);
 
-        if (chatsError) {
-          console.error('Error fetching chats:', chatsError.message);
-          return;
-        }
-
-        if (!userChats?.length) {
-          setChats([]);
-          return;
-        }
+        if (chatsError) return console.error('Error fetching chats:', chatsError.message);
+        if (!userChats?.length) return setChats([]);
 
         const chatData = await Promise.all(
           userChats.map(async (chat) => {
             const receiverId =
-              chat.client_id === authUser.id
-                ? chat.applicant_id
-                : chat.client_id;
+              chat.client_id === authUser.id ? chat.applicant_id : chat.client_id;
 
-            if (!receiverId) return null;
+            let receiver = null;
 
             // Employer lookup
-            let { data: receiverEmployer } = await supabase
+            const { data: receiverEmployer } = await supabase
               .from('employers')
               .select('id, name, avatar_url')
               .eq('id', receiverId)
               .maybeSingle();
 
-            let receiver = null;
-            if (receiverEmployer) {
-              receiver = {
-                id: receiverEmployer.id,
-                name: receiverEmployer.name,
-                avatar_url: receiverEmployer.avatar_url,
-              };
-            } else {
-              // Applicant lookup
+            if (receiverEmployer) receiver = receiverEmployer;
+            else {
               const { data: receiverApplicant } = await supabase
                 .from('applicants')
                 .select('id, full_name, avatar_url')
                 .eq('id', receiverId)
                 .maybeSingle();
-
-              if (receiverApplicant) {
-                receiver = {
-                  id: receiverApplicant.id,
-                  name: receiverApplicant.full_name,
-                  avatar_url: receiverApplicant.avatar_url,
-                };
-              }
+              if (receiverApplicant)
+                receiver = { id: receiverApplicant.id, name: receiverApplicant.full_name, avatar_url: receiverApplicant.avatar_url };
             }
 
             // Last message
@@ -142,13 +113,13 @@ export default function Messages() {
               .limit(1)
               .maybeSingle();
 
-            // Unread count
+            // Unread count: messages in this chat where sender != current user AND is_read = false
             const { count: unreadCount } = await supabase
               .from('messages')
               .select('*', { count: 'exact', head: true })
               .eq('chat_id', chat.id)
-              .eq('is_read', false)
-              .eq('receiver_id', authUser.id);
+              .neq('sender_id', authUser.id)
+              .eq('is_read', false);
 
             return {
               chatId: chat.id,
@@ -158,18 +129,14 @@ export default function Messages() {
               lastMessageTime: lastMsg?.created_at || chat.created_at,
               receiver,
               unreadCount: unreadCount || 0,
+              client_id: chat.client_id,
+              applicant_id: chat.applicant_id,
             };
           })
         );
 
         const validChats = chatData.filter(Boolean);
-
-        // Sort newest first
-        validChats.sort(
-          (a, b) =>
-            new Date(b.lastMessageTime).getTime() -
-            new Date(a.lastMessageTime).getTime()
-        );
+        validChats.sort((a, b) => new Date(b.lastMessageTime) - new Date(a.lastMessageTime));
 
         setChats(validChats);
       } catch (err) {
@@ -182,7 +149,7 @@ export default function Messages() {
     initAuth();
   }, [router]);
 
-  // ✅ real-time updates
+  // Real-time updates
   useEffect(() => {
     if (!user) return;
 
@@ -195,53 +162,37 @@ export default function Messages() {
           const newMessage = payload.new;
 
           setChats((prevChats) => {
-            const idx = prevChats.findIndex(
-              (chat) => chat.chatId === newMessage.chat_id
-            );
+            const idx = prevChats.findIndex((c) => c.chatId === newMessage.chat_id);
             if (idx === -1) return prevChats;
 
             const isFromMe = newMessage.sender_id === user.id;
-            const isForMe = newMessage.receiver_id === user.id;
 
             const updatedChat = {
               ...prevChats[idx],
               lastMessage: newMessage.content,
               lastMessageTime: newMessage.created_at,
-              unreadCount:
-                !isFromMe && isForMe
-                  ? (prevChats[idx].unreadCount || 0) + 1
-                  : prevChats[idx].unreadCount,
+              unreadCount: !isFromMe ? (prevChats[idx].unreadCount || 0) + 1 : prevChats[idx].unreadCount,
             };
 
             const newChats = [...prevChats];
             newChats[idx] = updatedChat;
-
-            newChats.sort(
-              (a, b) =>
-                new Date(b.lastMessageTime).getTime() -
-                new Date(a.lastMessageTime).getTime()
-            );
-
+            newChats.sort((a, b) => new Date(b.lastMessageTime) - new Date(a.lastMessageTime));
             return newChats;
           });
         }
       )
       .subscribe();
 
-    return () => {
-      supabase.removeChannel(channel);
-    };
+    return () => supabase.removeChannel(channel);
   }, [user]);
 
-  // ✅ open chat
+  // Open chat
   const handleOpenChat = async (chat) => {
     setActiveChat(chat);
     if (user) {
-      await markMessagesAsRead(chat.chatId, user.id);
+      await markMessagesAsRead(chat, user.id);
       setChats((prev) =>
-        prev.map((c) =>
-          c.chatId === chat.chatId ? { ...c, unreadCount: 0 } : c
-        )
+        prev.map((c) => (c.chatId === chat.chatId ? { ...c, unreadCount: 0 } : c))
       );
     }
   };
@@ -251,7 +202,6 @@ export default function Messages() {
   return (
     <div className="flex-1 px-4 sm:px-6">
       <h1 className="text-2xl font-bold mb-6 pt-0 sm:pt-20">Messages</h1>
-
       {chats.length === 0 ? (
         <p className="text-gray-500">You have no messages yet.</p>
       ) : (
@@ -262,11 +212,7 @@ export default function Messages() {
               onClick={() => handleOpenChat(chat)}
               className="flex items-center gap-4 p-4 border rounded-xl shadow-sm hover:shadow-md hover:bg-gray-50 cursor-pointer transition"
             >
-              <img
-                src={chat.avatar}
-                alt="Avatar"
-                className="w-12 h-12 rounded-full object-cover"
-              />
+              <img src={chat.avatar} alt="Avatar" className="w-12 h-12 rounded-full object-cover" />
               <div className="flex-1 min-w-0">
                 <h3 className="font-semibold text-gray-900 truncate flex items-center">
                   {chat.fullName}
@@ -276,30 +222,19 @@ export default function Messages() {
                     </span>
                   )}
                 </h3>
-                <p className="text-sm text-gray-600 truncate">
-                  {chat.lastMessage}
-                </p>
+                <p className="text-sm text-gray-600 truncate">{chat.lastMessage}</p>
               </div>
               {chat.lastMessageTime && (
                 <small className="text-gray-500 whitespace-nowrap text-xs">
-                  {new Date(chat.lastMessageTime).toLocaleTimeString([], {
-                    hour: '2-digit',
-                    minute: '2-digit',
-                  })}
+                  {new Date(chat.lastMessageTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                 </small>
               )}
             </li>
           ))}
         </ul>
       )}
-
       {activeChat && (
-        <ChatModal
-          chatId={activeChat.chatId}
-          userId={user.id}
-          isOpen={true}
-          onClose={() => setActiveChat(null)}
-        />
+        <ChatModal chatId={activeChat.chatId} userId={user.id} isOpen={true} onClose={() => setActiveChat(null)} />
       )}
     </div>
   );

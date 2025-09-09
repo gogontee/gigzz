@@ -14,6 +14,7 @@ export default function BottomTabs() {
         const { data: { session } } = await supabase.auth.getSession();
 
         if (!session) {
+          // ❌ No session at all → send to login
           setDashboardPath('/auth/login');
           setLoading(false);
           return;
@@ -21,7 +22,7 @@ export default function BottomTabs() {
 
         const userId = session.user.id;
 
-        // check if employer
+        // ✅ Check if employer
         const { data: employer } = await supabase
           .from('employers')
           .select('id')
@@ -34,7 +35,7 @@ export default function BottomTabs() {
           return;
         }
 
-        // check if applicant
+        // ✅ Check if applicant
         const { data: applicant } = await supabase
           .from('applicants')
           .select('id')
@@ -47,8 +48,8 @@ export default function BottomTabs() {
           return;
         }
 
-        // fallback
-        setDashboardPath('/auth/login');
+        // ⚠️ Authenticated but no role found → still send to generic dashboard, not login
+        setDashboardPath('/dashboard');
       } catch (err) {
         console.error(err);
         setDashboardPath('/auth/login');
@@ -80,7 +81,7 @@ export default function BottomTabs() {
     <div className="fixed bottom-0 w-full bg-black border-t border-gray-800 flex justify-around py-2 md:hidden z-50">
       {tabs.map((tab) => (
         <button
-          key={tab.label} // Use label as key to prevent duplicates
+          key={tab.label}
           onClick={() => handleTabClick(tab.href)}
           className="flex flex-col items-center text-xs text-white group"
         >
