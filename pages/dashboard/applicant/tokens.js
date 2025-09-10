@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { supabase } from "../../../utls/supabaseClient";
+import { supabase } from "../../../utils/supabaseClient";
 
 export default function TokensPage() {
   const [balance, setBalance] = useState(0);

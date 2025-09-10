@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/router";
-import { supabase } from "../../utls/supabaseClient";
+import { supabase } from "../../utils/supabaseClient";
 import Image from "next/image";
 
 export default function ChatListPage() {
