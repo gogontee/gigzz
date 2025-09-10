@@ -1,6 +1,6 @@
 'use client';
 import { useEffect, useState } from 'react';
-import { supabase } from '../lib/supabaseClient';
+import { supabase } from '../utils/supabaseClient';
 
 export default function useUnreadMessages() {
   const [count, setCount] = useState(0);

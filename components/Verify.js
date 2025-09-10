@@ -10,7 +10,7 @@ import {
   CreditCard as IdCard,
   Camera,
 } from 'lucide-react';
-import { supabase } from '../lib/supabaseClient';
+import { supabase } from '../utils/supabaseClient';
 
 export default function Verify() {
   const [user, setUser] = useState(null);

@@ -1,7 +1,7 @@
 'use client';
 import { useRouter } from "next/router";
 import { useEffect, useState } from "react";
-import { supabase } from "../../../lib/supabaseClient";
+import { supabase } from "../../../utils/supabaseClient";
 import MobileHeader from "../../../components/MobileHeader";
 
 export default function JobApplicantsPage() {

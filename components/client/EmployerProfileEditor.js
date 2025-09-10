@@ -1,7 +1,7 @@
 'use client';
 import React, { useState, useEffect } from 'react';
 import { Camera, CheckCircle, X } from 'lucide-react';
-import { supabase } from '../../lib/supabaseClient';
+import { supabase } from '../../utils/supabaseClient';
 
 export default function EmployerProfileEditor({ employer, onUpdated }) {
   const [form, setForm] = useState({

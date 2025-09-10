@@ -1,7 +1,7 @@
 // pages/gigzzstars.js
 'use client';
 import { useEffect, useState, useCallback } from "react";
-import { supabase } from "../lib/supabaseClient";
+import { supabase } from "../utils/supabaseClient";
 import ProfileCard from "../components/ProfileCard";
 import MobileHeader from "../components/MobileHeader";
 

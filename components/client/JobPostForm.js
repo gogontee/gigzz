@@ -1,7 +1,7 @@
 'use client';
 import React, { useState } from 'react';
 import { Calendar, Tag, ClipboardList, CheckCircle, X, Activity } from 'lucide-react';
-import { supabase } from '../../lib/supabaseClient';
+import { supabase } from '../../utils/supabaseClient';
 import dayjs from 'dayjs';
 
 const JOB_CATEGORIES = ['Remote', 'Hybrid', 'Onsite'];

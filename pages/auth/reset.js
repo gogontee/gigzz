@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { supabase } from '../../lib/supabaseClient';
+import { supabase } from '../../utils/supabaseClient';
 
 export default function ResetPasswordPage() {
   const [email, setEmail] = useState('');

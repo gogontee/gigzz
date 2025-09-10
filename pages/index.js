@@ -191,29 +191,30 @@ export default function Home() {
       </div>
 
       {/* ✅ Video Section */}
-      <div className="mt-14">
-        <h2 className="text-2xl md:text-3xl font-semibold mb-6 text-center">
-          Learn About Gigzz
-        </h2>
-        <div className="flex gap-4 overflow-x-auto scrollbar-hide pb-2">
-          {[
-            "https://www.youtube.com/embed/dQw4w9WgXcQ",
-            "https://www.youtube.com/embed/dQw4w9WgXcQ",
-            "https://www.youtube.com/embed/3fumBcKC6RE",
-          ].map((src, i) => (
-            <div key={i} className="min-w-[300px] md:min-w-[500px] aspect-video">
-              <iframe
-                className="w-full h-full rounded-lg"
-                src={src}
-                title={`Gigzz Video ${i + 1}`}
-                frameBorder="0"
-                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                allowFullScreen
-              ></iframe>
-            </div>
-          ))}
-        </div>
+<div className="mt-14">
+  <h2 className="text-2xl md:text-3xl font-semibold mb-6 text-center">
+    Learn About Gigzz
+  </h2>
+  <div className="flex gap-4 overflow-x-auto scrollbar-hide pb-2">
+    {[
+      "https://www.youtube.com/embed/tbnzAVRZ9Xc",
+      "https://www.youtube.com/embed/B-ekqBF2EMo",
+      "https://www.youtube.com/embed/fyOww2Yt8mM",
+    ].map((src, i) => (
+      <div key={i} className="min-w-[300px] md:min-w-[500px] aspect-video">
+        <iframe
+          className="w-full h-full rounded-lg"
+          src={src}
+          title={`Gigzz Video ${i + 1}`}
+          frameBorder="0"
+          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+          allowFullScreen
+        ></iframe>
       </div>
+    ))}
+  </div>
+</div>
+
 
       {/* ✅ Testimonials Section */}
       <div className="mt-14">

@@ -1,13 +1,19 @@
+// pages/_app.js
 import '../styles/globals.css'
 import Layout from '../components/Layout'
 import { AnimatePresence, motion } from 'framer-motion'
 import Head from 'next/head'
 import { useRouter } from 'next/router'
 import { useEffect, useState } from 'react'
+import { createPagesBrowserClient } from '@supabase/auth-helpers-nextjs'
+import { SessionContextProvider } from '@supabase/auth-helpers-react'
 
 function MyApp({ Component, pageProps }) {
   const router = useRouter()
   const [isMounted, setIsMounted] = useState(false)
+
+  // ✅ Create Supabase client
+  const [supabaseClient] = useState(() => createPagesBrowserClient())
 
   // Prevent hydration mismatches on first render
   useEffect(() => {
@@ -26,28 +32,28 @@ function MyApp({ Component, pageProps }) {
       </Head>
 
       {isMounted && (
-        <Layout>
-          <AnimatePresence mode="wait">
-            <motion.div
-              key={router.route}
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -10 }}
-              transition={{ duration: 0.2 }}
-            >
-              <Component {...pageProps} />
-            </motion.div>
-          </AnimatePresence>
-        </Layout>
+        // ✅ Wrap the entire app with SessionContextProvider
+        <SessionContextProvider
+          supabaseClient={supabaseClient}
+          initialSession={pageProps.initialSession}
+        >
+          <Layout>
+            <AnimatePresence mode="wait">
+              <motion.div
+                key={router.route}
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -10 }}
+                transition={{ duration: 0.2 }}
+              >
+                <Component {...pageProps} />
+              </motion.div>
+            </AnimatePresence>
+          </Layout>
+        </SessionContextProvider>
       )}
     </>
   )
 }
-
-// Optional: if you need server-side props at the app level
-// MyApp.getInitialProps = async (appContext) => {
-//   const appProps = await App.getInitialProps(appContext);
-//   return { ...appProps };
-// }
 
 export default MyApp

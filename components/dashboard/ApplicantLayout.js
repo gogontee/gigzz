@@ -12,7 +12,7 @@ import {
   ChevronLeft,
   ChevronRight
 } from 'lucide-react';
-import { supabase } from '../../lib/supabaseClient';
+import { supabase } from '../../utils/supabaseClient';
 
 const navItems = [
   { key: 'dashboard', label: 'Dashboard', icon: <Home size={18} /> },

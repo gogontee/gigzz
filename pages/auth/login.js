@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { supabase } from '../../lib/supabaseClient';
+import { supabase } from '../../utils/supabaseClient';
 import { useRouter } from 'next/router';
 import { Eye, EyeOff } from 'lucide-react';
 

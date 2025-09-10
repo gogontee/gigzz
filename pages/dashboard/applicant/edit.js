@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/router';
-import { supabase } from '../../../lib/supabaseClient';
+import { supabase } from '../../../utils/supabaseClient';
 import ApplicantsLayout from '../../../components/dashboard/ApplicantLayout';
 import PhoneInput from 'react-phone-input-2';
 import 'react-phone-input-2/lib/style.css';

@@ -1,6 +1,6 @@
 // components/ChatModal.js
 import { useEffect, useRef, useState } from "react";
-import { supabase } from "../lib/supabaseClient";
+import { supabase } from "../utils/supabaseClient";
 
 export default function ChatModal({ chatId, userId, isOpen, onClose }) {
   const [messages, setMessages] = useState([]);
@@ -46,16 +46,22 @@ useEffect(() => {
   }, [newMessage]);
 
   // 🔹 Format avatar URL (convert Supabase storage path to public URL)
-  const formatAvatarUrl = (path) => {
-    if (!path) return "/avatar-placeholder.png";
-    if (path.startsWith("http")) return path;
+const formatAvatarUrl = (path, type = "applicant") => {
+  if (!path) return "/avatar-placeholder.png";
+  if (path.startsWith("http")) return path;
 
-    const { data } = supabase.storage
-      .from("avatars") // ⚠️ adjust bucket name
-      .getPublicUrl(path);
+  // Decide folder inside 'profilephoto' bucket
+  let folder = "avatars"; // default fallback
+  if (type === "applicant" || type === "talent") folder = "talents_profile";
+  else if (type === "employer" || type === "client") folder = "clients_profile";
 
-    return data?.publicUrl || "/avatar-placeholder.png";
-  };
+  const { data } = supabase.storage
+    .from("profilephoto")
+    .getPublicUrl(`${folder}/${path}`);
+
+  return data?.publicUrl || "/avatar-placeholder.png";
+};
+
 
   // 🔹 Helper to format profile
   const formatProfile = (profile) => ({
