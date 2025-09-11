@@ -486,7 +486,7 @@ export default function JobDetailPage() {
             </div>
 
             {/* Pay & Price Frequency */}
-            <p className="text-lg font-semibold mb-1">{formattedPay}</p>
+            <p className="text-lg font-semibold mb-1 text-orange-400">{formattedPay}</p>
             {job.price_frequency && (
               <p className="text-sm text-gray-600 mb-4">{job.price_frequency}</p>
             )}
@@ -498,25 +498,35 @@ export default function JobDetailPage() {
 
             {/* Description */}
             <div className="mb-6">
-              <h2 className="text-xl font-bold mb-2">Description</h2>
+              <h2 className="text-xl font-bold mb-2 text-orange-400">Description</h2>
               <p className="text-gray-700 whitespace-pre-line">{job.description}</p>
             </div>
 
             {/* Responsibilities */}
             <div className="mb-6">
-              <h2 className="text-xl font-bold mb-2">Responsibilities</h2>
+              <h2 className="text-xl font-bold mb-2 text-orange-400">Responsibilities</h2>
               <p className="text-gray-700 whitespace-pre-line">{job.responsibilities}</p>
             </div>
 
             {/* Requirements */}
             <div className="mb-6">
-              <h2 className="text-xl font-bold mb-2">Requirements & Skills</h2>
+              <h2 className="text-xl font-bold mb-2 text-orange-400">Requirements & Skills</h2>
               <p className="text-gray-700 whitespace-pre-line">{job.requirements}</p>
             </div>
 
+            {/* Educational Qualification */}
+{job.educational_qualification && (
+  <div className="mb-6">
+    <h2 className="text-xl font-bold mb-2 text-orange-400">Educational Qualification</h2>
+    <p className="text-gray-700 whitespace-pre-line">
+      {job.educational_qualification}
+    </p>
+  </div>
+)}
+
             {/* Location */}
             <div className="mb-6">
-              <h2 className="text-xl font-bold mb-2">Location</h2>
+              <h2 className="text-xl font-bold mb-2 text-orange-400">Location</h2>
               <p className="text-gray-700">{job.location}</p>
             </div>
 

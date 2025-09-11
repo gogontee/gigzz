@@ -1,26 +1,27 @@
 import { Home, Briefcase, MapPin, User, Plus } from 'lucide-react';
 import { useRouter } from 'next/router';
 import { useEffect, useState } from 'react';
-import { supabase } from '../utils/supabaseClient';
+import { useUser, useSupabaseClient } from '@supabase/auth-helpers-react';
 
 export default function BottomTabs() {
   const router = useRouter();
+  const supabase = useSupabaseClient(); // ✅ use context client
+  const user = useUser(); // ✅ current session user
+
   const [dashboardPath, setDashboardPath] = useState(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const fetchUserRole = async () => {
       try {
-        const { data: { session } } = await supabase.auth.getSession();
-
-        if (!session) {
-          // ❌ No session at all → send to login
+        if (!user) {
+          // ❌ No session → send to login
           setDashboardPath('/auth/login');
           setLoading(false);
           return;
         }
 
-        const userId = session.user.id;
+        const userId = user.id;
 
         // ✅ Check if employer
         const { data: employer } = await supabase
@@ -48,7 +49,7 @@ export default function BottomTabs() {
           return;
         }
 
-        // ⚠️ Authenticated but no role found → still send to generic dashboard, not login
+        // ⚠️ Authenticated but no role found → fallback
         setDashboardPath('/dashboard');
       } catch (err) {
         console.error(err);
@@ -59,7 +60,7 @@ export default function BottomTabs() {
     };
 
     fetchUserRole();
-  }, []);
+  }, [user, supabase]);
 
   // Only render tabs **after dashboard path is resolved**
   if (loading || !dashboardPath) return null;

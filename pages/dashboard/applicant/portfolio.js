@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { supabase } from "../../../utils/supabaseClient";
+import { useUser, useSupabaseClient } from "@supabase/auth-helpers-react";
 
 import ApplicantLayout from "../../../components/dashboard/ApplicantLayout";
 import EmptyState from "../../../components/portfolio/EmptyState";
@@ -13,20 +13,17 @@ export default function PortfolioPage() {
   const [projects, setProjects] = useState([]);
   const [loading, setLoading] = useState(true);
 
+  const user = useUser(); // ✅ logged-in user
+  const supabase = useSupabaseClient(); // ✅ supabase client
+
   useEffect(() => {
     const fetchProjects = async () => {
-      setLoading(true);
-
-      const {
-        data: { user },
-        error: userError,
-      } = await supabase.auth.getUser();
-
-      if (userError || !user) {
-        console.error("User not found:", userError);
+      if (!user) {
         setLoading(false);
         return;
       }
+
+      setLoading(true);
 
       // Fetch projects created by the current user
       const { data, error } = await supabase
@@ -39,7 +36,7 @@ export default function PortfolioPage() {
         console.error("Error fetching projects:", error);
       } else {
         // Map project data to include only the fields needed by PortfolioCard
-        const mappedProjects = (data || []).map(p => ({
+        const mappedProjects = (data || []).map((p) => ({
           id: p.id,
           title: p.title,
           details: p.details,
@@ -53,7 +50,7 @@ export default function PortfolioPage() {
     };
 
     fetchProjects();
-  }, []);
+  }, [user, supabase]);
 
   return (
     <>

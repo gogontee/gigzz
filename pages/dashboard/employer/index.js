@@ -1,7 +1,7 @@
 'use client';
 import { useEffect, useState, useCallback } from 'react';
-import { createClient } from '@supabase/supabase-js';
 import { useRouter } from 'next/router';
+import { useUser, useSupabaseClient } from '@supabase/auth-helpers-react';
 
 import Sidebar from '../../../components/dashboard/ClientSidebar';
 import JobPostForm from '../../../components/client/JobPostForm';
@@ -12,19 +12,17 @@ import PromotionPanel from '../../../components/client/PromotionPanel';
 import JobListCard from '../../../components/client/JobListCard';
 import Verify from '../../../components/Verify';
 import Messages from '../../../components/Messages';
-import Portfolio from '../../../components/Portfolios'; 
-import Token from '../../../components/Token'; // ✅ imported Token
-
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-);
+import Portfolio from '../../../components/Portfolios';
+import Token from '../../../components/Token';
 
 const isValidComponent = (Comp) =>
   typeof Comp === 'function' || (typeof Comp === 'object' && Comp !== null);
 
 export default function EmployerDashboard() {
   const router = useRouter();
+  const supabase = useSupabaseClient(); // ✅ use client from provider
+  const user = useUser(); // ✅ get current session user
+
   const [employer, setEmployer] = useState(null);
   const [jobs, setJobs] = useState([]);
   const [wallet, setWallet] = useState(null);
@@ -32,6 +30,7 @@ export default function EmployerDashboard() {
   const [loading, setLoading] = useState(true);
   const [importErrors, setImportErrors] = useState([]);
 
+  // ✅ check imports once
   useEffect(() => {
     const errs = [];
     if (!isValidComponent(Sidebar)) errs.push('ClientSidebar');
@@ -48,18 +47,15 @@ export default function EmployerDashboard() {
     setImportErrors(errs);
   }, []);
 
+  // ✅ fetch initial data
   const fetchInitial = useCallback(async () => {
-    setLoading(true);
-    const {
-      data: { user },
-      error: authErr,
-    } = await supabase.auth.getUser();
-    if (authErr || !user) {
+    if (!user) {
       router.replace('/auth/login');
       return;
     }
+    setLoading(true);
 
-    // fetch employer
+    // employer
     const { data: employerData, error: empErr } = await supabase
       .from('employers')
       .select('*')
@@ -72,14 +68,14 @@ export default function EmployerDashboard() {
       return;
     }
 
-    // fetch jobs
+    // jobs
     const { data: jobPosts } = await supabase
       .from('jobs')
       .select('*')
       .eq('employer_id', user.id)
       .order('created_at', { ascending: false });
 
-    // fetch wallet
+    // wallet
     const { data: walletData } = await supabase
       .from('token_wallets')
       .select('*')
@@ -90,12 +86,13 @@ export default function EmployerDashboard() {
     setJobs(jobPosts || []);
     setWallet(walletData);
     setLoading(false);
-  }, [router]);
+  }, [user, supabase, router]);
 
   useEffect(() => {
-    fetchInitial();
-  }, [fetchInitial]);
+    if (user) fetchInitial();
+  }, [user, fetchInitial]);
 
+  if (!user) return <div className="p-4">Redirecting to login...</div>;
   if (loading) return <div className="p-4">Loading...</div>;
 
   if (importErrors.length > 0) {
@@ -128,7 +125,6 @@ export default function EmployerDashboard() {
             </h1>
           </div>
           <div className="flex gap-4">
-            {/* Show Token component button in header only if section is wallet */}
             {activeSection !== 'wallet' && <WalletSummary wallet={wallet} />}
             <button
               onClick={() => setActiveSection('post')}
@@ -139,12 +135,11 @@ export default function EmployerDashboard() {
           </div>
         </div>
 
-        {/* content panel */}
+        {/* content */}
         <div className="px-2 lg:px-6 py-6">
           {activeSection === 'overview' && (
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 lg:gap-6">
               <div className="col-span-2 space-y-4 lg:space-y-6">
-                {/* jobs */}
                 <div className="rounded-xl bg-white shadow p-4 lg:p-6">
                   <h2 className="text-xl font-semibold mb-2">Your Jobs</h2>
                   {jobs.length === 0 ? (
@@ -179,27 +174,21 @@ export default function EmployerDashboard() {
             </div>
           )}
 
-          {activeSection === 'token' && <Token wallet={wallet} />} {/* ✅ Render Token */}
-
+          {activeSection === 'token' && <Token wallet={wallet} />}
           {activeSection === 'profile' && employer && (
             <EmployerProfileEditor employer={employer} onUpdated={fetchInitial} />
           )}
-
           {activeSection === 'verify' && employer && (
             <div>
               <h2 className="text-xl font-semibold mb-4">Verify Your Identity</h2>
               <Verify employer={employer} />
             </div>
           )}
-
           {activeSection === 'chats' && <Messages />}
-
           {activeSection === 'portfolios' && <Portfolio />}
-
           {activeSection === 'calls' && <VideoCallModal />}
         </div>
       </div>
     </div>
   );
 }
-

@@ -3,7 +3,7 @@ import { useRouter } from "next/router";
 import { useEffect, useState } from "react";
 import { supabase } from "../../../utils/supabaseClient";
 import MobileHeader from "../../../components/MobileHeader";
-
+  
 export default function JobApplicantsPage() {
   const router = useRouter();
   const { id } = router.query; // job id from URL
@@ -71,10 +71,6 @@ export default function JobApplicantsPage() {
     return <p className="p-6 text-center">Loading applicants...</p>;
   }
 
-  if (applicants.length === 0) {
-    return <p className="p-6 text-center">No applicants yet</p>;
-  }
-
   return (
     <>
       {/* Mobile Header */}
@@ -82,7 +78,12 @@ export default function JobApplicantsPage() {
         <MobileHeader />
       </div>
 
-      <div className="flex flex-row h-screen pt-4 sm:pt-20">
+      {/* Desktop Page Title with enough padding below header */}
+      <div className="hidden sm:block pt-24 px-6">
+        <h1 className="text-2xl font-bold">Job Applicants</h1>
+      </div>
+
+      <div className="flex flex-row h-screen pt-4 sm:pt-6">
         {/* Sidebar */}
         <div className="w-20 sm:w-1/4 md:w-1/5 border-r bg-gray-50 overflow-y-auto">
           <h2 className="hidden sm:block p-4 font-semibold text-lg border-b">
@@ -123,7 +124,11 @@ export default function JobApplicantsPage() {
 
         {/* Content Area */}
         <div className="flex-1 p-4 sm:p-6 overflow-y-auto">
-          {selectedApplicant ? (
+          {applicants.length === 0 ? (
+            <p className="text-center text-gray-500 text-sm sm:text-base">
+              No applicants yet
+            </p>
+          ) : selectedApplicant ? (
             <div className="space-y-4 sm:space-y-6">
               <div className="flex items-center gap-3 sm:gap-4">
                 <img

@@ -1,5 +1,5 @@
 'use client';
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Calendar, Tag, ClipboardList, CheckCircle, X, Activity } from 'lucide-react';
 import { supabase } from '../../utils/supabaseClient';
 import dayjs from 'dayjs';
@@ -28,10 +28,28 @@ export default function JobPostForm({ employerId, onPosted }) {
     location: '',
     promotion_tag: '',
     tags: '',
+    educational_qualification: '',  // ✅ NEW FIELD
   });
 
   const [loading, setLoading] = useState(false);
   const [status, setStatus] = useState({ type: '', text: '' });
+
+  // 🔑 Load saved draft from localStorage when component mounts
+  useEffect(() => {
+    const saved = localStorage.getItem('jobPostDraft');
+    if (saved) {
+      try {
+        setForm(JSON.parse(saved));
+      } catch (e) {
+        console.error('Error parsing draft:', e);
+      }
+    }
+  }, []);
+
+  // 🔑 Save draft to localStorage whenever form changes
+  useEffect(() => {
+    localStorage.setItem('jobPostDraft', JSON.stringify(form));
+  }, [form]);
 
   const handleChange = (e) => {
     setForm((f) => ({ ...f, [e.target.name]: e.target.value }));
@@ -54,7 +72,6 @@ export default function JobPostForm({ employerId, onPosted }) {
       return;
     }
 
-    // ✅ Validate numeric prices
     const minPrice = Number(form.min_price);
     const maxPrice = Number(form.max_price);
     if (isNaN(minPrice) || isNaN(maxPrice) || minPrice <= 0 || maxPrice <= 0) {
@@ -66,7 +83,6 @@ export default function JobPostForm({ employerId, onPosted }) {
     setStatus({ type: '', text: '' });
 
     try {
-      // ✅ Fetch employer avatar
       const { data: employer, error: empErr } = await supabase
         .from('employers')
         .select('avatar_url')
@@ -101,7 +117,8 @@ export default function JobPostForm({ employerId, onPosted }) {
         tags: form.tags
           ? form.tags.split(',').map((t) => t.trim()).filter((t) => t.length > 0)
           : [],
-        avatar_url: employer.avatar_url, // ✅ store employer avatar into jobs table
+        avatar_url: employer.avatar_url,
+        educational_qualification: form.educational_qualification || null,  // ✅ SAVE TO DB
       };
 
       const { error } = await supabase.from('jobs').insert([insertObj]);
@@ -111,6 +128,8 @@ export default function JobPostForm({ employerId, onPosted }) {
         setStatus({ type: 'error', text: error.message || 'Failed to post job.' });
       } else {
         setStatus({ type: 'success', text: 'Job posted successfully!' });
+
+        // 🔑 Clear form + clear saved draft
         setForm({
           title: '',
           category: JOB_CATEGORIES[0],
@@ -125,7 +144,9 @@ export default function JobPostForm({ employerId, onPosted }) {
           location: '',
           promotion_tag: '',
           tags: '',
+          educational_qualification: '',  // ✅ RESET FIELD
         });
+        localStorage.removeItem('jobPostDraft');
         onPosted?.();
       }
     } catch (err) {
@@ -298,6 +319,19 @@ export default function JobPostForm({ employerId, onPosted }) {
             />
           </div>
         </div>
+
+        {/* Educational Qualification */}
+      <div>
+     <label className="text-sm font-medium mb-1">Educational Qualification</label>
+      <input
+      type="text"
+      name="educational_qualification"
+      value={form.educational_qualification}
+      onChange={handleChange}
+      placeholder="B.Sc. in Computer Science"
+      className="w-full border border-gray-300 rounded px-4 py-2"
+       />
+      </div>
 
         {/* Tags & Promotion */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

@@ -5,7 +5,7 @@ import { AnimatePresence, motion } from 'framer-motion'
 import Head from 'next/head'
 import { useRouter } from 'next/router'
 import { useEffect, useState } from 'react'
-import { createPagesBrowserClient } from '@supabase/auth-helpers-nextjs'
+import { createBrowserSupabaseClient } from '@supabase/auth-helpers-nextjs'
 import { SessionContextProvider } from '@supabase/auth-helpers-react'
 
 function MyApp({ Component, pageProps }) {
@@ -13,9 +13,9 @@ function MyApp({ Component, pageProps }) {
   const [isMounted, setIsMounted] = useState(false)
 
   // ✅ Create Supabase client
-  const [supabaseClient] = useState(() => createPagesBrowserClient())
+  const [supabaseClient] = useState(() => createBrowserSupabaseClient())
 
-  // Prevent hydration mismatches on first render
+  // Prevent hydration mismatches
   useEffect(() => {
     setIsMounted(true)
   }, [])
@@ -32,11 +32,7 @@ function MyApp({ Component, pageProps }) {
       </Head>
 
       {isMounted && (
-        // ✅ Wrap the entire app with SessionContextProvider
-        <SessionContextProvider
-          supabaseClient={supabaseClient}
-          initialSession={pageProps.initialSession}
-        >
+        <SessionContextProvider supabaseClient={supabaseClient}>
           <Layout>
             <AnimatePresence mode="wait">
               <motion.div

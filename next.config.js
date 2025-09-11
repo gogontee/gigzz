@@ -1,6 +1,15 @@
 // next.config.js
-module.exports = {
+/** @type {import('next').NextConfig} */
+const nextConfig = {
   images: {
-    domains: ['xatxjdsppcjgplmrtjcs.supabase.co'],
+    remotePatterns: [
+      {
+        protocol: 'https',
+        hostname: 'xatxjdsppcjgplmrtjcs.supabase.co',
+        pathname: '/storage/v1/object/public/**', // allow all public storage images
+      },
+    ],
   },
 };
+
+module.exports = nextConfig;

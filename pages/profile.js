@@ -1,7 +1,8 @@
-// pages/dashboard/profile.js
+// pages/profile.js
 'use client';
+
 import { useEffect, useState, useCallback } from 'react';
-import { createClient } from '@supabase/supabase-js';
+import { useUser, useSupabaseClient } from '@supabase/auth-helpers-react';
 import { motion } from 'framer-motion';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
@@ -14,66 +15,56 @@ import {
   EyeOff,
 } from 'lucide-react';
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-);
-
 export default function ProfilePage() {
   const router = useRouter();
-  const [user, setUser] = useState(null);
+  const user = useUser(); // ✅ already gives you the logged-in user
+  const supabase = useSupabaseClient(); // ✅ the client, no need to recreate
+
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
   const [projects, setProjects] = useState([]);
-
-  // Toggles
   const [showFullBio, setShowFullBio] = useState(false);
 
   const loadProfileAndProjects = useCallback(async () => {
-    setLoading(true);
-
-    const {
-      data: { user: authUser },
-      error: userError,
-    } = await supabase.auth.getUser();
-
-    // 🚨 If no auth user, redirect to login
-    if (userError || !authUser) {
+    if (!user) {
       router.push('/auth/login');
       return;
     }
 
-    setUser(authUser);
+    setLoading(true);
 
+    // Get user role
     const { data: userMeta } = await supabase
       .from('users')
       .select('role')
-      .eq('id', authUser.id)
+      .eq('id', user.id)
       .single();
-    const role = userMeta?.role;
 
+    const role = userMeta?.role;
     const table = role === 'employer' ? 'employers' : 'applicants';
 
+    // Get profile
     const { data: profileData } = await supabase
       .from(table)
       .select('*')
-      .eq('id', authUser.id)
+      .eq('id', user.id)
       .single();
 
     if (profileData) {
       setProfile({ ...profileData, role, table });
     }
 
+    // Get projects
     const { data: projectsData } = await supabase
       .from('projects')
       .select('*')
-      .eq('user_id', authUser.id)
+      .eq('user_id', user.id)
       .order('created_at', { ascending: false });
 
     if (projectsData) setProjects(projectsData);
 
     setLoading(false);
-  }, [router]);
+  }, [user, router, supabase]);
 
   useEffect(() => {
     loadProfileAndProjects();
@@ -98,6 +89,10 @@ export default function ProfilePage() {
       console.error('Error updating DOB visibility:', error.message);
     }
   };
+
+  if (!user) {
+    return <div className="p-6 text-center text-gray-500">Redirecting...</div>;
+  }
 
   if (loading) {
     return <div className="p-6 text-center text-gray-500">Loading profile...</div>;
