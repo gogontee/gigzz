@@ -115,12 +115,8 @@ export default function DesktopHeader() {
                 >
                   <Link href="/remote" className="block hover:text-orange-500 transition">Remote Jobs</Link>
                   <Link href="/hybrid" className="block hover:text-orange-500 transition">Hybrid Jobs</Link>
-                  <button
-                    onClick={() => setOnsiteModal(true)}
-                    className="block hover:text-orange-500 transition text-left w-full"
-                  >
-                    Onsite Jobs
-                  </button>
+                  {/* ✅ Changed from modal to href */}
+                  <Link href="/onsite" className="block hover:text-orange-500 transition">Onsite Jobs</Link>
                 </motion.div>
               )}
             </AnimatePresence>
@@ -221,22 +217,6 @@ export default function DesktopHeader() {
           )}
         </div>
       </div>
-
-      {/* Onsite Modal */}
-      {onsiteModal && (
-        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-[999]">
-          <div className="bg-white rounded-xl shadow p-6 w-full max-w-md text-center space-y-4">
-            <h2 className="text-xl font-bold text-gray-800">Onsite Jobs</h2>
-            <p className="text-gray-600">Onsite jobs will be available soon. Stay tuned!</p>
-            <button
-              onClick={() => setOnsiteModal(false)}
-              className="mt-4 px-4 py-2 bg-black text-white rounded hover:bg-orange-500 transition"
-            >
-              Close
-            </button>
-          </div>
-        </div>
-      )}
     </header>
   );
 }
