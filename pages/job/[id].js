@@ -517,7 +517,7 @@ export default function JobDetailPage() {
             {/* Educational Qualification */}
 {job.educational_qualification && (
   <div className="mb-6">
-    <h2 className="text-xl font-bold mb-2 text-orange-400">Educational Qualification</h2>
+    <h2 className="text-xl font-bold mb-2 text-orange-400">Qualification</h2>
     <p className="text-gray-700 whitespace-pre-line">
       {job.educational_qualification}
     </p>

@@ -6,7 +6,7 @@ import dayjs from 'dayjs';
 
 const JOB_CATEGORIES = ['Remote', 'Hybrid', 'Onsite'];
 const JOB_TYPES = ['Freelance', 'Contract', 'Full-time', 'Part-time'];
-const PRICE_FREQUENCIES = ['One-time', 'Daily', 'Weekly', 'Monthly'];
+const PRICE_FREQUENCIES = ['Per Job', 'One-Time', 'Daily', 'Weekly', 'Monthly'];
 const PROMOTION_LEVELS = [
   { label: 'None', value: '' },
   { label: 'Featured', value: 'featured' },
