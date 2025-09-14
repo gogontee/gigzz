@@ -20,8 +20,8 @@ const isValidComponent = (Comp) =>
 
 export default function EmployerDashboard() {
   const router = useRouter();
-  const supabase = useSupabaseClient(); // ✅ use client from provider
-  const user = useUser(); // ✅ get current session user
+  const supabase = useSupabaseClient();
+  const user = useUser();
 
   const [employer, setEmployer] = useState(null);
   const [jobs, setJobs] = useState([]);
@@ -29,6 +29,11 @@ export default function EmployerDashboard() {
   const [activeSection, setActiveSection] = useState('overview');
   const [loading, setLoading] = useState(true);
   const [importErrors, setImportErrors] = useState([]);
+
+  // pagination states
+  const [offset, setOffset] = useState(0);
+  const [hasMore, setHasMore] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
 
   // ✅ check imports once
   useEffect(() => {
@@ -68,12 +73,15 @@ export default function EmployerDashboard() {
       return;
     }
 
-    // jobs
-    const { data: jobPosts } = await supabase
+    // jobs first 10
+    const { data: jobPosts, error: jobErr } = await supabase
       .from('jobs')
       .select('*')
       .eq('employer_id', user.id)
-      .order('created_at', { ascending: false });
+      .order('created_at', { ascending: false })
+      .range(0, 9); // 10 jobs
+
+    if (jobErr) console.error('Failed to load jobs:', jobErr);
 
     // wallet
     const { data: walletData } = await supabase
@@ -85,8 +93,35 @@ export default function EmployerDashboard() {
     setEmployer(employerData);
     setJobs(jobPosts || []);
     setWallet(walletData);
+
+    setOffset(10); // next fetch starts at 10
+    setHasMore(jobPosts && jobPosts.length === 10); // if we got full 10, assume more exists
     setLoading(false);
   }, [user, supabase, router]);
+
+  // ✅ fetch more jobs
+  const loadMoreJobs = async () => {
+    if (!user) return;
+    setLoadingMore(true);
+
+    const { data: moreJobs, error } = await supabase
+      .from('jobs')
+      .select('*')
+      .eq('employer_id', user.id)
+      .order('created_at', { ascending: false })
+      .range(offset, offset + 29); // next 30
+
+    if (error) {
+      console.error('Error loading more jobs:', error);
+      setLoadingMore(false);
+      return;
+    }
+
+    setJobs((prev) => [...prev, ...(moreJobs || [])]);
+    setOffset(offset + 30);
+    setHasMore(moreJobs && moreJobs.length === 30); // only show button if 30 returned
+    setLoadingMore(false);
+  };
 
   useEffect(() => {
     if (user) fetchInitial();
@@ -145,11 +180,24 @@ export default function EmployerDashboard() {
                   {jobs.length === 0 ? (
                     <p className="text-gray-600">No jobs posted yet.</p>
                   ) : (
-                    <div className="space-y-2 lg:space-y-4">
-                      {jobs.map((j) => (
-                        <JobListCard key={j.id} job={j} onEdit={() => setActiveSection('jobs')} />
-                      ))}
-                    </div>
+                    <>
+                      <div className="space-y-2 lg:space-y-4">
+                        {jobs.map((j) => (
+                          <JobListCard key={j.id} job={j} onEdit={() => setActiveSection('jobs')} />
+                        ))}
+                      </div>
+                      {hasMore && (
+                        <div className="flex justify-center mt-4">
+                          <button
+                            onClick={loadMoreJobs}
+                            disabled={loadingMore}
+                            className="px-4 py-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600 disabled:opacity-50"
+                          >
+                            {loadingMore ? 'Loading...' : 'Load More'}
+                          </button>
+                        </div>
+                      )}
+                    </>
                   )}
                 </div>
               </div>
@@ -171,6 +219,17 @@ export default function EmployerDashboard() {
                   <JobListCard key={j.id} job={j} onEdit={() => setActiveSection('post')} />
                 ))}
               </div>
+              {hasMore && (
+                <div className="flex justify-center mt-4">
+                  <button
+                    onClick={loadMoreJobs}
+                    disabled={loadingMore}
+                    className="px-4 py-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600 disabled:opacity-50"
+                  >
+                    {loadingMore ? 'Loading...' : 'Load More'}
+                  </button>
+                </div>
+              )}
             </div>
           )}
 

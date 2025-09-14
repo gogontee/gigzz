@@ -87,6 +87,8 @@ const categoryKeywords = {
   ],
 };
 
+const PAGE_SIZE = 30;
+
 export default function AllJobs() {
   const router = useRouter();
   const { query: routerQuery } = router;
@@ -96,36 +98,66 @@ export default function AllJobs() {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("All Jobs");
   const [viewMode, setViewMode] = useState("grid");
+  const [page, setPage] = useState(0);
+  const [hasMore, setHasMore] = useState(true);
+  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    const fetchJobs = async () => {
-      const { data, error } = await supabase
-        .from("jobs")
-        .select("*")
-        .order("created_at", { ascending: false });
-
-      if (error) {
-        console.error("Error fetching jobs:", error.message);
-        return;
-      }
-
-      setJobs(data);
-
-      const initialQuery = routerQuery?.query || "";
-      const initialCategory = routerQuery?.category || "All Jobs";
-
-      setSearchQuery(initialQuery);
-      setSelectedCategory(initialCategory);
-
-      applyFilters(data, initialQuery, initialCategory);
-    };
-
-    fetchJobs();
+    fetchJobs(0, true); // load first page
   }, [routerQuery]);
 
   useEffect(() => {
     applyFilters(jobs, searchQuery, selectedCategory);
   }, [searchQuery, selectedCategory, jobs]);
+
+  // Fetch jobs with pagination
+  const fetchJobs = async (pageNumber, reset = false) => {
+    setLoading(true);
+    const from = pageNumber * PAGE_SIZE;
+    const to = from + PAGE_SIZE - 1;
+
+    const { data, error } = await supabase
+      .from("jobs")
+      .select("*")
+      .range(from, to);
+
+    if (error) {
+      console.error("Error fetching jobs:", error.message);
+      setLoading(false);
+      return;
+    }
+
+    // ✅ Custom client-side sort to enforce Premium → Gold → Silver → NULL
+    const sorted = data.sort((a, b) => {
+      const rank = (tag) => {
+        if (tag === "Premium") return 1;
+        if (tag === "Gold") return 2;
+        if (tag === "Silver") return 3;
+        return 4; // NULL or anything else
+      };
+      const rankDiff = rank(a.promotion_tag) - rank(b.promotion_tag);
+      if (rankDiff !== 0) return rankDiff;
+      return new Date(b.created_at) - new Date(a.created_at);
+    });
+
+    if (reset) {
+      setJobs(sorted);
+    } else {
+      setJobs((prev) => [...prev, ...sorted]);
+    }
+
+    setPage(pageNumber);
+    setHasMore(data.length === PAGE_SIZE); // only show "Load More" if full page loaded
+    setLoading(false);
+
+    const initialQuery = routerQuery?.query || "";
+    const initialCategory = routerQuery?.category || "All Jobs";
+
+    setSearchQuery(initialQuery);
+    setSelectedCategory(initialCategory);
+
+    applyFilters(reset ? sorted : [...jobs, ...sorted], initialQuery, initialCategory);
+  };
 
   // Main filtering function
   const applyFilters = (allJobs, query, category) => {
@@ -226,6 +258,19 @@ export default function AllJobs() {
             {filteredJobs.map((job) => (
               <JobCard key={job.id} job={job} viewMode="list" />
             ))}
+          </div>
+        )}
+
+        {/* Load More */}
+        {hasMore && (
+          <div className="flex justify-center mt-6">
+            <button
+              onClick={() => fetchJobs(page + 1)}
+              disabled={loading}
+              className="px-4 py-2 bg-black text-white rounded-full hover:bg-orange-600 transition disabled:opacity-50"
+            >
+              {loading ? "Loading..." : "Load More"}
+            </button>
           </div>
         )}
       </div>

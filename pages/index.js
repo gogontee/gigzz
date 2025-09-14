@@ -148,10 +148,10 @@ export default function Home() {
 
       {/* ✅ Insert AllJobs */}
       <div className="mt-8">
-        <AllJobs />
+        <AllJobs /> {/* 👈 This will now render jobs sorted: Premium → Gold → Silver → NULL */}
       </div>
 
-      {/* ✅ Category Section (Updated with padding + smaller tabs) */}
+      {/* ✅ Category Section */}
       <div className="mt-7 px-4 md:px-8">
         <h2 className="text-xl md:text-2xl font-semibold mb-6 text-center">
           Discover Jobs by Profession

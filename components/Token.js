@@ -6,12 +6,15 @@ import { supabase } from "../utils/supabaseClient";
 import { useUser, useSessionContext } from "@supabase/auth-helpers-react";
 
 export default function Token() {
-  const { isLoading } = useSessionContext(); // ✅ tells us if Supabase is still restoring session
+  const { isLoading } = useSessionContext();
   const user = useUser();
   const [balance, setBalance] = useState(0);
   const [loading, setLoading] = useState(true);
   const [funding, setFunding] = useState(false);
   const [transactions, setTransactions] = useState([]);
+  const [showModal, setShowModal] = useState(false);
+  const [amount, setAmount] = useState("");
+  const [alertMsg, setAlertMsg] = useState("");
 
   const userId = user?.id || null;
   const email = user?.email || null;
@@ -111,35 +114,36 @@ export default function Token() {
 
   // ---------------- Paystack Funding ----------------
   const handleFundTokens = async () => {
-    const amount = parseInt(prompt("Enter amount (min 5000 NGN):"));
-    if (!amount || amount < 5000) return alert("Minimum funding is 5000 NGN");
+    if (!amount || parseInt(amount) < 5000) {
+      setAlertMsg("❌ Minimum funding is 5000 NGN");
+      return;
+    }
 
+    setFunding(true);
     try {
-      console.log("Funding request:", { amount, userId, email });
-
       const res = await fetch("/api/paystack/init", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ amount, userId, email }),
+        body: JSON.stringify({ amount: parseInt(amount), userId, email }),
       });
 
       const data = await res.json();
-      console.log("Paystack init response:", data);
-
       if (data.authorization_url) {
         window.location.href = data.authorization_url;
       } else {
-        alert("Payment initialization failed: " + (data.error || "Unknown error"));
+        setAlertMsg("⚠️ Payment initialization failed: " + (data.error || "Unknown error"));
       }
     } catch (err) {
       console.error("Funding error:", err);
-      alert("Failed to initialize payment");
+      setAlertMsg("❌ Failed to initialize payment");
+    } finally {
+      setFunding(false);
+      setShowModal(false);
     }
   };
 
   // ---------------- UI ----------------
   if (isLoading) {
-    // ✅ Wait for Supabase to finish restoring session
     return <p className="text-center p-4">Restoring your session...</p>;
   }
 
@@ -161,11 +165,11 @@ export default function Token() {
         )}
         <div className="flex gap-2 justify-center">
           <button
-            onClick={handleFundTokens}
+            onClick={() => setShowModal(true)}
             className="bg-white text-black hover:bg-gray-200 text-xs sm:text-sm px-3 py-1.5 rounded-md"
             disabled={funding}
           >
-            {funding ? "Processing..." : "Fund Tokens"}
+            Fund Tokens
           </button>
         </div>
       </div>
@@ -202,6 +206,50 @@ export default function Token() {
           </div>
         )}
       </div>
+
+      {/* Modal for Funding */}
+      {showModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50">
+          <div className="bg-white rounded-xl shadow-lg p-6 w-80">
+            <h3 className="text-lg font-semibold mb-4">💳 Fund Tokens</h3>
+            <input
+              type="number"
+              value={amount}
+              onChange={(e) => setAmount(e.target.value)}
+              placeholder="Enter amount (NGN)"
+              className="w-full border rounded-md px-3 py-2 mb-4 focus:outline-none focus:ring-2 focus:ring-orange-500"
+            />
+            <div className="flex justify-end gap-3">
+              <button
+                onClick={() => setShowModal(false)}
+                className="px-4 py-2 rounded-md border border-gray-300 hover:bg-gray-100"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleFundTokens}
+                disabled={funding}
+                className="px-4 py-2 rounded-md bg-orange-500 text-white hover:bg-orange-600"
+              >
+                {funding ? "Processing..." : "Proceed"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Alert Message */}
+      {alertMsg && (
+        <div className="fixed top-5 left-1/2 transform -translate-x-1/2 bg-white border border-red-400 text-red-600 px-4 py-2 rounded-lg shadow-lg z-50">
+          {alertMsg}
+          <button
+            className="ml-2 text-gray-500"
+            onClick={() => setAlertMsg("")}
+          >
+            ✖
+          </button>
+        </div>
+      )}
     </div>
   );
 }

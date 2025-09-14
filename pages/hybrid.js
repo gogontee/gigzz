@@ -21,13 +21,20 @@ export default function Hybrid() {
       const { data, error } = await supabase
         .from("jobs")
         .select("*")
-        .ilike("category", "%hybrid%")
-        .order("created_at", { ascending: false });
+        .ilike("category", "%hybrid%"); // fetch only hybrid jobs
 
       if (error) {
         console.error("Error fetching hybrid jobs:", error);
       } else {
-        setJobs(data);
+        // JS-side sorting by promotion_tag priority → created_at
+        const priority = { Premium: 1, Gold: 2, Silver: 3, null: 4, undefined: 4 };
+        const sorted = [...data].sort((a, b) => {
+          const priA = priority[a.promotion_tag] ?? 4;
+          const priB = priority[b.promotion_tag] ?? 4;
+          if (priA !== priB) return priA - priB;
+          return new Date(b.created_at) - new Date(a.created_at);
+        });
+        setJobs(sorted);
       }
     };
 

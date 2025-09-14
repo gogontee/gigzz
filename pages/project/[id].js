@@ -1,14 +1,16 @@
 'use client';
 import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/router';
-import { supabase } from '../../utils/supabaseClient';
+import { createPagesBrowserClient } from '@supabase/auth-helpers-nextjs';
 import { MessageCircle, Pencil, Megaphone, Eye } from 'lucide-react';
 import { useUser } from '@supabase/auth-helpers-react';
 
 export default function ProjectPage() {
   const router = useRouter();
   const user = useUser();
+  const supabase = createPagesBrowserClient(); // ✅ correct client initialization
   const { id } = router.query;
+
   const [project, setProject] = useState(null);
   const [loading, setLoading] = useState(true);
   const [fullName, setFullName] = useState('');
@@ -19,7 +21,7 @@ export default function ProjectPage() {
   const [successMsg, setSuccessMsg] = useState('');
   const [expandedDesc, setExpandedDesc] = useState(false);
   const [expandedGallery, setExpandedGallery] = useState({});
-  const [promoting, setPromoting] = useState(false); // ✅ Loading state for promotion
+  const [promoting, setPromoting] = useState(false); // ✅ state for promotion
 
   const [editData, setEditData] = useState({
     title: '',
@@ -571,12 +573,13 @@ const handlePromote = async () => {
         </div>
       )}
 
-      {/* Success */}
       {successMsg && (
-        <div className="fixed bottom-6 right-6 bg-green-500 text-white px-4 py-2 rounded-lg shadow-lg">
-          {successMsg}
-        </div>
-      )}
+  <div className="fixed inset-0 flex items-center justify-center z-50">
+    <div className="bg-green-500 text-white px-6 py-3 rounded-lg shadow-lg text-lg font-semibold">
+      {successMsg}
+    </div>
+  </div>
+)}
 
       {/* External links */}
       {externalLinks.length > 0 && (

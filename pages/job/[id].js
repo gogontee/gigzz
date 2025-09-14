@@ -1,14 +1,14 @@
 'use client';
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/router';
-import { createClient } from '@supabase/supabase-js';
+import { createPagesBrowserClient } from '@supabase/auth-helpers-nextjs';
 import Header from '../../components/Header';
 import MobileHeader from '../../components/MobileHeader';
 import Footer from '../../components/Footer';
 import { motion } from 'framer-motion';
 import JobCard from '../../components/JobCard';
 
-const supabase = createClient(
+export const supabase = createPagesBrowserClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL,
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
 );

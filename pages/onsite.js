@@ -39,13 +39,20 @@ export default function OnsiteJobsPage() {
       const { data, error } = await supabase
         .from("jobs")
         .select("*")
-        .ilike("category", "%onsite%")
-        .order("created_at", { ascending: false });
+        .eq("category", "Onsite");
 
       if (error) {
         console.error("Error fetching onsite jobs:", error);
       } else {
-        setJobs(data);
+        // Custom sort: promotion_tag priority, then created_at desc
+        const priority = { Premium: 1, Gold: 2, Silver: 3, null: 4 };
+        const sortedJobs = data.sort((a, b) => {
+          const rankA = priority[a.promotion_tag] ?? 4;
+          const rankB = priority[b.promotion_tag] ?? 4;
+          if (rankA !== rankB) return rankA - rankB;
+          return new Date(b.created_at) - new Date(a.created_at);
+        });
+        setJobs(sortedJobs);
       }
     };
 
@@ -71,7 +78,7 @@ export default function OnsiteJobsPage() {
     return matchesSearch && matchesCategory;
   });
 
-  // Shuffle images and insert after every 3 jobs
+  // Shuffle promo images
   const promoImages = [
     {
       src: "https://xatxjdsppcjgplmrtjcs.supabase.co/storage/v1/object/public/generalphoto//1.jpg",
@@ -178,7 +185,7 @@ export default function OnsiteJobsPage() {
               </motion.div>
             ))}
 
-            {/* Insert promo images after every 3 jobs */}
+            {/* Insert promo images */}
             {filteredJobs.length > 0 &&
               promoImages.map((img, i) => (
                 <motion.div

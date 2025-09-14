@@ -21,6 +21,14 @@ const categories = [
   "Product",
 ];
 
+// Helper: assign rank for promotion_tag
+const getTagRank = (tag) => {
+  if (tag === "Premium") return 1;
+  if (tag === "Gold") return 2;
+  if (tag === "Silver") return 3;
+  return 4; // NULL or anything else
+};
+
 export default function Remote() {
   const [jobs, setJobs] = useState([]);
   const [viewMode, setViewMode] = useState("grid");
@@ -35,13 +43,19 @@ export default function Remote() {
     const { data, error } = await supabase
       .from("jobs")
       .select("*")
-      .ilike("category", "%remote%") // checks 'category' not 'location'
+      .eq("category", "Remote") // ✅ Only fetch remote jobs
       .order("created_at", { ascending: false });
 
     if (error) {
       console.error("Error fetching remote jobs:", error);
     } else {
-      setJobs(data);
+      // ✅ Sort client-side: promotion_tag priority, then newest
+      const sorted = (data || []).sort((a, b) => {
+        const rankDiff = getTagRank(a.promotion_tag) - getTagRank(b.promotion_tag);
+        if (rankDiff !== 0) return rankDiff;
+        return new Date(b.created_at) - new Date(a.created_at);
+      });
+      setJobs(sorted);
     }
   };
 
@@ -90,7 +104,7 @@ export default function Remote() {
           />
         </div>
 
-        {/* Category Filter (same style as All Jobs) */}
+        {/* Category Filter */}
         <div className="flex flex-wrap justify-center gap-1 mb-6">
           {categories.map((cat) => {
             const isActive = activeCategory === cat;

@@ -2,7 +2,7 @@
 "use client";
 import { useRouter } from "next/router";
 import { useEffect, useState, useCallback } from "react";
-import { createClient } from "@supabase/supabase-js";
+import { createPagesBrowserClient } from "@supabase/auth-helpers-nextjs"; 
 import { motion } from "framer-motion";
 import Link from "next/link";
 import {
@@ -14,10 +14,7 @@ import {
 } from "lucide-react";
 import ChatModal from "../../../components/ChatModal";
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-);
+const supabase = createPagesBrowserClient();
 
 export default function ProfilePage() {
   const router = useRouter();
