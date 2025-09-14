@@ -113,7 +113,7 @@ export default function Home() {
 
       {/* ✅ Tagline under hero */}
       <p className="mt-6 text-center text-gray-700 text-sm md:text-base">
-        Your all-in-one freelance platform for remote, hybrid, and onsite jobs.
+        Your gateway top job and side gigs.
       </p>
 
       {/* ✅ Mobile → job type icons */}
