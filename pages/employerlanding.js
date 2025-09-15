@@ -1,23 +1,19 @@
 import { useEffect, useState } from "react";
-import Link from "next/link";
 import { useRouter } from "next/router";
 import { motion, AnimatePresence } from "framer-motion";
-import { createClient } from "@supabase/supabase-js";
+import { createPagesBrowserClient } from "@supabase/auth-helpers-nextjs";
 import {
   Briefcase,
   BookOpen,
-  Users,
-  MessageCircle,
   ClipboardList,
   ArrowRight,
-  HelpCircle,
   X,
 } from "lucide-react";
 
 import MobileHeader from "../components/MobileHeader";
 import Footer from "../components/Footer";
 
-const supabase = createClient(
+const supabase = createPagesBrowserClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL,
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
 );
@@ -27,37 +23,19 @@ const tabs = [
     title: "Post a job & hire a pro",
     description: "Find top talent and start building today.",
     icon: <Briefcase className="w-5 h-5 text-black" />,
-    href: "#",
+    href: "/job/post",
   },
   {
-    title: "Browse Projects",
-    description: "Get custom projects delivered by pros.",
+    title: "Browse Portfolio",
+    description: "View portfolios of top creatives.",
     icon: <ClipboardList className="w-5 h-5 text-black" />,
-    href: "#",
-  },
-  {
-    title: "Consult an Expert",
-    description: "Book time with experienced professionals.",
-    icon: <MessageCircle className="w-5 h-5 text-black" />,
-    href: "#",
+    href: "/portfolio",
   },
   {
     title: "How it works",
     description: "Learn how Gigzz makes hiring simple.",
     icon: <BookOpen className="w-5 h-5 text-black" />,
-    href: "#",
-  },
-  {
-    title: "Manage Your Team",
-    description: "Collaborate, pay, and grow with ease.",
-    icon: <Users className="w-5 h-5 text-black" />,
-    href: "#",
-  },
-  {
-    title: "FAQs",
-    description: "Find answers to the most common questions.",
-    icon: <HelpCircle className="w-5 h-5 text-black" />,
-    href: "/faq",
+    href: "/learnmore",
   },
 ];
 
@@ -90,23 +68,23 @@ export default function EmployerLanding() {
     fetchUser();
   }, []);
 
-  const handleGetStarted = () => {
-    if (user && role === "employer") {
-      router.push("/dashboard/employer");
-    } else {
-      setModalMessage(
-        "Please sign up or log in as a client to post jobs for free."
-      );
+  const handleTabClick = (href, tabTitle) => {
+  if (tabTitle === "Post a job & hire a pro") {
+    if (!user) {
+      setModalMessage("Kindly sign up or log in as client to post jobs.");
+    } else if (role === "applicant") {
+      setModalMessage("Kindly login as client to post jobs.");
+    } else if (role === "employer") {
+      router.push(href); // /job/post
     }
-  };
+  } else if (tabTitle === "Browse Portfolio") {
+    // Everyone can access portfolio, optionally you can customize for role
+    router.push(href); // /portfolio
+  } else {
+    router.push(href); // /learnmore
+  }
+};
 
-  const handleTabClick = (href) => {
-    if (href === "/faq") {
-      router.push(href);
-    } else {
-      setModalMessage("We're still working on this feature.");
-    }
-  };
 
   return (
     <div className="min-h-screen bg-white relative">
@@ -136,7 +114,7 @@ export default function EmployerLanding() {
         </motion.p>
 
         <button
-          onClick={handleGetStarted}
+          onClick={() => handleTabClick("/job/post", "Post a job & hire a pro")}
           className="inline-flex items-center gap-2 px-6 py-3 bg-black text-white rounded-full hover:bg-orange-500 transition ring-2 ring-transparent hover:ring-orange-500"
         >
           Get Started <ArrowRight className="w-4 h-4" />
@@ -153,7 +131,7 @@ export default function EmployerLanding() {
             transition={{ delay: 0.1 * index }}
             whileHover={{ scale: 1.03 }}
             className="bg-white border border-gray-200 rounded-xl shadow-sm hover:shadow-md transition-all duration-300 p-6 group cursor-pointer"
-            onClick={() => handleTabClick(tab.href)}
+            onClick={() => handleTabClick(tab.href, tab.title)}
           >
             <div className="flex items-center gap-3 text-black mb-2">
               <div className="p-2 bg-gray-100 rounded-full">{tab.icon}</div>
@@ -163,7 +141,7 @@ export default function EmployerLanding() {
             </div>
             <p className="text-gray-600 text-sm mb-4">{tab.description}</p>
             <span className="text-sm text-orange-500 hover:text-black font-medium">
-              {tab.href === "/faq" ? "Go to FAQ →" : "Learn more →"}
+              Learn more →
             </span>
           </motion.div>
         ))}
