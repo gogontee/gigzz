@@ -15,21 +15,24 @@ const PROMOTION_LEVELS = [
 
 export default function JobPostForm({ employerId, onPosted }) {
   const [form, setForm] = useState({
-    title: '',
-    category: JOB_CATEGORIES[0],
-    type: JOB_TYPES[0],
-    min_price: '',
-    max_price: '',
-    price_frequency: PRICE_FREQUENCIES[0],
-    application_deadline: '',
-    description: '',
-    responsibilities: '',
-    requirements: '',
-    location: '',
-    promotion_tag: '',
-    tags: '',
-    educational_qualification: '',  // ✅ NEW FIELD
-  });
+  title: '',
+  category: JOB_CATEGORIES[0],
+  type: JOB_TYPES[0],
+  min_price: '',
+  max_price: '',
+  price_frequency: PRICE_FREQUENCIES[0],
+  application_deadline: '',
+  description: '',
+  responsibilities: '',
+  requirements: '',
+  location: '',
+  promotion_tag: '',
+  tags: '',
+  educational_qualification: '',
+  confirmNoPayment: false,   // ✅ new
+  confirmJobAvailable: false // ✅ new
+});
+
 
   const [loading, setLoading] = useState(false);
   const [status, setStatus] = useState({ type: '', text: '' });
@@ -45,6 +48,13 @@ export default function JobPostForm({ employerId, onPosted }) {
       }
     }
   }, []);
+
+
+  const handleCheckboxChange = (e) => {
+  const { name, checked } = e.target;
+  setForm((f) => ({ ...f, [name]: checked }));
+};
+
 
   // 🔑 Save draft to localStorage whenever form changes
   useEffect(() => {
@@ -362,15 +372,48 @@ export default function JobPostForm({ employerId, onPosted }) {
           </div>
         </div>
 
+        {/* ✅ Policy Confirmations */}
+<div className="space-y-3">
+  <label className="flex items-start gap-2 text-sm">
+    <input
+      type="checkbox"
+      name="confirmNoPayment"
+      checked={form.confirmNoPayment}
+      onChange={handleCheckboxChange}
+      className="mt-1"
+    />
+    <span>Kindly confirm you are not asking applicants to pay in whatever form before getting hired.</span>
+  </label>
+
+  <label className="flex items-start gap-2 text-sm">
+    <input
+      type="checkbox"
+      name="confirmJobAvailable"
+      checked={form.confirmJobAvailable}
+      onChange={handleCheckboxChange}
+      className="mt-1"
+    />
+    <span>Kindly confirm this job is currently available and open for application.</span>
+  </label>
+</div>
+
+
         {/* Submit */}
         <div className="flex items-center gap-4">
           <button
-            type="submit"
-            disabled={loading}
-            className="bg-black text-white px-6 py-2 rounded-full hover:bg-orange-600"
-          >
-            {loading ? 'Posting...' : 'Post Job'}
-          </button>
+  type="submit"
+  disabled={
+    loading || !form.confirmNoPayment || !form.confirmJobAvailable
+  }
+  className={`px-6 py-2 rounded-full transition ${
+    loading || !form.confirmNoPayment || !form.confirmJobAvailable
+      ? "bg-gray-400 cursor-not-allowed text-white"
+      : "bg-black text-white hover:bg-orange-600"
+  }`}
+>
+  {loading ? "Posting..." : "Post Job"}
+</button>
+
           {status.text && (
             <p className={`text-sm ${status.type === 'success' ? 'text-green-600' : 'text-red-600'}`}>
               {status.text}

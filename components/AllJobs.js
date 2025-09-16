@@ -10,7 +10,7 @@ import { Search } from "lucide-react";
 /* categoryKeywords */
 const categoryKeywords = {
   "All Jobs": [],
-  "Design & Creative": ["design", "creative", "creatives", "ui", "ux", "illustration", "photoshop", "figma"],
+  "Design & Creative": ["design","creative","creatives","ui","ux","illustration","photoshop","figma"],
   "Development & IT": ["development","developer","frontend","backend","fullstack","software","engineer","it","programmer","devops"],
   "Marketing & Sales": ["marketing","sales","seo","advertising","growth","campaign","brand","outreach"],
   "Writing & Translation": ["writing","writer","translation","content","copywriting","editing","proofreading","blog"],
@@ -21,6 +21,22 @@ const categoryKeywords = {
 };
 
 const PAGE_SIZE = 30;
+
+// ranking helper (normalize tag, return numeric rank)
+const rankFor = (tag) => {
+  const t = (tag || "").toString().toLowerCase().trim();
+  if (t === "premium") return 1;
+  if (t === "gold") return 2;
+  if (t === "silver") return 3;
+  return 4; // null / other / unknown
+};
+
+// comparator: rank first, then created_at desc
+const compareByRankAndDate = (a, b) => {
+  const r = rankFor(a.promotion_tag) - rankFor(b.promotion_tag);
+  if (r !== 0) return r;
+  return new Date(b.created_at) - new Date(a.created_at);
+};
 
 export default function AllJobs() {
   const router = useRouter();
@@ -55,6 +71,7 @@ export default function AllJobs() {
   );
   // ----------------------------------------
 
+  // fetchJobs: retrieves a page, merges with previous pages and re-sorts everything
   const fetchJobs = async (reset = false, pageIndex = 0) => {
     setLoading(true);
 
@@ -73,31 +90,28 @@ export default function AllJobs() {
       return;
     }
 
-    // ✅ Sort by promotion_tag priority first, then created_at
-    const sorted = (data || []).sort((a, b) => {
-      const rank = (tag) => {
-        if (tag === "Premium") return 1;
-        if (tag === "Gold") return 2;
-        if (tag === "Silver") return 3;
-        return 4;
-      };
-      const rankDiff = rank(a.promotion_tag) - rank(b.promotion_tag);
-      if (rankDiff !== 0) return rankDiff;
-      return new Date(b.created_at) - new Date(a.created_at);
+    const newPage = data || [];
+
+    setJobs((prevJobs) => {
+      const combined = reset ? [...newPage] : [...prevJobs, ...newPage];
+
+      // Remove duplicates by id
+      const uniqueMap = new Map();
+      for (const j of combined) {
+        uniqueMap.set(j.id, j);
+      }
+
+      const uniqueList = Array.from(uniqueMap.values());
+      uniqueList.sort(compareByRankAndDate); // ✅ enforce sort
+
+      // Apply filters immediately
+      applyFilters(uniqueList, searchQuery, selectedCategory);
+
+      setHasMore(newPage.length === PAGE_SIZE);
+      setLoading(false);
+
+      return uniqueList;
     });
-
-    if (reset) {
-      setJobs(sorted);
-    } else {
-      setJobs((prev) => [...prev, ...sorted]);
-    }
-
-    // If fewer than PAGE_SIZE were returned → no more pages
-    setHasMore(data.length === PAGE_SIZE);
-    setLoading(false);
-
-    // apply filters on new data
-    applyFilters(reset ? sorted : [...jobs, ...sorted], searchQuery, selectedCategory);
   };
 
   useEffect(() => {
@@ -118,8 +132,9 @@ export default function AllJobs() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchQuery, selectedCategory, jobs]);
 
+  // applyFilters: filters then sorts
   const applyFilters = (allJobs, query, category) => {
-    let filtered = allJobs || [];
+    let filtered = allJobs ? [...allJobs] : [];
 
     if (query && query.trim()) {
       const q = query.toLowerCase();
@@ -136,6 +151,8 @@ export default function AllJobs() {
         return keywords.some((kw) => searchable.includes(kw));
       });
     }
+
+    filtered.sort(compareByRankAndDate); // ✅ enforce sort
 
     setFilteredJobs(filtered);
   };

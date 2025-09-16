@@ -2,6 +2,7 @@ import Head from "next/head";
 import Header from "../components/Header";
 import MobileHeader from "../components/MobileHeader";
 import Footer from "../components/Footer";
+import { motion } from "framer-motion";
 
 export default function PricingPage() {
   return (
@@ -10,7 +11,7 @@ export default function PricingPage() {
         <title>Pricing - Gigzz</title>
         <meta
           name="description"
-          content="View pricing for token plans and post promotions on Gigzz."
+          content="Transparent pricing for Clients and Creatives on Gigzz."
         />
       </Head>
 
@@ -26,56 +27,157 @@ export default function PricingPage() {
         </div>
 
         <main className="flex-grow px-6 py-12 max-w-5xl mx-auto pt-0 md:pt-20">
-          <h1 className="text-4xl font-bold mb-8 border-b-4 border-orange-500 inline-block">
+          <motion.h1
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.6 }}
+            className="text-2xl md:text-3xl font-bold mb-8"
+          >
             Pricing
-          </h1>
+          </motion.h1>
 
-          {/* Token Purchase Section */}
-          <section className="mb-12">
-            <h2 className="text-2xl font-semibold mb-6">🎯 Token Purchase (For Creatives)</h2>
-            <div className="grid gap-6 md:grid-cols-2">
-              {/* Standard Token */}
-              <div className="border border-black rounded-lg p-6 hover:shadow-lg transition duration-300">
-                <h3 className="text-xl font-bold mb-2">Standard Token</h3>
-                <p className="text-gray-700 mb-2">20 Tokens • Access Standard Jobs</p>
-                <p className="text-black font-semibold text-lg">₦5,000</p>
-              </div>
+          {/* Clients Section */}
+          <motion.section
+            initial={{ opacity: 0, y: 15 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.7, delay: 0.2 }}
+            className="mb-12"
+          >
+            <h2 className="text-xl md:text-2xl font-semibold mb-6">
+              💼 For Clients (Employers)
+            </h2>
+            <div className="grid gap-6 md:grid-cols-3">
+              {/* Free Listing */}
+              <motion.div
+                whileHover={{ scale: 1.03 }}
+                className="border border-gray-200 rounded-xl p-6 shadow-md hover:shadow-xl transition duration-300"
+              >
+                <h3 className="text-lg font-bold mb-2">Job Listing</h3>
+                <p className="text-gray-600 mb-2">Post jobs for free anytime</p>
+                <p className="text-green-600 font-semibold text-lg">Free</p>
+              </motion.div>
 
-              {/* Premium Token */}
-              <div className="border border-black rounded-lg p-6 hover:shadow-lg transition duration-300">
-                <h3 className="text-xl font-bold mb-2">Premium Token</h3>
-                <p className="text-gray-700 mb-2">50 Tokens • Access All Jobs</p>
-                <p className="text-black font-semibold text-lg">₦10,000</p>
-              </div>
+              {/* Verification */}
+              <motion.div
+                whileHover={{ scale: 1.03 }}
+                className="border border-gray-200 rounded-xl p-6 shadow-md hover:shadow-xl transition duration-300"
+              >
+                <h3 className="text-lg font-bold mb-2">Verification</h3>
+                <p className="text-gray-600 mb-2">
+                  Get your account verified for trust
+                </p>
+                <p className="text-green-600 font-semibold text-lg">Free</p>
+              </motion.div>
+
+              {/* Silver */}
+              <motion.div
+                whileHover={{ scale: 1.03 }}
+                className="border border-gray-200 rounded-xl p-6 shadow-md hover:shadow-xl transition duration-300"
+              >
+                <h3 className="text-lg font-bold mb-2">Silver Promotion</h3>
+                <p className="text-gray-600 mb-2">Highlight job post</p>
+                <p className="text-black font-semibold text-lg">5 Tokens</p>
+              </motion.div>
+
+              {/* Gold */}
+              <motion.div
+                whileHover={{ scale: 1.03 }}
+                className="border border-gray-200 rounded-xl p-6 shadow-md hover:shadow-xl transition duration-300"
+              >
+                <h3 className="text-lg font-bold mb-2">Gold Promotion</h3>
+                <p className="text-gray-600 mb-2">
+                  Boost visibility for faster reach
+                </p>
+                <p className="text-black font-semibold text-lg">10 Tokens</p>
+              </motion.div>
+
+              {/* Premium */}
+              <motion.div
+  whileHover={{ scale: 1.03 }}
+  className="border border-gray-200 rounded-xl p-6 shadow-md hover:shadow-xl transition duration-300 md:col-span-2"
+>
+  <h3 className="text-lg font-bold mb-2">Premium Promotion</h3>
+  <p className="text-gray-600 mb-2">
+    Urgent applications • Maximum exposure
+  </p>
+  <p className="text-black font-semibold text-lg">20 Tokens</p>
+</motion.div>
             </div>
-          </section>
+          </motion.section>
 
-          {/* Promotion Category Section */}
-          <section>
-            <h2 className="text-2xl font-semibold mb-6">🚀 Job Post Promotion (For Clients)</h2>
-            <div className="grid gap-6 md:grid-cols-2">
-              {/* Featured Post */}
-              <div className="border border-black rounded-lg p-6 hover:shadow-lg transition duration-300">
-                <h3 className="text-xl font-bold mb-2">Featured Post</h3>
-                <p className="text-gray-700 mb-2">Highlighted post for 7 days</p>
-                <p className="text-black font-semibold text-lg">₦3,000</p>
-              </div>
+          {/* Creatives Section */}
+          <motion.section
+            initial={{ opacity: 0, y: 15 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.7, delay: 0.4 }}
+            className="mb-12"
+          >
+            <h2 className="text-xl md:text-2xl font-semibold mb-6">
+              🎨 For Creatives (Applicants)
+            </h2>
+            <div className="grid gap-6 md:grid-cols-3">
+              {/* Portfolio Creation */}
+              <motion.div
+                whileHover={{ scale: 1.03 }}
+                className="border border-gray-200 rounded-xl p-6 shadow-md hover:shadow-xl transition duration-300"
+              >
+                <h3 className="text-lg font-bold mb-2">Portfolio Creation</h3>
+                <p className="text-gray-600 mb-2">Build and showcase your work</p>
+                <p className="text-green-600 font-semibold text-lg">Free</p>
+              </motion.div>
 
-              {/* Top of List */}
-              <div className="border border-black rounded-lg p-6 hover:shadow-lg transition duration-300">
-                <h3 className="text-xl font-bold mb-2">Top of List</h3>
-                <p className="text-gray-700 mb-2">Pinned job listing for 5 days</p>
-                <p className="text-black font-semibold text-lg">₦5,000</p>
-              </div>
+              {/* Job Application */}
+              <motion.div
+                whileHover={{ scale: 1.03 }}
+                className="border border-gray-200 rounded-xl p-6 shadow-md hover:shadow-xl transition duration-300"
+              >
+                <h3 className="text-lg font-bold mb-2">Job Application</h3>
+                <p className="text-gray-600 mb-2">Apply to jobs seamlessly</p>
+                <p className="text-black font-semibold text-lg">3 Tokens</p>
+              </motion.div>
 
-              {/* Spotlight */}
-              <div className="border border-black rounded-lg p-6 hover:shadow-lg transition duration-300">
-                <h3 className="text-xl font-bold mb-2">Spotlight</h3>
-                <p className="text-gray-700 mb-2">Special badge and homepage display</p>
-                <p className="text-black font-semibold text-lg">₦7,000</p>
-              </div>
+              {/* Portfolio Promotion */}
+              <motion.div
+                whileHover={{ scale: 1.03 }}
+                className="border border-gray-200 rounded-xl p-6 shadow-md hover:shadow-xl transition duration-300"
+              >
+                <h3 className="text-lg font-bold mb-2">Portfolio Promotion</h3>
+                <p className="text-gray-600 mb-2">Boost portfolio visibility</p>
+                <p className="text-black font-semibold text-lg">5 Tokens</p>
+              </motion.div>
             </div>
-          </section>
+          </motion.section>
+
+          {/* Token Conversion */}
+          <motion.section
+            initial={{ opacity: 0, y: 15 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.7, delay: 0.6 }}
+            className="mb-12"
+          >
+            <h2 className="text-xl md:text-2xl font-semibold mb-6">
+              💰 Token Conversion
+            </h2>
+            <div className="grid gap-6 md:grid-cols-2">
+              <motion.div
+                whileHover={{ scale: 1.03 }}
+                className="border border-gray-200 rounded-xl p-6 shadow-md hover:shadow-xl transition duration-300"
+              >
+                <h3 className="text-lg font-bold mb-2">Value</h3>
+                <p className="text-gray-600 mb-2">20 Tokens = ₦5,000</p>
+              </motion.div>
+
+              <motion.div
+                whileHover={{ scale: 1.03 }}
+                className="border border-gray-200 rounded-xl p-6 shadow-md hover:shadow-xl transition duration-300"
+              >
+                <h3 className="text-lg font-bold mb-2">Top-Up</h3>
+                <p className="text-gray-600 mb-2">
+                  Wallet top-up starts from ₦5,000 and above
+                </p>
+              </motion.div>
+            </div>
+          </motion.section>
         </main>
 
         <Footer />

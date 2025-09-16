@@ -19,7 +19,6 @@ export default function DesktopHeader() {
   const [role, setRole] = useState(null);
   const [navDropdownOpen, setNavDropdownOpen] = useState(null);
   const [userDropdownOpen, setUserDropdownOpen] = useState(false);
-  const [onsiteModal, setOnsiteModal] = useState(false);
 
   // Fetch user's avatar and role
   const fetchProfile = async (userId) => {
@@ -90,7 +89,12 @@ export default function DesktopHeader() {
 
         {/* Center nav */}
         <nav className="flex-1 flex justify-center gap-6 items-center">
-          <Link href="/" className={`transition ${isActive("/") ? "text-orange-500" : ""}`}>Home</Link>
+          <Link
+            href="/"
+            className={`transition ${isActive("/") ? "text-orange-500" : ""}`}
+          >
+            Home
+          </Link>
 
           {/* Find Jobs Dropdown */}
           <div
@@ -100,8 +104,18 @@ export default function DesktopHeader() {
           >
             <button className="transition hover:text-orange-500 flex items-center gap-1">
               Find Jobs
-              <svg className="w-4 h-4 mt-0.5 text-white transition" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
+              <svg
+                className="w-4 h-4 mt-0.5 text-white transition"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth="2"
+                  d="M19 9l-7 7-7-7"
+                />
               </svg>
             </button>
 
@@ -113,57 +127,86 @@ export default function DesktopHeader() {
                   exit={{ opacity: 0, y: -8 }}
                   className="absolute top-10 bg-white text-black rounded shadow p-3 space-y-2 min-w-[160px] z-50"
                 >
-                  <Link href="/remote" className="block hover:text-orange-500 transition">Remote Jobs</Link>
-                  <Link href="/hybrid" className="block hover:text-orange-500 transition">Hybrid Jobs</Link>
-                  {/* ✅ Changed from modal to href */}
-                  <Link href="/onsite" className="block hover:text-orange-500 transition">Onsite Jobs</Link>
+                  <Link
+                    href="/remote"
+                    className="block hover:text-orange-500 transition"
+                  >
+                    Remote Jobs
+                  </Link>
+                  <Link
+                    href="/hybrid"
+                    className="block hover:text-orange-500 transition"
+                  >
+                    Hybrid Jobs
+                  </Link>
+                  <Link
+                    href="/onsite"
+                    className="block hover:text-orange-500 transition"
+                  >
+                    Onsite Jobs
+                  </Link>
                 </motion.div>
               )}
             </AnimatePresence>
           </div>
 
-          <Link href="/employerlanding" className="transition hover:text-orange-500">Post Your Job</Link>
-
-          {/* Gigzzstars Dropdown */}
-          <div
-            className="relative"
-            onMouseEnter={() => setNavDropdownOpen("gigzzstars")}
-            onMouseLeave={() => setNavDropdownOpen(null)}
+          <Link
+            href="/employerlanding"
+            className="transition hover:text-orange-500"
           >
-            <button className="transition hover:text-orange-500 flex items-center gap-1">
-              Gigzzstars
-              <svg className="w-4 h-4 mt-0.5 text-white transition" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
-              </svg>
-            </button>
+            Post Your Job
+          </Link>
 
-            <AnimatePresence>
-              {navDropdownOpen === "gigzzstars" && (
-                <motion.div
-                  initial={{ opacity: 0, y: -6 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -6 }}
-                  className="absolute top-10 left-0 bg-white/95 text-black rounded-xl shadow-lg p-4 grid grid-cols-1 sm:grid-cols-2 gap-3 min-w-[220px] z-50"
-                >
-                  <Link href="/gigzzstar" className="px-3 py-2 rounded-md text-sm font-medium hover:text-orange-600">All Stars</Link>
-                  <Link href="/gigzzstars/development-it" className="px-3 py-2 rounded-md text-sm font-medium hover:text-orange-600">Development & IT</Link>
-                  <Link href="/gigzzstars/marketing-sales" className="px-3 py-2 rounded-md text-sm font-medium hover:text-orange-600">Marketing & Sales</Link>
-                  <Link href="/gigzzstars/writing-translation" className="px-3 py-2 rounded-md text-sm font-medium hover:text-orange-600">Writing & Translation</Link>
-                  <Link href="/gigzzstars/customer-support" className="px-3 py-2 rounded-md text-sm font-medium hover:text-orange-600">Customer Support</Link>
-                  <Link href="/gigzzstars/finance-accounting" className="px-3 py-2 rounded-md text-sm font-medium hover:text-orange-600">Finance & Accounting</Link>
-                  <Link href="/gigzzstars/legal-services" className="px-3 py-2 rounded-md text-sm font-medium hover:text-orange-600">Legal Services</Link>
-                  <Link href="/gigzzstars/engineering-industry" className="px-3 py-2 rounded-md text-sm font-medium hover:text-orange-600">Engineering</Link>
-                  <Link href="/gigzzstars/entertainment" className="px-3 py-2 rounded-md text-sm font-medium hover:text-orange-600">Entertainment</Link>
-                </motion.div>
-              )}
-            </AnimatePresence>
-          </div>
+          {/* ✅ Gigzzstars direct link */}
+          <Link
+            href="/gigzzstar"
+            className={`transition hover:text-orange-500 ${
+              isActive("/gigzzstar") ? "text-orange-500" : ""
+            }`}
+          >
+            Gigzzstars
+          </Link>
 
-          <Link href="/news" className={`transition hover:text-orange-500 ${isActive("/news") ? "text-orange-500" : ""}`}>News</Link>
-          <Link href="/pricing" className={`transition hover:text-orange-500 ${isActive("/pricing") ? "text-orange-500" : ""}`}>Pricing</Link>
-          <Link href="/about" className={`transition hover:text-orange-500 ${isActive("/about") ? "text-orange-500" : ""}`}>Why Gigzz</Link>
-          <Link href="/faq" className={`transition hover:text-orange-500 ${isActive("/faq") ? "text-orange-500" : ""}`}>FAQ</Link>
-          <Link href="/contact" className={`transition hover:text-orange-500 ${isActive("/contact") ? "text-orange-500" : ""}`}>Contact</Link>
+          <Link
+            href="/news"
+            className={`transition hover:text-orange-500 ${
+              isActive("/news") ? "text-orange-500" : ""
+            }`}
+          >
+            News
+          </Link>
+          <Link
+            href="/pricing"
+            className={`transition hover:text-orange-500 ${
+              isActive("/pricing") ? "text-orange-500" : ""
+            }`}
+          >
+            Pricing
+          </Link>
+          <Link
+            href="/about"
+            className={`transition hover:text-orange-500 ${
+              isActive("/about") ? "text-orange-500" : ""
+            }`}
+          >
+            Why Gigzz
+          </Link>
+          <Link
+            href="/faq"
+            className={`transition hover:text-orange-500 ${
+              isActive("/faq") ? "text-orange-500" : ""
+            }`}
+          >
+            FAQ
+          </Link>
+          <Link
+            href="/contact"
+            className={`transition hover:text-orange-500 ${
+              isActive("/contact") ? "text-orange-500" : ""
+            }`}
+          >
+            Contact
+          </Link>
         </nav>
 
         {/* Auth Section */}
@@ -176,11 +219,17 @@ export default function DesktopHeader() {
             >
               <button className="hover:text-orange-500 transition flex items-center gap-2 px-3 py-1.5 rounded-full border border-white bg-white/5">
                 {avatarUrl ? (
-                  <img src={avatarUrl} alt="Profile" className="w-8 h-8 rounded-full object-cover" />
+                  <img
+                    src={avatarUrl}
+                    alt="Profile"
+                    className="w-8 h-8 rounded-full object-cover"
+                  />
                 ) : (
                   <User className="w-5 h-5 text-white" />
                 )}
-                <span className="hidden sm:inline text-sm">{user.email?.split("@")[0]}</span>
+                <span className="hidden sm:inline text-sm">
+                  {user.email?.split("@")[0]}
+                </span>
               </button>
 
               <AnimatePresence>
@@ -192,7 +241,11 @@ export default function DesktopHeader() {
                     className="absolute right-0 mt-2 bg-white text-black rounded shadow-lg w-44 p-2 z-50"
                   >
                     <Link
-                      href={role === "employer" ? "/dashboard/employer" : "/dashboard/applicant"}
+                      href={
+                        role === "employer"
+                          ? "/dashboard/employer"
+                          : "/dashboard/applicant"
+                      }
                       className="flex items-center gap-2 px-3 py-2 rounded hover:bg-gray-100 transition"
                     >
                       <Briefcase className="w-4 h-4" /> Dashboard

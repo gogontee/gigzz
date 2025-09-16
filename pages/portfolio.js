@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { createPagesBrowserClient } from '@supabase/auth-helpers-nextjs';
 import Link from 'next/link';
 import { Eye } from 'lucide-react';
+import MobileHeader from '../components/MobileHeader'; // ✅ import mobile header
 
 const supabase = createPagesBrowserClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL,
@@ -82,7 +83,12 @@ export default function Portfolio() {
 
   return (
     <div className="flex-1 flex flex-col bg-white text-black">
-      <div className="p-6">
+      {/* ✅ Mobile Header */}
+      <div className="md:hidden">
+        <MobileHeader />
+      </div>
+
+      <div className="p-6 md:pt-20">
         <h1 className="text-2xl font-bold mb-4">Premium Portfolios</h1>
 
         {/* Search Bar */}

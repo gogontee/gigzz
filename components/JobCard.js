@@ -28,12 +28,13 @@ export default function JobCard({ job, viewMode }) {
     <motion.div
       initial={{ opacity: 0, y: 30 }}
       whileInView={{ opacity: 1, y: 0 }}
+      whileHover={{ scale: 1.03 }} // ✅ Hover scale
       viewport={{ once: true }}
       transition={{ duration: 0.5 }}
       onClick={handleCardClick}
-      className={`relative bg-white rounded-xl p-4 shadow-sm transition duration-200 cursor-pointer group
+      className={`relative bg-white rounded-xl border border-gray-200 p-4 shadow-sm transition duration-200 cursor-pointer group
         ${viewMode === "list" ? "flex flex-col" : ""}
-        hover:border-black hover:ring-1 hover:ring-black hover:shadow-md`}
+        hover:shadow-xl hover:border-gray-300`}
     >
       {/* Top Section: avatar, title, pay */}
       <div className="flex flex-col items-start md:flex-row md:justify-between md:items-center mb-2">
