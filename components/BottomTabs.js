@@ -5,8 +5,8 @@ import { useUser, useSupabaseClient } from '@supabase/auth-helpers-react';
 
 export default function BottomTabs() {
   const router = useRouter();
-  const supabase = useSupabaseClient(); // ✅ use context client
-  const user = useUser(); // ✅ current session user
+  const supabase = useSupabaseClient();
+  const user = useUser();
 
   const [dashboardPath, setDashboardPath] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -15,15 +15,14 @@ export default function BottomTabs() {
     const fetchUserRole = async () => {
       try {
         if (!user) {
-          // ❌ No session → send to login
+          // Not logged in → login page
           setDashboardPath('/auth/login');
-          setLoading(false);
           return;
         }
 
         const userId = user.id;
 
-        // ✅ Check if employer
+        // Check employer
         const { data: employer } = await supabase
           .from('employers')
           .select('id')
@@ -32,11 +31,10 @@ export default function BottomTabs() {
 
         if (employer) {
           setDashboardPath('/dashboard/employer');
-          setLoading(false);
           return;
         }
 
-        // ✅ Check if applicant
+        // Check applicant
         const { data: applicant } = await supabase
           .from('applicants')
           .select('id')
@@ -45,14 +43,13 @@ export default function BottomTabs() {
 
         if (applicant) {
           setDashboardPath('/dashboard/applicant');
-          setLoading(false);
           return;
         }
 
-        // ⚠️ Authenticated but no role found → fallback
-        setDashboardPath('/dashboard');
+        // Authenticated but no role found → fallback to login
+        setDashboardPath('/auth/login');
       } catch (err) {
-        console.error(err);
+        console.error('Error fetching role:', err);
         setDashboardPath('/auth/login');
       } finally {
         setLoading(false);
@@ -62,12 +59,11 @@ export default function BottomTabs() {
     fetchUserRole();
   }, [user, supabase]);
 
-  // Only render tabs **after dashboard path is resolved**
   if (loading || !dashboardPath) return null;
 
   const tabs = [
     { href: '/', label: 'Home', icon: <Home size={22} /> },
-    { href: '/profile', label: 'Profile', icon: <User size={22} /> }, // Always /profile
+    { href: '/profile', label: 'Profile', icon: <User size={22} /> },
     { href: '/more', label: 'More', icon: <MapPin size={22} /> },
     { href: '/employerlanding', label: 'Post', icon: <Plus size={22} /> },
     { href: dashboardPath, label: 'Dashboard', icon: <Briefcase size={22} /> },
