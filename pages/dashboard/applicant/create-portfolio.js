@@ -1,11 +1,35 @@
+// components/ProjectForm.js (or pages/... whichever path you use)
 "use client";
 
+import dynamic from "next/dynamic";
+import "react-quill/dist/quill.snow.css";
 import { useState, useEffect } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { supabase } from "../../../utils/supabaseClient";
 import Footer from "../../../components/Footer";
 import MobileHeader from "../../../components/MobileHeader";
+
+// ReactQuill: dynamically imported to avoid SSR problems
+const ReactQuill = dynamic(() => import("react-quill"), { ssr: false });
+
+// Quill toolbar modules & formats (you can adjust)
+const quillModules = {
+  toolbar: [
+    [{ header: [1, 2, 3, false] }],
+    ["bold", "italic", "underline", "strike", "blockquote"],
+    [{ list: "ordered" }, { list: "bullet" }, { indent: "-1" }, { indent: "+1" }],
+    [{ align: [] }],
+    [{ color: [] }, { background: [] }],
+    ["link", "image", "video", "code-block"],
+    ["clean"],
+  ],
+};
+const quillFormats = [
+  "header", "bold", "italic", "underline", "strike", "blockquote",
+  "list", "bullet", "indent", "align",
+  "color", "background", "link", "image", "video", "code-block"
+];
 
 export default function ProjectForm() {
   const [user, setUser] = useState(null);
@@ -17,18 +41,18 @@ export default function ProjectForm() {
   );
   const [formData, setFormData] = useState({
     title: "",
-    details: "",
+    details: "", // will hold HTML from ReactQuill
     tags: "",
     visibility: "public",
     location: "",
   });
   const [message, setMessage] = useState({ text: "", type: "" });
-  const [createdProject, setCreatedProject] = useState(null); // 👈 store created project
+  const [createdProject, setCreatedProject] = useState(null);
 
   useEffect(() => {
     const getUser = async () => {
       const { data } = await supabase.auth.getUser();
-      setUser(data.user);
+      setUser(data?.user ?? null);
     };
     getUser();
   }, []);
@@ -62,7 +86,7 @@ export default function ProjectForm() {
     if (
       !formData.title ||
       !profilePic ||
-      !formData.details ||
+      !formData.details || // now HTML
       !formData.tags ||
       !formData.location
     ) {
@@ -117,7 +141,7 @@ export default function ProjectForm() {
         .insert([
           {
             title: formData.title,
-            details: formData.details,
+            details: formData.details, // HTML saved here
             tags: formData.tags,
             visibility: formData.visibility,
             location: formData.location,
@@ -125,15 +149,14 @@ export default function ProjectForm() {
             ...galleryUploads,
             promote: null,
             approve: true,
+            user_id: user.id, // make sure you track owner
           },
         ])
         .select()
         .single();
       if (projectError) throw projectError;
 
-      // ✅ Store created project for later
       setCreatedProject(projectData);
-
       showMessage("✅ Project created successfully!", "success");
 
       // Reset form
@@ -146,9 +169,7 @@ export default function ProjectForm() {
       });
       setProfilePic(null);
       setProfilePreview(null);
-      setGalleries(
-        Array(6).fill({ file: null, description: "", preview: null })
-      );
+      setGalleries(Array(6).fill({ file: null, description: "", preview: null }));
     } catch (err) {
       console.error("Upload error:", err);
       showMessage(err.message || "Something went wrong", "error");
@@ -159,25 +180,19 @@ export default function ProjectForm() {
 
   return (
     <>
-      {/* Desktop Header + padding */}
       <div className="hidden md:block pt-20" />
-      {/* Mobile Header */}
       <div className="md:hidden">
         <MobileHeader />
       </div>
 
       <div className="relative max-w-4xl mx-auto p-8 bg-white shadow-2xl rounded-2xl space-y-8">
-        {/* Success/Error Popup */}
         {message.text && (
           <div
             className={`fixed top-8 left-1/2 transform -translate-x-1/2 px-6 py-4 rounded-lg shadow-lg text-white z-50 transition-all duration-500 ${
-              message.type === "success"
-                ? "bg-green-600"
-                : "bg-red-600"
+              message.type === "success" ? "bg-green-600" : "bg-red-600"
             }`}
           >
             {message.text}
-            {/* ✅ Go to Portfolio button after success */}
             {message.type === "success" && createdProject && (
               <div className="mt-3 text-center">
                 <Link
@@ -194,9 +209,7 @@ export default function ProjectForm() {
         <form onSubmit={handleSubmit} className="space-y-8">
           {/* Project Banner */}
           <div>
-            <label className="block font-semibold text-lg mb-2">
-              Project Banner
-            </label>
+            <label className="block font-semibold text-lg mb-2">Project Banner</label>
             <input
               type="file"
               accept="image/*"
@@ -206,97 +219,67 @@ export default function ProjectForm() {
             />
             {profilePreview && (
               <div className="mt-3 w-full h-48 relative rounded-xl overflow-hidden shadow-md">
-                <Image
-                  src={profilePreview}
-                  alt="Profile Banner"
-                  fill
-                  className="object-cover"
-                />
+                <Image src={profilePreview} alt="Profile Banner" fill className="object-cover" />
               </div>
             )}
           </div>
 
           {/* Project Title */}
           <div>
-            <label className="block font-semibold text-lg mb-2">
-              Project Title
-            </label>
+            <label className="block font-semibold text-lg mb-2">Project Title</label>
             <input
               type="text"
               placeholder="Enter project title"
               value={formData.title}
-              onChange={(e) =>
-                setFormData({ ...formData, title: e.target.value })
-              }
+              onChange={(e) => setFormData({ ...formData, title: e.target.value })}
               className="w-full border p-3 rounded-xl"
               required
             />
           </div>
 
-          {/* Project Details */}
+          {/* Project Details - REPLACED TEXTAREA with ReactQuill */}
           <div>
-            <label className="block font-semibold text-lg mb-2">
-              Project Details
-            </label>
-            <textarea
-              placeholder="Enter project details"
+            <label className="block font-semibold text-lg mb-2">Project Details</label>
+            <ReactQuill
+              theme="snow"
               value={formData.details}
-              onChange={(e) =>
-                setFormData({ ...formData, details: e.target.value })
-              }
-              className="w-full border p-3 rounded-xl"
-              rows={5}
-              required
+              onChange={(value) => setFormData({ ...formData, details: value })}
+              modules={quillModules}
+              formats={quillFormats}
+              className="bg-white border rounded-xl"
             />
+            <p className="text-sm text-gray-500 mt-2">
+              Tip: Use the editor toolbar to add headings, lists, links, and images.
+            </p>
           </div>
 
           {/* Gallery */}
           <div>
-            <h3 className="font-semibold text-lg mb-2">
-              Gallery Images (Optional)
-            </h3>
-            <p className="text-sm text-gray-500 mb-3">
-              Gallery images optional. Add 1 or more to enhance your
-              portfolio.
-            </p>
+            <h3 className="font-semibold text-lg mb-2">Gallery Images (Optional)</h3>
+            <p className="text-sm text-gray-500 mb-3">Gallery images optional. Add 1 or more to enhance your portfolio.</p>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {galleries.map((gallery, idx) => (
-                <div
-                  key={idx}
-                  className="flex items-center space-x-4 border p-3 rounded-xl bg-gray-50"
-                >
+                <div key={idx} className="flex items-center space-x-4 border p-3 rounded-xl bg-gray-50">
                   <div className="w-24 h-24 relative rounded-lg overflow-hidden bg-gray-200">
                     {gallery.preview ? (
-                      <Image
-                        src={gallery.preview}
-                        alt={`Gallery ${idx + 1}`}
-                        fill
-                        className="object-cover"
-                      />
+                      <Image src={gallery.preview} alt={`Gallery ${idx + 1}`} fill className="object-cover" />
                     ) : (
-                      <span className="text-gray-400 text-sm flex items-center justify-center h-full w-full">
-                        Thumbnail
-                      </span>
+                      <span className="text-gray-400 text-sm flex items-center justify-center h-full w-full">Thumbnail</span>
                     )}
                   </div>
                   <div className="flex-1 space-y-2">
                     <input
                       type="file"
                       accept="image/*"
-                      onChange={(e) =>
-                        handleGalleryChange(idx, "file", e.target.files[0])
-                      }
+                      onChange={(e) => handleGalleryChange(idx, "file", e.target.files[0])}
                       className="w-full border p-2 rounded"
                     />
-                    <input
-                      type="text"
-                      placeholder="Image description"
-                      value={gallery.description}
-                      onChange={(e) =>
-                        handleGalleryChange(idx, "description", e.target.value)
-                      }
-                      className="w-full border p-2 rounded"
-                    />
+                    <textarea
+  placeholder="Write your description"
+  value={gallery.description}
+  onChange={(e) => handleGalleryChange(idx, "description", e.target.value)}
+  className="w-full border p-2 rounded h-32"
+/>
                   </div>
                 </div>
               ))}
@@ -305,16 +288,12 @@ export default function ProjectForm() {
 
           {/* Tags */}
           <div>
-            <label className="block font-semibold text-lg mb-2">
-              Tags (comma separated)
-            </label>
+            <label className="block font-semibold text-lg mb-2">Tags (comma separated)</label>
             <input
               type="text"
               placeholder="e.g. Design, Architecture, Photography"
               value={formData.tags}
-              onChange={(e) =>
-                setFormData({ ...formData, tags: e.target.value })
-              }
+              onChange={(e) => setFormData({ ...formData, tags: e.target.value })}
               className="w-full border p-3 rounded-xl"
               required
             />
@@ -322,14 +301,10 @@ export default function ProjectForm() {
 
           {/* Visibility */}
           <div>
-            <label className="block font-semibold text-lg mb-2">
-              Visibility
-            </label>
+            <label className="block font-semibold text-lg mb-2">Visibility</label>
             <select
               value={formData.visibility}
-              onChange={(e) =>
-                setFormData({ ...formData, visibility: e.target.value })
-              }
+              onChange={(e) => setFormData({ ...formData, visibility: e.target.value })}
               className="w-full border p-3 rounded-xl"
             >
               <option value="public">Public</option>
@@ -339,16 +314,12 @@ export default function ProjectForm() {
 
           {/* Location */}
           <div>
-            <label className="block font-semibold text-lg mb-2">
-              Location
-            </label>
+            <label className="block font-semibold text-lg mb-2">Location</label>
             <input
               type="text"
               placeholder="Country, State, City"
               value={formData.location}
-              onChange={(e) =>
-                setFormData({ ...formData, location: e.target.value })
-              }
+              onChange={(e) => setFormData({ ...formData, location: e.target.value })}
               className="w-full border p-3 rounded-xl"
               required
             />
@@ -365,7 +336,6 @@ export default function ProjectForm() {
         </form>
       </div>
 
-      {/* Footer - desktop only */}
       <div className="hidden md:block">
         <Footer />
       </div>

@@ -1,11 +1,6 @@
 // components/ApplicantProfile.js
 import { useEffect, useState } from "react";
-import { createClient } from "@supabase/supabase-js";
-
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-);
+import { supabase } from "../utils/supabaseClient"; // ✅ use your shared client
 
 export default function ApplicantProfile({ applicantId }) {
   const [profile, setProfile] = useState(null);
@@ -21,8 +16,11 @@ export default function ApplicantProfile({ applicantId }) {
         .eq("id", applicantId)
         .single();
 
-      if (error) console.error("Error fetching applicant:", error);
-      else setProfile(data);
+      if (error) {
+        console.error("Error fetching applicant:", error.message);
+      } else {
+        setProfile(data);
+      }
 
       setLoading(false);
     };
@@ -48,9 +46,18 @@ export default function ApplicantProfile({ applicantId }) {
       </div>
 
       <div className="mt-4">
-        <p><span className="font-semibold">Specialties:</span> {profile.specialties || "Not specified"}</p>
-        <p className="mt-2"><span className="font-semibold">Phone:</span> {profile.phone || "N/A"}</p>
-        <p className="mt-2"><span className="font-semibold">Bio:</span> {profile.bio || "No bio provided."}</p>
+        <p>
+          <span className="font-semibold">Specialties:</span>{" "}
+          {profile.specialties || "Not specified"}
+        </p>
+        <p className="mt-2">
+          <span className="font-semibold">Phone:</span>{" "}
+          {profile.phone || "N/A"}
+        </p>
+        <p className="mt-2">
+          <span className="font-semibold">Bio:</span>{" "}
+          {profile.bio || "No bio provided."}
+        </p>
       </div>
     </div>
   );

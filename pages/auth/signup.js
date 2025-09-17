@@ -156,7 +156,9 @@ export default function Signup() {
 
     const { error: profileError } = await supabase.from(profileTable).insert([profilePayload]);
     if (profileError) {
-      setErrorMsg(`Database error: ${profileError.message}`);
+      console.error(profileError);
+setErrorMsg('Database error: ' + JSON.stringify(profileError));
+
       setLoading(false);
       return;
     }

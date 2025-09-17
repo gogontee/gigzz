@@ -1,14 +1,10 @@
-// components/Portfolio.js
-'use client';
-import { useState, useEffect, useCallback } from 'react';
-import { createClient } from '@supabase/supabase-js';
-import Link from 'next/link';
-import { Eye } from 'lucide-react';
+"use client";
+import { useState, useEffect, useCallback } from "react";
+import { createPagesBrowserClient } from "@supabase/auth-helpers-nextjs";
+import Link from "next/link";
+import { Eye } from "lucide-react";
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-);
+const supabase = createPagesBrowserClient();
 
 export default function Portfolio() {
   const [projects, setProjects] = useState([]);

@@ -2,15 +2,10 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/router";
-import { createClient } from "@supabase/supabase-js";
+import { supabase } from "../utils/supabaseClient";
 import { useUser } from "@supabase/auth-helpers-react";
 import { Briefcase, LogOut, LogIn, User } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
-
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-);
 
 export default function DesktopHeader() {
   const router = useRouter();
@@ -19,6 +14,7 @@ export default function DesktopHeader() {
   const [role, setRole] = useState(null);
   const [navDropdownOpen, setNavDropdownOpen] = useState(null);
   const [userDropdownOpen, setUserDropdownOpen] = useState(false);
+
 
   // Fetch user's avatar and role
   const fetchProfile = async (userId) => {

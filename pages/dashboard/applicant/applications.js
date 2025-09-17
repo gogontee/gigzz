@@ -1,13 +1,10 @@
 'use client';
 import { useEffect, useState } from 'react';
-import { createClient } from '@supabase/supabase-js';
+import { createPagesBrowserClient } from "@supabase/auth-helpers-nextjs";
 import ApplicantLayout from '../../../components/dashboard/ApplicantLayout';
 import JobCard from '../../../components/JobCard';
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-);
+const supabase = createPagesBrowserClient();
 
 export default function ApplicationsPage() {
   const [applications, setApplications] = useState([]);

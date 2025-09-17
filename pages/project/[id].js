@@ -4,6 +4,11 @@ import { useRouter } from 'next/router';
 import { createPagesBrowserClient } from '@supabase/auth-helpers-nextjs';
 import { MessageCircle, Pencil, Megaphone, Eye } from 'lucide-react';
 import { useUser } from '@supabase/auth-helpers-react';
+import DOMPurify from 'dompurify';
+import dynamic from "next/dynamic";
+// Dynamically import Quill so it only runs client-side
+const ReactQuill = dynamic(() => import("react-quill"), { ssr: false });
+import "react-quill/dist/quill.snow.css";
 
 export default function ProjectPage() {
   const router = useRouter();
@@ -22,6 +27,7 @@ export default function ProjectPage() {
   const [expandedDesc, setExpandedDesc] = useState(false);
   const [expandedGallery, setExpandedGallery] = useState({});
   const [promoting, setPromoting] = useState(false); // ✅ state for promotion
+  
 
   const [editData, setEditData] = useState({
     title: '',
@@ -432,116 +438,141 @@ const handlePromote = async () => {
       </div>
 
       {/* Title & Details */}
-      <div className="mt-20 text-center">
-        {isEditing ? (
-          <input
-            type="text"
-            value={editData.title}
-            onChange={(e) => setEditData((p) => ({ ...p, title: e.target.value }))}
-            className="text-xl font-bold border-b p-2 w-full text-center"
-          />
-        ) : (
-          <h1 className="text-xl font-bold">{project.title}</h1>
-        )}
+<div className="mt-20 text-center">
+  {isEditing ? (
+    <input
+      type="text"
+      value={editData.title}
+      onChange={(e) =>
+        setEditData((p) => ({ ...p, title: e.target.value }))
+      }
+      className="text-xl font-bold border-b p-2 w-full text-center"
+    />
+  ) : (
+    <h1 className="text-xl font-bold">{project.title}</h1>
+  )}
 
-        {isEditing ? (
-          <textarea
-            value={editData.details}
-            onChange={(e) => setEditData((p) => ({ ...p, details: e.target.value }))}
-            className="mt-4 w-full border p-2 rounded"
-          />
-        ) : (
-          project.details && (
-            <p className="mt-4 text-gray-700">
-              {renderWithReadMore(
-                project.details,
-                expandedDesc,
-                () => setExpandedDesc((prev) => !prev)
-              )}
-            </p>
-          )
-        )}
-
-        {project.location && (
-          <p className="mt-2 text-gray-500 text-sm">📍 {project.location}</p>
+  {isEditing ? (
+    // ✅ Use Quill editor for details instead of textarea
+    <div className="mt-4">
+      <ReactQuill
+        theme="snow"
+        value={editData.details}
+        onChange={(val) =>
+          setEditData((p) => ({ ...p, details: val }))
+        }
+        className="bg-white rounded"
+      />
+    </div>
+  ) : (
+    project.details && (
+      <div className="mt-4 text-gray-700 prose text-left">
+        <div
+          dangerouslySetInnerHTML={{
+            __html: DOMPurify.sanitize(
+              expandedDesc
+                ? project.details
+                : project.details
+                    ?.split(" ")
+                    .slice(0, 50)
+                    .join(" ") + "..."
+            ),
+          }}
+        />
+        {project.details?.split(" ").length > 50 && (
+          <button
+            onClick={() => setExpandedDesc((prev) => !prev)}
+            className="ml-2 text-orange-600 text-sm hover:underline"
+          >
+            {expandedDesc ? "Read less" : "Read more"}
+          </button>
         )}
       </div>
+    )
+  )}
+
+  {project.location && (
+    <p className="mt-2 text-gray-500 text-sm">📍 {project.location}</p>
+  )}
+</div>
 
       {/* Gallery */}
-      <div className="mt-8">
-        <h2 className="text-xl font-semibold mb-4">Gallery</h2>
-        <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-          {(isEditing ? editData.gallery : galleryFromDB)
-            .filter((item) => isEditing || item.image)
-            .map((item) => (
-              <div key={item.index} className="flex flex-col">
-                {isEditing ? (
-                  <>
-                    <img
-                      src={item.preview || item.image || '/placeholder.jpg'}
-                      alt={`Preview ${item.index}`}
-                      className="w-full h-32 object-cover rounded mb-2"
-                    />
-                    <input
-                      type="file"
-                      accept="image/*"
-                      onChange={(e) => {
-                        const file = e.target.files?.[0];
-                        if (!file) return;
-                        setEditData((prev) => {
-                          const next = prev.gallery.map((g) => {
-                            if (g.index !== item.index) return g;
-                            if (g.preview) URL.revokeObjectURL(g.preview);
-                            return { ...g, preview: URL.createObjectURL(file), file };
-                          });
-                          return { ...prev, gallery: next };
-                        });
-                      }}
-                    />
-                    <input
-                      type="text"
-                      value={item.desc || ''}
-                      onChange={(e) => {
-                        const val = e.target.value;
-                        setEditData((prev) => {
-                          const next = prev.gallery.map((g) =>
-                            g.index === item.index ? { ...g, desc: val } : g
-                          );
-                          return { ...prev, gallery: next };
-                        });
-                      }}
-                      placeholder="Description"
-                      className="border p-2 rounded mt-2"
-                    />
-                  </>
-                ) : (
-                  <>
-                    {item.image && (
-                      <img
-                        src={item.image}
-                        alt={item.desc || `Gallery image ${item.index}`}
-                        className="w-full h-48 object-cover rounded-lg"
-                      />
-                    )}
-                    {item.desc && (
-                      <p className="mt-2 text-gray-600 text-sm">
-                        {renderWithReadMore(
-                          item.desc,
-                          !!expandedGallery[item.index],
-                          () =>
-                            setExpandedGallery((prev) => ({
-                              ...prev,
-                              [item.index]: !prev[item.index],
-                            }))
-                        )}
-                      </p>
-                    )}
-                  </>
-                )}
-              </div>
-            ))}
+<div className="mt-8">
+  <h2 className="text-xl font-semibold mb-4">Gallery</h2>
+  <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+    {(isEditing ? editData.gallery : galleryFromDB)
+      .filter((item) => isEditing || item.image)
+      .map((item) => (
+        <div key={item.index} className="flex flex-col">
+          {isEditing ? (
+            <>
+              <img
+                src={item.preview || item.image || '/placeholder.jpg'}
+                alt={`Preview ${item.index}`}
+                className="w-full h-32 object-cover rounded mb-2"
+              />
+              <input
+                type="file"
+                accept="image/*"
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (!file) return;
+                  setEditData((prev) => {
+                    const next = prev.gallery.map((g) => {
+                      if (g.index !== item.index) return g;
+                      if (g.preview) URL.revokeObjectURL(g.preview);
+                      return { ...g, preview: URL.createObjectURL(file), file };
+                    });
+                    return { ...prev, gallery: next };
+                  });
+                }}
+              />
+
+              {/* Multiline textarea for description */}
+              <textarea
+                placeholder="Write your description"
+                value={item.desc || ''}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  setEditData((prev) => {
+                    const next = prev.gallery.map((g) =>
+                      g.index === item.index ? { ...g, desc: val } : g
+                    );
+                    return { ...prev, gallery: next };
+                  });
+                }}
+                className="w-full border p-2 rounded mt-2 h-32"
+              />
+            </>
+          ) : (
+            <>
+              {item.image && (
+                <img
+                  src={item.image}
+                  alt={item.desc || `Gallery image ${item.index}`}
+                  className="w-full h-48 object-cover rounded-lg"
+                />
+              )}
+              {item.desc && (
+                <p className="mt-2 text-gray-600 text-sm whitespace-pre-line">
+                  {renderWithReadMore(
+                    item.desc,
+                    !!expandedGallery[item.index],
+                    () =>
+                      setExpandedGallery((prev) => ({
+                        ...prev,
+                        [item.index]: !prev[item.index],
+                      }))
+                  )}
+                </p>
+              )}
+            </>
+          )}
         </div>
-      </div>
+      ))}
+  </div>
+</div>
+
 
       {/* Show See Profile button only if viewer is NOT the owner */}
       {user && user.id !== project.user_id && (

@@ -3,17 +3,27 @@
 
 import { useEffect, useState, useRef, useCallback } from "react";
 import { useRouter } from "next/router";
-import { useSupabaseClient, useUser } from "@supabase/auth-helpers-react";
+import { useUser } from "@supabase/auth-helpers-react";
+import { supabase } from "../utils/supabaseClient"; // ✅ import from utils
 import JobCard from "./JobCard";
 import { Search } from "lucide-react";
 
 /* categoryKeywords */
 const categoryKeywords = {
   "All Jobs": [],
-  "Design & Creative": ["design","creative","creatives","ui","ux","illustration","photoshop","figma"],
-  "Development & IT": ["development","developer","frontend","backend","fullstack","software","engineer","it","programmer","devops"],
-  "Marketing & Sales": ["marketing","sales","seo","advertising","growth","campaign","brand","outreach"],
-  "Writing & Translation": ["writing","writer","translation","content","copywriting","editing","proofreading","blog"],
+  "Design & Creative": [
+    "design","creative","creatives","ui","ux","illustration","photoshop","figma"
+  ],
+  "Development & IT": [
+    "development","developer","frontend","backend","fullstack","software",
+    "engineer","it","programmer","devops"
+  ],
+  "Marketing & Sales": [
+    "marketing","sales","seo","advertising","growth","campaign","brand","outreach"
+  ],
+  "Writing & Translation": [
+    "writing","writer","translation","content","copywriting","editing","proofreading","blog"
+  ],
   "Customer Support": ["customer support","helpdesk","service","support","csr","call center"],
   "Finance & Accounting": ["finance","accounting","bookkeeping","budget","tax","financial","audit"],
   "Legal Services": ["legal","law","compliance","contract","lawyer","paralegal"],
@@ -42,9 +52,7 @@ export default function AllJobs() {
   const router = useRouter();
   const { query: routerQuery } = router;
 
-  const supabase = useSupabaseClient();
   const user = useUser();
-
   const [jobs, setJobs] = useState([]);
   const [filteredJobs, setFilteredJobs] = useState([]);
   const [searchQuery, setSearchQuery] = useState("");

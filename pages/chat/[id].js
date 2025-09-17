@@ -1,15 +1,11 @@
 // pages/chat/[id].js
 import { useEffect, useState } from "react";
 import { useRouter } from "next/router";
-import { createClient } from "@supabase/supabase-js";
+import { createPagesBrowserClient } from "@supabase/auth-helpers-nextjs";
 import ChatMessages from "../../components/ChatMessages";
 
 
-// Initialize Supabase client
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-);
+const supabase = createPagesBrowserClient();
 
 export default function ChatDetailPage() {
   const router = useRouter();

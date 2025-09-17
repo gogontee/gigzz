@@ -2,13 +2,10 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { createClient } from '@supabase/supabase-js';
+import { createPagesBrowserClient } from "@supabase/auth-helpers-nextjs";
 import { useRouter } from 'next/router';
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-);
+const supabase = createPagesBrowserClient();
 
 export default function Settings() {
   const [profile, setProfile] = useState(null);

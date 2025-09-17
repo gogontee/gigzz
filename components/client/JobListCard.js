@@ -1,15 +1,12 @@
 'use client';
 import React, { useState, useEffect } from 'react';
 import { Pencil, Trash2, X } from 'lucide-react';
-import { createClient } from '@supabase/supabase-js';
+import { createPagesBrowserClient } from "@supabase/auth-helpers-nextjs";
 import { useRouter } from 'next/navigation';
 import Link from "next/link";
 import ProfileCard from '../ProfileCard'; // expects prop: id
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-);
+export const supabase = createPagesBrowserClient();
 
 export default function JobListCard({ job, onDelete, onUpdate }) {
   const router = useRouter();
@@ -135,7 +132,7 @@ export default function JobListCard({ job, onDelete, onUpdate }) {
           <input name="application_deadline" type="date" value={formData.application_deadline} onChange={handleChange} className="border rounded p-2 text-sm w-full" />
           <textarea name="responsibilities" value={formData.responsibilities} onChange={handleChange} placeholder="Responsibilities" className="border rounded p-2 text-sm w-full resize-none" rows={3} />
           <textarea name="requirements" value={formData.requirements} onChange={handleChange} placeholder="Requirements" className="border rounded p-2 text-sm w-full resize-none" rows={3} />
-          <textarea name="educational_qualification" value={formData.requirements} onChange={handleChange} placeholder="Qualification" className="border rounded p-2 text-sm w-full resize-none" rows={3} />
+          <textarea name="educational_qualification" value={formData.educational_qualification} onChange={handleChange} placeholder="Qualification" className="border rounded p-2 text-sm w-full resize-none" rows={3} />
           <input name="location" value={formData.location} onChange={handleChange} placeholder="Location" className="border rounded p-2 text-sm w-full" />
           <div className="flex gap-2">
             <input name="min_price" value={formData.min_price} onChange={handleChange} placeholder="Min Price" type="number" className="border rounded p-2 text-sm w-1/2" />
