@@ -8,7 +8,10 @@ export default function PortfolioCard({ projectData }) {
 
   if (!projectData) return null;
 
-  const description = projectData.details || "";
+  // Truncate description to first 15 words
+  const description = projectData.details
+    ? projectData.details.split(' ').slice(0, 15).join(' ') + (projectData.details.split(' ').length > 15 ? '...' : '')
+    : '';
 
   const handleView = (e) => {
     e.stopPropagation(); // Prevents triggering any parent onClick
@@ -40,7 +43,7 @@ export default function PortfolioCard({ projectData }) {
         <div className="flex justify-between items-start gap-4">
           <div className="flex-1 min-w-0">
             <h2 className="text-lg font-semibold mb-1 truncate">{projectData.title}</h2>
-            <p className="text-sm text-gray-600 line-clamp-2">{description}</p>
+            <p className="text-sm text-gray-600">{description}</p>
           </div>
 
           {/* Eye icon as button */}

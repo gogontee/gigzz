@@ -288,47 +288,66 @@ export default function ProfilePage() {
       </div>
 
       {/* Portfolio */}
-      <div className="mt-10">
-        <h2 className="text-xl font-semibold mb-4">Portfolio</h2>
-        {projects.length === 0 ? (
-          <div className="flex flex-col items-center justify-center border border-dashed border-gray-300 rounded-2xl p-8 text-center">
-            <p className="text-gray-600 mb-2">No portfolio to show.</p>
-          </div>
-        ) : (
-          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
-            {projects.map((project, idx) => (
-              <motion.div
-                key={project.id}
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: idx * 0.1 }}
-                className="bg-white rounded-2xl shadow-md hover:shadow-xl transition overflow-hidden group"
-              >
-                <div className="relative h-40 w-full overflow-hidden">
-                  <img
-                    src={project.profile || "/placeholder.png"}
-                    alt={project.title}
-                    className="h-full w-full object-cover transform group-hover:scale-105 transition duration-500"
-                  />
-                  <Link
-                    href={`/project/${project.id}`}
-                    className="absolute top-3 right-3 bg-white/80 backdrop-blur-md rounded-full p-2 shadow hover:bg-white transition"
-                  >
-                    <Eye className="w-5 h-5 text-gray-700" />
-                  </Link>
-                </div>
+<div className="mt-10">
+  <h2 className="text-xl font-semibold mb-4">Portfolio</h2>
+  {projects.length === 0 ? (
+    <div className="flex flex-col items-center justify-center border border-dashed border-gray-300 rounded-2xl p-8 text-center">
+      <p className="text-gray-600 mb-2">No portfolio to show.</p>
+    </div>
+  ) : (
+    <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
+      {projects.map((project, idx) => {
+        // Truncate description to first 15 words
+        const truncateHTML = (html, wordLimit = 15) => {
+          if (!html) return "";
+          // Remove HTML tags for counting words
+          const text = html.replace(/<[^>]+>/g, "");
+          const words = text.split(" ").slice(0, wordLimit).join(" ");
+          const truncated = words + (text.split(" ").length > wordLimit ? "..." : "");
+          return truncated;
+        };
 
-                <div className="p-4">
-                  <h3 className="font-semibold text-lg mb-1 line-clamp-1">
-                    {project.title}
-                  </h3>
-                  <HtmlPreview htmlContent={project.details} wordLimit={30} />
-                </div>
-              </motion.div>
-            ))}
-          </div>
-        )}
-      </div>
+        return (
+          <motion.div
+            key={project.id}
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: idx * 0.1 }}
+            className="bg-white rounded-2xl shadow-md hover:shadow-xl transition overflow-hidden group"
+          >
+            <div className="relative h-40 w-full overflow-hidden">
+              <img
+                src={project.profile || "/placeholder.png"}
+                alt={project.title}
+                className="h-full w-full object-cover transform group-hover:scale-105 transition duration-500"
+              />
+              <Link
+                href={`/project/${project.id}`}
+                className="absolute top-3 right-3 bg-white/80 backdrop-blur-md rounded-full p-2 shadow hover:bg-white transition"
+              >
+                <Eye className="w-5 h-5 text-gray-700" />
+              </Link>
+            </div>
+
+            <div className="p-4">
+              <h3 className="font-semibold text-lg mb-1 line-clamp-1">
+                {project.title}
+              </h3>
+              <p
+                className="text-gray-600 text-sm"
+                dangerouslySetInnerHTML={{
+                  __html: truncateHTML(project.details, 15),
+                }}
+              />
+            </div>
+          </motion.div>
+        );
+      })}
+    </div>
+  )}
+</div>
+
+
 
       {/* Chat Modal */}
       {chatOpen && chatId && (
