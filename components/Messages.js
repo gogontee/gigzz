@@ -8,7 +8,6 @@ import ChatModal from './ChatModal';
 
 // ✅ utility to mark messages as read
 async function markMessagesAsRead(chat, currentUserId) {
-  // Determine the receiver in this chat (the other participant)
   const receiverId =
     chat.receiver?.id || (chat.client_id === currentUserId ? chat.applicant_id : chat.client_id);
 
@@ -104,6 +103,9 @@ export default function Messages() {
                 receiver = { id: receiverApplicant.id, name: receiverApplicant.full_name, avatar_url: receiverApplicant.avatar_url };
             }
 
+            // Extract first name only
+            const firstName = receiver?.name?.split(' ')[0] || 'Unknown';
+
             // Last message
             const { data: lastMsg } = await supabase
               .from('messages')
@@ -123,7 +125,7 @@ export default function Messages() {
 
             return {
               chatId: chat.id,
-              fullName: receiver?.name || 'Unknown User',
+              fullName: firstName, // ✅ only first name
               avatar: receiver?.avatar_url || '/placeholder.png',
               lastMessage: lastMsg?.content || 'No messages yet',
               lastMessageTime: lastMsg?.created_at || chat.created_at,

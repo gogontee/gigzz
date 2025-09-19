@@ -105,7 +105,7 @@ export default function GigzzStarsPage() {
                 : "bg-gray-200 text-gray-700"
             }`}
           >
-            Top Applicants
+            Top Profile
           </button>
           <button
             onClick={() => setActiveTab("portfolios")}
@@ -115,7 +115,7 @@ export default function GigzzStarsPage() {
                 : "bg-gray-200 text-gray-700"
             }`}
           >
-            Premium Portfolios
+            Top Portfolios
           </button>
         </div>
 
