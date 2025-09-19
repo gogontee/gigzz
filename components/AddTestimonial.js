@@ -1,32 +1,31 @@
 "use client";
 
 import { useState } from "react";
-import { motion, AnimatePresence } from "framer-motion";
 import { supabase } from "../utils/supabaseClient";
 
-export default function AddTestimonial() {
+export default function AddTestimonial({ onSuccess }) {
   const [testimony, setTestimony] = useState("");
-  const [popup, setPopup] = useState(false);
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
   const [limitReached, setLimitReached] = useState(false);
+  const [loginRequired, setLoginRequired] = useState(false);
 
   const handleAddTestimonial = async (e) => {
     e.preventDefault();
     setLoading(true);
 
-    // Get authenticated user
+    // ✅ Get authenticated user
     const {
       data: { user },
     } = await supabase.auth.getUser();
 
     if (!user) {
-      setPopup(true);
+      setLoginRequired(true);
       setLoading(false);
       return;
     }
 
-    // Check how many testimonials this user already has
+    // ✅ Check how many testimonials this user already has
     const { count, error: countError } = await supabase
       .from("testimonials")
       .select("*", { count: "exact", head: true })
@@ -44,11 +43,10 @@ export default function AddTestimonial() {
       return;
     }
 
-    // Fetch the user's full_name and avatar from applicants or employers
+    // ✅ Fetch the user's full_name and avatar
     let fullName = "Anonymous";
     let avatarUrl = null;
 
-    // Check both tables
     const { data: applicantData } = await supabase
       .from("applicants")
       .select("full_name, avatar_url")
@@ -70,7 +68,7 @@ export default function AddTestimonial() {
       }
     }
 
-    // Prepare payload
+    // ✅ Prepare payload
     const payload = {
       user_id: user.id,
       full_name: fullName,
@@ -79,9 +77,7 @@ export default function AddTestimonial() {
       approved: false,
     };
 
-    console.log("Inserting testimonial payload:", payload);
-
-    // Insert testimonial
+    // ✅ Insert testimonial
     const { error } = await supabase.from("testimonials").insert(payload);
 
     setLoading(false);
@@ -91,13 +87,41 @@ export default function AddTestimonial() {
     } else {
       setTestimony("");
       setSuccess(true);
-      setTimeout(() => setSuccess(false), 3000);
+
+      // Auto close modal if parent passed onSuccess
+      if (onSuccess) {
+        setTimeout(() => {
+          onSuccess();
+        }, 1500);
+      }
     }
   };
 
   return (
-    <div className="w-full max-w-md mx-auto bg-white p-6 rounded-2xl shadow-lg mt-6">
-      <h2 className="text-lg font-bold text-gray-800 mb-4">Add Your Testimonial</h2>
+    <div className="w-full max-w-md mx-auto bg-white p-6 rounded-2xl shadow-lg">
+      <h2 className="text-lg font-bold text-gray-800 mb-4">
+        Add Your Testimonial
+      </h2>
+
+      {/* ✅ Alerts directly inside form */}
+      {success && (
+        <div className="mb-3 p-2 text-sm text-green-700 bg-green-100 border border-green-300 rounded">
+          ✅ Testimonial submitted! Waiting for approval.
+        </div>
+      )}
+
+      {loginRequired && (
+        <div className="mb-3 p-2 text-sm text-yellow-700 bg-yellow-100 border border-yellow-300 rounded">
+          ⚠️ Please log in to add a testimonial.
+        </div>
+      )}
+
+      {limitReached && (
+        <div className="mb-3 p-2 text-sm text-red-700 bg-red-100 border border-red-300 rounded">
+          ⚠️ You can only submit up to 5 testimonials.
+        </div>
+      )}
+
       <form onSubmit={handleAddTestimonial} className="space-y-4">
         <textarea
           value={testimony}
@@ -115,51 +139,6 @@ export default function AddTestimonial() {
           {loading ? "Submitting..." : "Submit Testimonial"}
         </button>
       </form>
-
-      <AnimatePresence>
-        {success && (
-          <motion.div
-            initial={{ opacity: 0, y: 15 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -15 }}
-            className="mt-4 p-3 bg-green-100 text-green-700 rounded-lg text-center"
-          >
-            ✅ Testimonial submitted! Waiting for approval.
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      <AnimatePresence>
-        {popup && (
-          <motion.div
-            initial={{ opacity: 0, y: 15 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -15 }}
-            className="fixed bottom-6 left-1/2 transform -translate-x-1/2 bg-white shadow-lg rounded-lg p-4 border z-50 max-w-xs text-center"
-          >
-            <p className="text-gray-800 font-medium">Please log in to add a testimonial 🙏</p>
-            <button
-              onClick={() => setPopup(false)}
-              className="mt-2 px-4 py-1 bg-orange-500 text-white rounded-lg"
-            >
-              Close
-            </button>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      <AnimatePresence>
-        {limitReached && (
-          <motion.div
-            initial={{ opacity: 0, y: 15 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -15 }}
-            className="mt-4 p-3 bg-red-100 text-red-700 rounded-lg text-center"
-          >
-            ⚠️ You can only submit up to 5 testimonials.
-          </motion.div>
-        )}
-      </AnimatePresence>
     </div>
   );
 }

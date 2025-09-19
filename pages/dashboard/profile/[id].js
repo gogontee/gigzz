@@ -5,6 +5,7 @@ import { useEffect, useState, useCallback } from "react";
 import { createPagesBrowserClient } from "@supabase/auth-helpers-nextjs"; 
 import { motion } from "framer-motion";
 import Link from "next/link";
+import DOMPurify from "dompurify";
 import {
   Eye,
   MessageCircle,
@@ -16,6 +17,44 @@ import ChatModal from "../../../components/ChatModal";
 
 const supabase = createPagesBrowserClient();
 
+// Helper component to safely render HTML with preview/expand
+function HtmlPreview({ htmlContent, wordLimit = 50 }) {
+  const [expanded, setExpanded] = useState(false);
+
+  if (!htmlContent) return null;
+
+  const cleanHtml = DOMPurify.sanitize(htmlContent, {
+    ALLOWED_TAGS: ["p", "strong", "em", "ul", "ol", "li", "br"],
+    ALLOWED_ATTR: [],
+  });
+
+  // Strip tags for word counting
+  const textContent = cleanHtml.replace(/<[^>]+>/g, "");
+  const words = textContent.trim().split(/\s+/);
+  const isLong = words.length > wordLimit;
+
+  const displayContent = expanded
+    ? cleanHtml
+    : `<p>${words.slice(0, wordLimit).join(" ")}${isLong ? "..." : ""}</p>`;
+
+  return (
+    <div>
+      <div
+        className="text-gray-700 text-sm leading-relaxed prose prose-sm max-w-none"
+        dangerouslySetInnerHTML={{ __html: displayContent }}
+      />
+      {isLong && (
+        <button
+          onClick={() => setExpanded(!expanded)}
+          className="text-orange-600 text-sm font-medium mt-2 hover:underline"
+        >
+          {expanded ? "Read less" : "Read more"}
+        </button>
+      )}
+    </div>
+  );
+}
+
 export default function ProfilePage() {
   const router = useRouter();
   const { id: applicantId } = router.query;
@@ -24,9 +63,6 @@ export default function ProfilePage() {
   const [projects, setProjects] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  const [showFullBio, setShowFullBio] = useState(false);
-
-  // Chat state
   const [chatOpen, setChatOpen] = useState(false);
   const [chatId, setChatId] = useState(null);
   const [clientId, setClientId] = useState(null);
@@ -36,18 +72,9 @@ export default function ProfilePage() {
   useEffect(() => {
     const getUser = async () => {
       try {
-        const {
-          data: { user },
-          error,
-        } = await supabase.auth.getUser();
-
-        if (error) {
-          console.error("Supabase auth error:", error.message);
-        }
-
-        if (user) {
-          setClientId(user.id);
-        }
+        const { data: { user }, error } = await supabase.auth.getUser();
+        if (error) console.error("Supabase auth error:", error.message);
+        if (user) setClientId(user.id);
       } catch (err) {
         console.error("Error getting auth user:", err);
       }
@@ -88,7 +115,7 @@ export default function ProfilePage() {
         .maybeSingle();
 
       if (profileErr) console.error("Error fetching profile:", profileErr);
-      else if (profileData) setProfile({ ...profileData, role });
+      else if (profileData) setProfile({ ...profileData, role, table });
 
       // Projects
       const { data: projectsData, error: projectsErr } = await supabase
@@ -120,7 +147,7 @@ export default function ProfilePage() {
 
     setChatLoading(true);
     try {
-      // Look for existing chat (check both directions)
+      // Look for existing chat
       const { data: existingChats, error: fetchError } = await supabase
         .from("chats")
         .select("id")
@@ -137,12 +164,7 @@ export default function ProfilePage() {
       if (!cId) {
         const { data: newChat, error: insertError } = await supabase
           .from("chats")
-          .insert([
-            {
-              client_id: clientId,
-              applicant_id: applicantId,
-            },
-          ])
+          .insert([{ client_id: clientId, applicant_id: applicantId }])
           .select()
           .single();
 
@@ -168,19 +190,6 @@ export default function ProfilePage() {
     return (
       <div className="p-6 text-center text-red-500">Profile not found</div>
     );
-
-  const getPreview = (text) =>
-    text
-      ? text.split(" ").slice(0, 20).join(" ") +
-        (text.split(" ").length > 20 ? "..." : "")
-      : "";
-
-  const renderBio = (text) => {
-    if (!text) return null;
-    const words = text.split(" ");
-    if (words.length <= 50) return text;
-    return showFullBio ? text : words.slice(0, 50).join(" ") + "...";
-  };
 
   return (
     <motion.div
@@ -246,17 +255,7 @@ export default function ProfilePage() {
         {profile.bio && (
           <div>
             <h3 className="text-lg font-semibold mb-2">About</h3>
-            <p className="text-gray-700 text-sm leading-relaxed">
-              {renderBio(profile.bio)}
-            </p>
-            {profile.bio.split(" ").length > 50 && (
-              <button
-                onClick={() => setShowFullBio(!showFullBio)}
-                className="text-orange-600 text-sm font-medium mt-2 hover:underline"
-              >
-                {showFullBio ? "Read less" : "Read more"}
-              </button>
-            )}
+            <HtmlPreview htmlContent={profile.bio} wordLimit={50} />
           </div>
         )}
 
@@ -266,14 +265,10 @@ export default function ProfilePage() {
               <GraduationCap className="w-5 h-5 text-orange-500" /> Education
             </h3>
             {profile.educational_qualification && (
-              <p className="text-gray-700">
-                Qualification: {profile.educational_qualification}
-              </p>
+              <HtmlPreview htmlContent={profile.educational_qualification} />
             )}
             {profile.institutions && (
-              <p className="text-gray-700">
-                Institution: {profile.institutions}
-              </p>
+              <HtmlPreview htmlContent={profile.institutions} />
             )}
           </div>
         )}
@@ -327,9 +322,7 @@ export default function ProfilePage() {
                   <h3 className="font-semibold text-lg mb-1 line-clamp-1">
                     {project.title}
                   </h3>
-                  <p className="text-sm text-gray-600">
-                    {getPreview(project.details)}
-                  </p>
+                  <HtmlPreview htmlContent={project.details} wordLimit={30} />
                 </div>
               </motion.div>
             ))}

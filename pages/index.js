@@ -4,7 +4,7 @@ import { useEffect, useState, useRef } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import Footer from "../components/Footer";
-import MobileHeader from "../components/MobileHeader"; // ✅ Import Mobile Header
+import MobileHeader from "../components/MobileHeader"; 
 import { FaLaptopCode, FaBuilding, FaMapMarkerAlt, FaClock } from "react-icons/fa";
 import { motion, AnimatePresence } from "framer-motion";
 import FeatureTab from "../components/FeatureTab";
@@ -17,6 +17,9 @@ export default function Home() {
   const [media, setMedia] = useState([]);
   const [currentIndex, setCurrentIndex] = useState(0);
   const videoRef = useRef(null);
+
+  // ✅ Modal state
+  const [showForm, setShowForm] = useState(false);
 
   // ✅ Fetch hero media from Supabase "header" bucket
   useEffect(() => {
@@ -40,7 +43,7 @@ export default function Home() {
     fetchMedia();
   }, []);
 
-  // ✅ Handle slide change (image → 5s, video → wait till end)
+  // ✅ Handle slide change
   useEffect(() => {
     if (!media.length) return;
 
@@ -67,7 +70,7 @@ export default function Home() {
         <MobileHeader />
       </div>
 
-      {/* ✅ Hero Section with thin spacing on mobile, large on desktop */}
+      {/* ✅ Hero Section */}
       <div className="w-full relative overflow-hidden mt-2 md:mt-20"> 
         <div className="relative w-full aspect-[3/1] md:aspect-[1920/600]">
           <AnimatePresence mode="wait">
@@ -111,12 +114,12 @@ export default function Home() {
         </div>
       </div>
 
-      {/* ✅ Tagline under hero */}
+      {/* ✅ Tagline */}
       <p className="mt-6 text-center text-gray-700 text-sm md:text-base">
-        Your gateway top job and side gigs.
+        Your gateway to top jobs and side gigs.
       </p>
 
-      {/* ✅ Mobile → job type icons */}
+      {/* ✅ Mobile job type icons */}
       <div className="mt-8 flex justify-center gap-12 md:hidden">
         {[
           { icon: <FaLaptopCode />, label: "Remote", href: "/remote" },
@@ -138,17 +141,17 @@ export default function Home() {
         ))}
       </div>
 
-      {/* ✅ Desktop → feature tabs with icons + text */}
+      {/* ✅ Desktop feature tabs */}
       <div className="hidden md:flex justify-center gap-8 mt-8 flex-wrap">
-        <FeatureTab icon={<FaLaptopCode />} title="Remote Jobs" href="/remote" className="max-w-xs w-full" />
-        <FeatureTab icon={<FaBuilding />} title="Hybrid Jobs" href="/hybrid" className="max-w-xs w-full" />
-        <FeatureTab icon={<FaMapMarkerAlt />} title="Onsite Jobs" href="/onsite" className="max-w-xs w-full" />
-        <FeatureTab icon={<FaClock />} title="Contract" href="/contract" className="max-w-xs w-full" />
+        <FeatureTab icon={<FaLaptopCode />} title="Remote Jobs" href="/remote" />
+        <FeatureTab icon={<FaBuilding />} title="Hybrid Jobs" href="/hybrid" />
+        <FeatureTab icon={<FaMapMarkerAlt />} title="Onsite Jobs" href="/onsite" />
+        <FeatureTab icon={<FaClock />} title="Contract" href="/contract" />
       </div>
 
-      {/* ✅ Insert AllJobs */}
+      {/* ✅ All Jobs */}
       <div className="mt-8">
-        <AllJobs /> {/* 👈 This will now render jobs sorted: Premium → Gold → Silver → NULL */}
+        <AllJobs />
       </div>
 
       {/* ✅ Category Section */}
@@ -214,15 +217,50 @@ export default function Home() {
       </div>
 
       {/* ✅ Testimonials Section */}
-      <div className="mt-14">
+      <div className="mt-14 relative">
         <h2 className="text-2xl md:text-3xl font-semibold mb-6 text-center">
           What People Say About Gigzz
         </h2>
         <TestimonialCard />
 
-        <div className="mt-10">
-          <AddTestimonial />
+        {/* ✅ Button to open form modal */}
+        <div className="flex justify-center mt-10">
+          <button
+            onClick={() => setShowForm(true)}
+            className="px-6 py-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600 transition"
+          >
+            Add Your Testimonial
+          </button>
         </div>
+
+        {/* ✅ Modal popup */}
+        <AnimatePresence>
+          {showForm && (
+            <motion.div
+              className="fixed inset-0 bg-black/50 flex items-center justify-center z-50"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+            >
+              <motion.div
+                className="bg-white p-6 rounded-lg max-w-lg w-full shadow-lg relative"
+                initial={{ scale: 0.9, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                exit={{ scale: 0.9, opacity: 0 }}
+              >
+                {/* Close button */}
+                <button
+                  onClick={() => setShowForm(false)}
+                  className="absolute top-2 right-2 text-gray-500 hover:text-black"
+                >
+                  ✕
+                </button>
+
+                <AddTestimonial onSuccess={() => setShowForm(false)} />
+              </motion.div>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
 
       {/* ✅ Desktop-only Footer */}

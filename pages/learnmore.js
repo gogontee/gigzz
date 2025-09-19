@@ -37,8 +37,20 @@ export default function LearnMore() {
         console.error("Error fetching learn_more:", error.message);
       } else {
         setTopics(data || []);
-        if (data && data.length > 0) {
-          setActive(data[0].slug); // set first as active
+
+        // ✅ If there's a hash in the URL, use that as active
+        const hash = window.location.hash?.replace("#", "");
+        if (hash && data.some((t) => t.slug === hash)) {
+          setActive(hash);
+          // scroll to it
+          setTimeout(() => {
+            document.getElementById(hash)?.scrollIntoView({
+              behavior: "smooth",
+              block: "start",
+            });
+          }, 100);
+        } else if (data.length > 0) {
+          setActive(data[0].slug);
         }
       }
       setLoading(false);
@@ -47,13 +59,23 @@ export default function LearnMore() {
     fetchTopics();
   }, []);
 
-  if (loading) {
-    return (
-      <div className="flex justify-center items-center min-h-screen">
-        <p className="text-gray-500">Loading...</p>
-      </div>
-    );
-  }
+  // ✅ Watch for hash changes (if user clicks sidebar or external link)
+  useEffect(() => {
+    const handleHashChange = () => {
+      const hash = window.location.hash?.replace("#", "");
+      if (hash && topics.some((t) => t.slug === hash)) {
+        setActive(hash);
+        // also scroll to section
+        document.getElementById(hash)?.scrollIntoView({
+          behavior: "smooth",
+          block: "start",
+        });
+      }
+    };
+
+    window.addEventListener("hashchange", handleHashChange);
+    return () => window.removeEventListener("hashchange", handleHashChange);
+  }, [topics]);
 
   return (
     <div className="min-h-screen flex flex-col md:flex-row bg-gray-50">

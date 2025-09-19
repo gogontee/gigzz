@@ -10,7 +10,8 @@ import Application from '../../../components/Application';
 import Settings from '../../../components/Settings';
 import Token from '../../../components/Token';
 import { Briefcase, Coins, Layers, Bell, MessageSquare, Pencil } from 'lucide-react';
-import useUnreadMessages from '../../../hooks/useUnreadMessages'; // ✅ import the hook
+import useUnreadMessages from '../../../hooks/useUnreadMessages';
+import ProfilePromotion from '../../../components/ProfilePromotion'; // ✅ import the promotion component
 
 export default function ApplicantDashboard() {
   const [activeTab, setActiveTab] = useState('dashboard');
@@ -21,46 +22,45 @@ export default function ApplicantDashboard() {
   const [unreadCountNotifications, setUnreadCountNotifications] = useState(0);
   const fileInputRef = useRef(null);
 
-  // ✅ use hook for unread messages
   const unreadMessagesCount = useUnreadMessages();
 
   // Fetch profile and stats
+  const fetchProfile = async () => {
+    const { data: userData, error: userError } = await supabase.auth.getUser();
+    if (userError || !userData?.user) return;
+
+    const userId = userData.user.id;
+
+    const { data: profileData } = await supabase
+      .from('applicants')
+      .select('*')
+      .eq('id', userId)
+      .single();
+
+    const { data: tokenData } = await supabase
+      .from('token_wallets')
+      .select('balance')
+      .eq('user_id', userId)
+      .single();
+
+    const { count: applicationsCount } = await supabase
+      .from('applications')
+      .select('*', { count: 'exact', head: true })
+      .eq('applicant_id', userId);
+
+    const { count: projectsCount } = await supabase
+      .from('projects')
+      .select('*', { count: 'exact', head: true })
+      .eq('user_id', userId);
+
+    setProfile(profileData);
+    setTokens(tokenData?.balance || 0);
+    setApplicationsCount(applicationsCount || 0);
+    setProjectsCount(projectsCount || 0);
+  };
+
   useEffect(() => {
-    const fetchData = async () => {
-      const { data: userData, error: userError } = await supabase.auth.getUser();
-      if (userError || !userData?.user) return;
-
-      const userId = userData.user.id;
-
-      const { data: profileData } = await supabase
-        .from('applicants')
-        .select('*')
-        .eq('id', userId)
-        .single();
-
-      const { data: tokenData } = await supabase
-        .from('token_wallets')
-        .select('balance')
-        .eq('user_id', userId)
-        .single();
-
-      const { count: applicationsCount } = await supabase
-        .from('applications')
-        .select('*', { count: 'exact', head: true })
-        .eq('applicant_id', userId);
-
-      const { count: projectsCount } = await supabase
-        .from('projects')
-        .select('*', { count: 'exact', head: true })
-        .eq('user_id', userId);
-
-      setProfile(profileData);
-      setTokens(tokenData?.balance || 0);
-      setApplicationsCount(applicationsCount || 0);
-      setProjectsCount(projectsCount || 0);
-    };
-
-    fetchData();
+    fetchProfile();
   }, []);
 
   // Fetch notifications count
@@ -125,6 +125,7 @@ export default function ApplicantDashboard() {
           transition={{ duration: 0.3 }}
           className="space-y-6 md:pt-20 relative"
         >
+          {/* Welcome & Notifications */}
           <div className="flex items-center justify-between flex-wrap gap-4">
             <div>
               <h2 className="text-2xl font-semibold">
@@ -134,7 +135,6 @@ export default function ApplicantDashboard() {
             </div>
 
             <div className="flex items-center gap-4">
-              {/* ✅ Messages icon with real-time unread badge */}
               <a href="/messages" title="Messages" className="relative">
                 <MessageSquare className="w-6 h-6 text-gray-700 hover:text-orange-600" />
                 {unreadMessagesCount > 0 && (
@@ -144,11 +144,7 @@ export default function ApplicantDashboard() {
                 )}
               </a>
 
-              <a
-                href="/dashboard/applicant/notifications"
-                title="Notifications"
-                className="relative"
-              >
+              <a href="/dashboard/applicant/notifications" title="Notifications" className="relative">
                 <Bell className="w-6 h-6 text-gray-700 hover:text-orange-600" />
                 {unreadCountNotifications > 0 && (
                   <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs w-4 h-4 flex items-center justify-center rounded-full">
@@ -157,7 +153,6 @@ export default function ApplicantDashboard() {
                 )}
               </a>
 
-              {/* Avatar with edit */}
               <div className="relative group">
                 <img
                   src={profile?.avatar_url || '/default-avatar.png'}
@@ -186,6 +181,22 @@ export default function ApplicantDashboard() {
             <StatCard icon={<Coins className="text-orange-500" />} label="Token Balance" value={tokens} />
             <StatCard icon={<Briefcase className="text-orange-500" />} label="Applications" value={applicationsCount} />
             <StatCard icon={<Layers className="text-orange-500" />} label="Portfolios" value={projectsCount} />
+          </div>
+
+          {/* Promote Profile & Edit Profile Buttons */}
+          <div className="flex flex-wrap gap-4 mt-6">
+            {/* Promote Profile */}
+            {profile && (
+              <ProfilePromotion profile={profile} refreshProfile={fetchProfile} />
+            )}
+
+            {/* Edit Profile */}
+            <a
+              href="/dashboard/applicant/edit"
+              className="mt-6 px-6 py-3 bg-orange-500 text-white rounded-xl shadow hover:bg-orange-600 transition"
+            >
+              Edit Profile
+            </a>
           </div>
         </motion.div>
       )}

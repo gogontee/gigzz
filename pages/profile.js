@@ -8,22 +8,58 @@ import Link from 'next/link';
 import { useRouter } from 'next/router';
 import {
   Eye,
+  EyeOff,
   MessageCircle,
   MapPin,
   GraduationCap,
   Calendar,
-  EyeOff,
 } from 'lucide-react';
+import DOMPurify from 'dompurify';
+
+// AboutPreview component: truncates text but keeps HTML formatting
+function AboutPreview({ htmlContent }) {
+  const [expanded, setExpanded] = useState(false);
+
+  // Clean HTML (strip editor metadata but keep formatting)
+  const cleanHtml = DOMPurify.sanitize(htmlContent, {
+    ALLOWED_TAGS: ['p', 'strong', 'em', 'ul', 'ol', 'li', 'br'],
+    ALLOWED_ATTR: [],
+  });
+
+  // For preview, strip HTML to count words
+  const textContent = cleanHtml.replace(/<[^>]+>/g, '');
+  const words = textContent.trim().split(/\s+/);
+  const isLong = words.length > 30;
+  const previewText = words.slice(0, 30).join(' ');
+
+  const displayContent = expanded ? cleanHtml : `<p>${previewText}${isLong ? '...' : ''}</p>`;
+
+  return (
+    <div>
+      <div
+        className="prose prose-sm text-gray-700 max-w-none"
+        dangerouslySetInnerHTML={{ __html: displayContent }}
+      />
+      {isLong && (
+        <button
+          className="text-orange-600 mt-2 text-sm font-medium hover:underline"
+          onClick={() => setExpanded(!expanded)}
+        >
+          {expanded ? 'Show less' : 'Show more'}
+        </button>
+      )}
+    </div>
+  );
+}
 
 export default function ProfilePage() {
   const router = useRouter();
-  const user = useUser(); // ✅ already gives you the logged-in user
-  const supabase = useSupabaseClient(); // ✅ the client, no need to recreate
+  const user = useUser();
+  const supabase = useSupabaseClient();
 
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
   const [projects, setProjects] = useState([]);
-  const [showFullBio, setShowFullBio] = useState(false);
 
   const loadProfileAndProjects = useCallback(async () => {
     if (!user) {
@@ -43,18 +79,16 @@ export default function ProfilePage() {
     const role = userMeta?.role;
     const table = role === 'employer' ? 'employers' : 'applicants';
 
-    // Get profile
+    // Fetch profile
     const { data: profileData } = await supabase
       .from(table)
       .select('*')
       .eq('id', user.id)
       .single();
 
-    if (profileData) {
-      setProfile({ ...profileData, role, table });
-    }
+    if (profileData) setProfile({ ...profileData, role, table });
 
-    // Get projects
+    // Fetch projects
     const { data: projectsData } = await supabase
       .from('projects')
       .select('*')
@@ -70,7 +104,6 @@ export default function ProfilePage() {
     loadProfileAndProjects();
   }, [loadProfileAndProjects]);
 
-  // 🔄 Toggle DOB visibility
   const toggleDobVisibility = async () => {
     if (!profile) return;
 
@@ -81,40 +114,17 @@ export default function ProfilePage() {
       .eq('id', profile.id);
 
     if (!error) {
-      setProfile((prev) => ({
-        ...prev,
-        show_date_of_birth: updatedValue,
-      }));
+      setProfile((prev) => ({ ...prev, show_date_of_birth: updatedValue }));
     } else {
       console.error('Error updating DOB visibility:', error.message);
     }
   };
 
-  if (!user) {
-    return <div className="p-6 text-center text-gray-500">Redirecting...</div>;
-  }
+  if (!user) return <div className="p-6 text-center text-gray-500">Redirecting...</div>;
+  if (loading) return <div className="p-6 text-center text-gray-500">Loading profile...</div>;
+  if (!profile) return <div className="p-6 text-center text-red-500">Profile not found</div>;
 
-  if (loading) {
-    return <div className="p-6 text-center text-gray-500">Loading profile...</div>;
-  }
-
-  if (!profile) {
-    return <div className="p-6 text-center text-red-500">Profile not found</div>;
-  }
-
-  // Helper to trim project details
-  const getPreview = (text) => {
-    if (!text) return '';
-    const words = text.split(' ');
-    return words.slice(0, 20).join(' ') + (words.length > 20 ? '...' : '');
-  };
-
-  const renderBio = (text) => {
-    if (!text) return null;
-    const words = text.split(' ');
-    if (words.length <= 50) return text;
-    return showFullBio ? text : words.slice(0, 50).join(' ') + '...';
-  };
+  const aboutHtml = profile.about || profile.bio || '';
 
   return (
     <motion.div
@@ -123,7 +133,7 @@ export default function ProfilePage() {
       transition={{ duration: 0.4 }}
       className="max-w-5xl mx-auto px-4 py-6 relative"
     >
-      {/* Profile Header Card */}
+      {/* Profile Header */}
       <div className="bg-gradient-to-r from-black to-orange-500 rounded-3xl p-6 text-white shadow-lg flex flex-col sm:flex-row gap-6 lg:mt-20 relative">
         <div className="flex-shrink-0">
           <div className="relative w-24 h-24 rounded-full overflow-hidden border-4 border-white">
@@ -136,9 +146,7 @@ export default function ProfilePage() {
         </div>
         <div className="flex-1 flex flex-col justify-center">
           <div className="flex items-center gap-2 flex-wrap">
-            <h1 className="text-2xl font-bold leading-tight">
-              {profile.full_name || profile.name}
-            </h1>
+            <h1 className="text-2xl font-bold leading-tight">{profile.full_name || profile.name}</h1>
             {profile.role && (
               <span className="text-xs uppercase bg-white/20 px-3 py-1 rounded-full">
                 {profile.role === 'employer' ? 'Client' : 'Creative'}
@@ -146,65 +154,62 @@ export default function ProfilePage() {
             )}
           </div>
           <p className="mt-1 text-sm opacity-90">{profile.email}</p>
-          {profile.phone && (
-            <p className="mt-1 text-sm opacity-90">📞 {profile.phone}</p>
-          )}
+          {profile.phone && <p className="mt-1 text-sm opacity-90">📞 {profile.phone}</p>}
           <p className="mt-3 text-sm opacity-90 flex items-center gap-1">
             <MapPin className="w-4 h-4" />
-            {`${profile.city || ''}, ${profile.state || ''}, ${profile.country || ''}`}
+            {`${profile.city || ''}${profile.city || profile.state || profile.country ? ', ' : ''}${profile.state || ''}${profile.state && profile.country ? ', ' : ''}${profile.country || ''}`}
           </p>
         </div>
 
-        {/* 🔔 Messages Button - Only for profile owner */}
         {user?.id === profile.id && (
           <Link
             href="/messages"
             className="absolute bottom-4 right-4 bg-white text-black p-3 rounded-full shadow-lg hover:scale-110 transition transform duration-200 focus:outline-none group"
-            aria-label="View Messages"
           >
             <MessageCircle className="w-6 h-6 group-hover:rotate-12 transition-transform" />
           </Link>
         )}
       </div>
 
-      {/* Profile Details Section */}
+      {/* Profile Details */}
       <div className="mt-6 bg-white rounded-2xl shadow-lg p-6 space-y-6">
-        {/* Bio */}
-        {profile.bio && (
+        {aboutHtml && (
           <div>
             <h3 className="text-lg font-semibold mb-2">About</h3>
-            <p className="text-gray-700 text-sm leading-relaxed">
-              {renderBio(profile.bio)}
-            </p>
-            {profile.bio.split(' ').length > 50 && (
-              <button
-                onClick={() => setShowFullBio(!showFullBio)}
-                className="text-orange-600 text-sm font-medium mt-2 hover:underline"
-              >
-                {showFullBio ? 'Read less' : 'Read more'}
-              </button>
-            )}
+            <AboutPreview htmlContent={aboutHtml} />
           </div>
         )}
 
-        {/* Education */}
         {(profile.educational_qualification || profile.institutions) && (
           <div>
             <h3 className="text-lg font-semibold mb-2 flex items-center gap-2">
               <GraduationCap className="w-5 h-5 text-orange-500" /> Education
             </h3>
             {profile.educational_qualification && (
-              <p className="text-gray-700">
-                Qualification: {profile.educational_qualification}
-              </p>
+              <div
+                className="text-gray-700 prose prose-sm max-w-none mb-2"
+                dangerouslySetInnerHTML={{
+                  __html: DOMPurify.sanitize(profile.educational_qualification, {
+                    ALLOWED_TAGS: ['p', 'strong', 'em', 'ul', 'ol', 'li', 'br'],
+                    ALLOWED_ATTR: [],
+                  }),
+                }}
+              />
             )}
             {profile.institutions && (
-              <p className="text-gray-700">Institution: {profile.institutions}</p>
+              <div
+                className="text-gray-700 prose prose-sm max-w-none"
+                dangerouslySetInnerHTML={{
+                  __html: DOMPurify.sanitize(profile.institutions, {
+                    ALLOWED_TAGS: ['p', 'strong', 'em', 'ul', 'ol', 'li', 'br'],
+                    ALLOWED_ATTR: [],
+                  }),
+                }}
+              />
             )}
           </div>
         )}
 
-        {/* Date of Birth */}
         {profile.date_of_birth && (
           <div>
             <h3 className="text-lg font-semibold mb-2 flex items-center gap-2">
@@ -266,27 +271,21 @@ export default function ProfilePage() {
                   </Link>
                 </div>
                 <div className="p-4">
-                  <h3 className="font-semibold text-lg mb-1 line-clamp-1">
-                    {project.title}
-                  </h3>
-                  <p className="text-sm text-gray-600">
-                    {getPreview(project.details)}
-                  </p>
+                  <h3 className="font-semibold text-lg mb-1 line-clamp-1">{project.title}</h3>
+                  <div
+                    className="text-sm text-gray-600 prose prose-sm max-w-none"
+                    dangerouslySetInnerHTML={{
+                      __html: DOMPurify.sanitize(project.details || '', {
+                        ALLOWED_TAGS: ['p', 'strong', 'em', 'ul', 'ol', 'li', 'br'],
+                        ALLOWED_ATTR: [],
+                      }),
+                    }}
+                  />
                 </div>
               </motion.div>
             ))}
           </div>
         )}
-
-        {/* Back button */}
-        <div className="hidden md:flex justify-end mt-8">
-          <Link
-            href="/dashboard/applicant"
-            className="px-6 py-3 rounded-xl bg-black text-white font-medium shadow hover:bg-orange-600 transition"
-          >
-            Go Back to Dashboard
-          </Link>
-        </div>
       </div>
     </motion.div>
   );

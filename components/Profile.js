@@ -1,7 +1,7 @@
 // components/profile/Profile.js
 'use client';
 
-import { useEffect, useState, useCallback, useRef } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { motion } from 'framer-motion';
 import Link from 'next/link';
 import {
@@ -11,22 +11,56 @@ import {
   MapPin,
   GraduationCap,
   Calendar,
+  Edit3,
 } from 'lucide-react';
 import { supabase } from '../utils/supabaseClient';
 
+// AboutPreview component for truncating About text
+function AboutPreview({ htmlContent }) {
+  const [expanded, setExpanded] = useState(false);
+
+  // Strip HTML tags for counting words
+  const textContent = htmlContent.replace(/<[^>]+>/g, '');
+  const words = textContent.trim().split(/\s+/);
+  const isLong = words.length > 30;
+
+  const previewText = words.slice(0, 30).join(' ');
+  const displayContent = expanded
+    ? htmlContent
+    : previewText + (isLong ? '...' : '');
+
+  return (
+    <div>
+      <div
+        className="prose prose-sm text-gray-700 max-w-none"
+        dangerouslySetInnerHTML={{ __html: displayContent }}
+      />
+      {isLong && (
+        <button
+          className="text-orange-600 mt-2 text-sm font-medium hover:underline"
+          onClick={() => setExpanded(!expanded)}
+        >
+          {expanded ? 'Show less' : 'Show more'}
+        </button>
+      )}
+    </div>
+  );
+}
 
 export default function Profile({ userId }) {
   const [user, setUser] = useState(null);
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
   const [projects, setProjects] = useState([]);
-  const [showFullBio, setShowFullBio] = useState(false);
 
   const loadProfileAndProjects = useCallback(async () => {
     setLoading(true);
 
     // Get authenticated user
-    const { data: { user: authUser }, error: userError } = await supabase.auth.getUser();
+    const {
+      data: { user: authUser },
+      error: userError,
+    } = await supabase.auth.getUser();
     if (userError || !authUser) {
       setLoading(false);
       return;
@@ -88,19 +122,6 @@ export default function Profile({ userId }) {
     }
   };
 
-  const getPreview = (text) => {
-    if (!text) return '';
-    const words = text.split(' ');
-    return words.slice(0, 20).join(' ') + (words.length > 20 ? '...' : '');
-  };
-
-  const renderBio = (text) => {
-    if (!text) return null;
-    const words = text.split(' ');
-    if (words.length <= 50) return text;
-    return showFullBio ? text : words.slice(0, 50).join(' ') + '...';
-  };
-
   if (loading) {
     return <div className="p-6 text-center text-gray-500">Loading profile...</div>;
   }
@@ -139,22 +160,33 @@ export default function Profile({ userId }) {
             )}
           </div>
           <p className="mt-1 text-sm opacity-90">{profile.email}</p>
-          {profile.phone && <p className="mt-1 text-sm opacity-90">📞 {profile.phone}</p>}
+          {profile.phone && (
+            <p className="mt-1 text-sm opacity-90">📞 {profile.phone}</p>
+          )}
           <p className="mt-3 text-sm opacity-90 flex items-center gap-1">
             <MapPin className="w-4 h-4" />
             {`${profile.city || ''}, ${profile.state || ''}, ${profile.country || ''}`}
           </p>
         </div>
 
-        {/* Messages Button */}
+        {/* Actions (Edit + Messages) */}
         {user?.id === profile.id && (
-          <Link
-            href="/messages"
-            className="absolute bottom-4 right-4 bg-white text-black p-3 rounded-full shadow-lg hover:scale-110 transition transform duration-200 focus:outline-none group"
-            aria-label="View Messages"
-          >
-            <MessageCircle className="w-6 h-6 group-hover:rotate-12 transition-transform" />
-          </Link>
+          <div className="absolute bottom-4 right-4 flex gap-3">
+            <Link
+              href="/dashboard/applicant/edit"
+              className="bg-white text-black p-3 rounded-full shadow-lg hover:scale-110 transition transform duration-200 focus:outline-none group"
+              aria-label="Edit Profile"
+            >
+              <Edit3 className="w-6 h-6 group-hover:rotate-12 transition-transform" />
+            </Link>
+            <Link
+              href="/messages"
+              className="bg-white text-black p-3 rounded-full shadow-lg hover:scale-110 transition transform duration-200 focus:outline-none group"
+              aria-label="View Messages"
+            >
+              <MessageCircle className="w-6 h-6 group-hover:rotate-12 transition-transform" />
+            </Link>
+          </div>
         )}
       </div>
 
@@ -163,15 +195,7 @@ export default function Profile({ userId }) {
         {profile.bio && (
           <div>
             <h3 className="text-lg font-semibold mb-2">About</h3>
-            <p className="text-gray-700 text-sm leading-relaxed">{renderBio(profile.bio)}</p>
-            {profile.bio.split(' ').length > 50 && (
-              <button
-                onClick={() => setShowFullBio(!showFullBio)}
-                className="text-orange-600 text-sm font-medium mt-2 hover:underline"
-              >
-                {showFullBio ? 'Read less' : 'Read more'}
-              </button>
-            )}
+            <AboutPreview htmlContent={profile.bio} />
           </div>
         )}
 
@@ -181,11 +205,19 @@ export default function Profile({ userId }) {
               <GraduationCap className="w-5 h-5 text-orange-500" /> Education
             </h3>
             {profile.educational_qualification && (
-              <p className="text-gray-700">
-                Qualification: {profile.educational_qualification}
-              </p>
+              <div
+                className="text-gray-700 prose prose-sm max-w-none"
+                dangerouslySetInnerHTML={{
+                  __html: profile.educational_qualification,
+                }}
+              />
             )}
-            {profile.institutions && <p className="text-gray-700">Institution: {profile.institutions}</p>}
+            {profile.institutions && (
+              <div
+                className="text-gray-700 prose prose-sm max-w-none"
+                dangerouslySetInnerHTML={{ __html: profile.institutions }}
+              />
+            )}
           </div>
         )}
 
@@ -250,8 +282,15 @@ export default function Profile({ userId }) {
                   </Link>
                 </div>
                 <div className="p-4">
-                  <h3 className="font-semibold text-lg mb-1 line-clamp-1">{project.title}</h3>
-                  <p className="text-sm text-gray-600">{getPreview(project.details)}</p>
+                  <h3 className="font-semibold text-lg mb-1 line-clamp-1">
+                    {project.title}
+                  </h3>
+                  <div
+                    className="text-sm text-gray-600 prose prose-sm max-w-none"
+                    dangerouslySetInnerHTML={{
+                      __html: project.details || '',
+                    }}
+                  />
                 </div>
               </motion.div>
             ))}

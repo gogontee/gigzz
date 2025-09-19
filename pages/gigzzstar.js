@@ -4,7 +4,7 @@ import { useEffect, useState, useCallback } from "react";
 import { supabase } from "../utils/supabaseClient";
 import ProfileCard from "../components/ProfileCard";
 import MobileHeader from "../components/MobileHeader";
-import Portfolio from "../components/Portfolios"; // ✅ Import Portfolio component
+import Portfolio from "../components/Portfolios";
 
 export default function GigzzStarsPage() {
   const [applicants, setApplicants] = useState([]);
@@ -12,39 +12,52 @@ export default function GigzzStarsPage() {
   const [page, setPage] = useState(0);
   const [hasMoreApplicants, setHasMoreApplicants] = useState(true);
 
-  // Toggle state
   const [activeTab, setActiveTab] = useState("stars"); // "stars" | "portfolios"
+  const [searchTerm, setSearchTerm] = useState("");
 
   /** Fetch Applicants (All star) */
-  const fetchApplicants = useCallback(async (pageNumber) => {
-    setLoadingApplicants(true);
+  const fetchApplicants = useCallback(
+    async (pageNumber, search = "") => {
+      setLoadingApplicants(true);
 
-    const { data, error } = await supabase
-      .from("applicants")
-      .select("id")
-      .in("subscription", ["All star", "all star"])
-      .order("updated_at", { ascending: false })
-      .range(pageNumber * 30, pageNumber * 30 + 29);
+      let query = supabase
+        .from("applicants")
+        .select("id, full_name, specialties, token")
+        .gt("token", 0) // only applicants with token > 0
+        .order("token", { ascending: false }) // highest tokens first
+        .range(pageNumber * 30, pageNumber * 30 + 29);
 
-    if (error) {
-      console.error("❌ Error fetching applicants:", error);
-    } else {
-      if (!data || data.length < 30) setHasMoreApplicants(false);
-
-      if (pageNumber === 0) {
-        setApplicants(data || []);
-      } else {
-        setApplicants((prev) => [...prev, ...(data || [])]);
+      if (search.trim() !== "") {
+        query = query.or(
+          `full_name.ilike.%${search}%,specialties.ilike.%${search}%`
+        );
       }
-    }
 
-    setLoadingApplicants(false);
-  }, []);
+      const { data, error } = await query;
 
-  /** Initial load */
+      if (error) {
+        console.error("❌ Error fetching applicants:", error);
+      } else {
+        if (!data || data.length < 30) setHasMoreApplicants(false);
+
+        if (pageNumber === 0) {
+          setApplicants(data || []);
+        } else {
+          setApplicants((prev) => [...prev, ...(data || [])]);
+        }
+      }
+
+      setLoadingApplicants(false);
+    },
+    []
+  );
+
+  /** Initial load or search */
   useEffect(() => {
-    fetchApplicants(page);
-  }, [page, fetchApplicants]);
+    setPage(0);
+    setHasMoreApplicants(true);
+    fetchApplicants(0, searchTerm);
+  }, [searchTerm, fetchApplicants]);
 
   /** Infinite scroll for applicants */
   useEffect(() => {
@@ -62,6 +75,12 @@ export default function GigzzStarsPage() {
     window.addEventListener("scroll", handleScroll);
     return () => window.removeEventListener("scroll", handleScroll);
   }, [activeTab, loadingApplicants, hasMoreApplicants]);
+
+  /** Load more applicants when page changes (infinite scroll) */
+  useEffect(() => {
+    if (page === 0) return; // already fetched
+    fetchApplicants(page, searchTerm);
+  }, [page, searchTerm, fetchApplicants]);
 
   return (
     <>
@@ -100,6 +119,19 @@ export default function GigzzStarsPage() {
           </button>
         </div>
 
+        {/* Search Input */}
+        {activeTab === "stars" && (
+          <div className="flex justify-center mb-6">
+            <input
+              type="text"
+              placeholder="Search by name or specialty..."
+              className="w-full max-w-md px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+            />
+          </div>
+        )}
+
         {/* Applicants Grid */}
         {activeTab === "stars" && (
           <>
@@ -130,7 +162,7 @@ export default function GigzzStarsPage() {
         {/* Premium Portfolios */}
         {activeTab === "portfolios" && (
           <div>
-            <Portfolio /> {/* ✅ Render Portfolio component directly */}
+            <Portfolio /> {/* Render Portfolio component directly */}
           </div>
         )}
       </div>

@@ -13,11 +13,10 @@ export default function Footer() {
         <div>
           <h3 className="text-base font-semibold mb-4">For Clients</h3>
           <ul className="space-y-2">
-            <li><a href="#" className="hover:text-orange-400">How to hire</a></li>
-            <li><a href="#" className="hover:text-orange-400">Talent Marketplace</a></li>
-            <li><a href="#" className="hover:text-orange-400">Project Catalog</a></li>
+            <li><a href="/job/post" className="hover:text-orange-400">List your job</a></li>
+            <li><a href="/gigzzstar" className="hover:text-orange-400">Talent Marketplace</a></li>
+            <li><a href="/portfolio" className="hover:text-orange-400">Portfolio Catalog</a></li>
             <li><a href="#" className="hover:text-orange-400">Hire an agency</a></li>
-            <li><a href="#" className="hover:text-orange-400">Direct Contracts</a></li>
           </ul>
         </div>
 
@@ -25,10 +24,9 @@ export default function Footer() {
         <div>
           <h3 className="text-base font-semibold mb-4">For Creatives</h3>
           <ul className="space-y-2">
-            <li><a href="#" className="hover:text-orange-400">How to find work</a></li>
-            <li><a href="#" className="hover:text-orange-400">Direct Contracts</a></li>
+            <li><a href="/learnmore#how-to-land-juicy-gigs" className="hover:text-orange-400">How to land juicy gigs</a></li>
             <li><a href="#" className="hover:text-orange-400">Find freelance jobs</a></li>
-            <li><a href="#" className="hover:text-orange-400">Win work with ads</a></li>
+            <li><a href="/learnmore#how-to-win-jobs-with-ads" className="hover:text-orange-400">Win work with ads</a></li>
             <li><a href="#" className="hover:text-orange-400">Exclusive resources with Premium</a></li>
           </ul>
         </div>
@@ -37,11 +35,10 @@ export default function Footer() {
         <div>
           <h3 className="text-base font-semibold mb-4">Resources</h3>
           <ul className="space-y-2">
-            <li><a href="#" className="hover:text-orange-400">Help & support</a></li>
+            <li><a href="/learnmore" className="hover:text-orange-400">Help & support</a></li>
             <li><a href="#" className="hover:text-orange-400">Gigzz reviews</a></li>
-            <li><a href="#" className="hover:text-orange-400">Blog</a></li>
-            <li><a href="#" className="hover:text-orange-400">Free Business Tools</a></li>
-            <li><a href="#" className="hover:text-orange-400">Release notes</a></li>
+            <li><a href="/news" className="hover:text-orange-400">Blog</a></li>
+            <li><a href="/gigzz/releasenote" className="hover:text-orange-400">Release notes</a></li>
           </ul>
         </div>
 
@@ -49,11 +46,11 @@ export default function Footer() {
         <div>
           <h3 className="text-base font-semibold mb-4">Company</h3>
           <ul className="space-y-2">
-            <li><a href="#" className="hover:text-orange-400">About us</a></li>
+            <li><a href="/about" className="hover:text-orange-400">About us</a></li>
             <li><a href="#" className="hover:text-orange-400">Careers</a></li>
-            <li><a href="#" className="hover:text-orange-400">Contact us</a></li>
-            <li><a href="#" className="hover:text-orange-400">Trust & safety</a></li>
-            <li><a href="#" className="hover:text-orange-400">Modern slavery statement</a></li>
+            <li><a href="/contact" className="hover:text-orange-400">Contact us</a></li>
+            <li><a href="/gigzz/trust-safety" className="hover:text-orange-400">Trust & safety</a></li>
+            <li><a href="/gigzz/modern-slavery" className="hover:text-orange-400">Modern slavery statement</a></li>
           </ul>
         </div>
 
