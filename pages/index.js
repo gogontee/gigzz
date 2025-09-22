@@ -76,48 +76,48 @@ export default function Home() {
       </div>
 
       {/* ✅ Hero Section */}
-      <div className="w-full relative overflow-hidden mt-2 md:mt-20"> 
-        <div className="relative w-full aspect-[3/1] md:aspect-[1920/600]">
-          <AnimatePresence mode="wait">
-            {media.length > 0 && (
-              <>
-                {media[currentIndex].endsWith(".mp4") ||
-                media[currentIndex].endsWith(".webm") ? (
-                  <motion.video
-                    key={media[currentIndex]}
-                    ref={videoRef}
-                    src={media[currentIndex]}
-                    className="absolute inset-0 w-full h-full object-cover rounded-lg"
-                    autoPlay
-                    muted
-                    playsInline
-                    initial={{ opacity: 0, x: 50 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    exit={{ opacity: 0, x: -50 }}
-                    transition={{ duration: 0.8 }}
-                  />
-                ) : (
-                  <motion.div
-                    key={media[currentIndex]}
-                    className="absolute inset-0"
-                    initial={{ opacity: 0, x: 50 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    exit={{ opacity: 0, x: -50 }}
-                    transition={{ duration: 0.8 }}
-                  >
-                    <Image
-                      src={media[currentIndex]}
-                      alt="Hero Media"
-                      fill
-                      className="object-cover rounded-lg"
-                    />
-                  </motion.div>
-                )}
-              </>
-            )}
-          </AnimatePresence>
-        </div>
-      </div>
+<div className="w-full relative overflow-hidden mt-2 md:mt-20">
+  <div className="relative w-full aspect-[3/1] md:aspect-[1920/600]">
+    <AnimatePresence mode="wait">
+      {media.length > 0 && (
+        <>
+          {media[currentIndex].endsWith(".mp4") ||
+          media[currentIndex].endsWith(".webm") ? (
+            <motion.div
+              key={media[currentIndex]}
+              className="absolute inset-0"
+              initial={{ opacity: 0, x: 50 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: -50 }}
+              transition={{ duration: 0.8 }}
+            >
+              <VideoWithOverlay
+                src={media[currentIndex]}
+                videoRef={videoRef}
+              />
+            </motion.div>
+          ) : (
+            <motion.div
+              key={media[currentIndex]}
+              className="absolute inset-0"
+              initial={{ opacity: 0, x: 50 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: -50 }}
+              transition={{ duration: 0.8 }}
+            >
+              <Image
+                src={media[currentIndex]}
+                alt="Hero Media"
+                fill
+                className="object-cover rounded-lg"
+              />
+            </motion.div>
+          )}
+        </>
+      )}
+    </AnimatePresence>
+  </div>
+</div>
 
       {/* ✅ Tagline */}
       <p className="mt-6 text-center text-gray-700 text-sm md:text-base">
