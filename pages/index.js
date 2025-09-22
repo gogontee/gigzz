@@ -22,6 +22,14 @@ export default function Home() {
   const [currentIndex, setCurrentIndex] = useState(0);
   const videoRef = useRef(null);
 
+  // ✅ Detect Instagram in-app browser
+  const [isInApp, setIsInApp] = useState(false);
+  useEffect(() => {
+    if (typeof navigator !== "undefined") {
+      setIsInApp(navigator.userAgent.includes("Instagram"));
+    }
+  }, []);
+
   // ✅ Modal state
   const [showForm, setShowForm] = useState(false);
 
@@ -41,7 +49,6 @@ export default function Home() {
           (file) =>
             supabase.storage.from("header").getPublicUrl(file.name).data.publicUrl
         );
-        // ✅ Merge Supabase media with fallback (fallback shows first, supabase overrides if available)
         setMedia(urls);
       }
     };
@@ -53,7 +60,7 @@ export default function Home() {
     if (!media.length) return;
 
     const current = media[currentIndex];
-    if (current.endsWith(".mp4") || current.endsWith(".webm")) {
+    if (!isInApp && (current.endsWith(".mp4") || current.endsWith(".webm"))) {
       const videoEl = videoRef.current;
       if (videoEl) {
         videoEl.onended = () => {
@@ -66,7 +73,7 @@ export default function Home() {
       }, 5000);
       return () => clearTimeout(timer);
     }
-  }, [currentIndex, media]);
+  }, [currentIndex, media, isInApp]);
 
   return (
     <div className="flex flex-col min-h-screen text-black bg-white">
@@ -75,49 +82,58 @@ export default function Home() {
         <MobileHeader />
       </div>
 
-      {/* ✅ Hero Section */}
-<div className="w-full relative overflow-hidden mt-2 md:mt-20">
-  <div className="relative w-full aspect-[3/1] md:aspect-[1920/600]">
-    <AnimatePresence mode="wait">
-      {media.length > 0 && (
-        <>
-          {media[currentIndex].endsWith(".mp4") ||
-          media[currentIndex].endsWith(".webm") ? (
-            <motion.div
-              key={media[currentIndex]}
-              className="absolute inset-0"
-              initial={{ opacity: 0, x: 50 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: -50 }}
-              transition={{ duration: 0.8 }}
-            >
-              <VideoWithOverlay
-                src={media[currentIndex]}
-                videoRef={videoRef}
-              />
-            </motion.div>
-          ) : (
-            <motion.div
-              key={media[currentIndex]}
-              className="absolute inset-0"
-              initial={{ opacity: 0, x: 50 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: -50 }}
-              transition={{ duration: 0.8 }}
-            >
-              <Image
-                src={media[currentIndex]}
-                alt="Hero Media"
-                fill
-                className="object-cover rounded-lg"
-              />
-            </motion.div>
-          )}
-        </>
+      {/* ✅ Instagram warning banner */}
+      {isInApp && (
+        <div className="bg-yellow-100 text-yellow-800 text-center py-2 px-4 text-sm">
+          For the best experience, please{" "}
+          <strong>open this site in Chrome or Safari</strong>.
+        </div>
       )}
-    </AnimatePresence>
-  </div>
-</div>
+
+      {/* ✅ Hero Section */}
+      <div className="w-full relative overflow-hidden mt-2 md:mt-20"> 
+        <div className="relative w-full aspect-[3/1] md:aspect-[1920/600]">
+          <AnimatePresence mode="wait">
+            {media.length > 0 && (
+              <>
+                {!isInApp &&
+                (media[currentIndex].endsWith(".mp4") ||
+                  media[currentIndex].endsWith(".webm")) ? (
+                  <motion.video
+                    key={media[currentIndex]}
+                    ref={videoRef}
+                    src={media[currentIndex]}
+                    className="absolute inset-0 w-full h-full object-cover rounded-lg"
+                    autoPlay
+                    muted
+                    playsInline
+                    initial={{ opacity: 0, x: 50 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    exit={{ opacity: 0, x: -50 }}
+                    transition={{ duration: 0.8 }}
+                  />
+                ) : (
+                  <motion.div
+                    key={media[currentIndex]}
+                    className="absolute inset-0"
+                    initial={{ opacity: 0, x: 50 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    exit={{ opacity: 0, x: -50 }}
+                    transition={{ duration: 0.8 }}
+                  >
+                    <Image
+                      src={media[currentIndex]}
+                      alt="Hero Media"
+                      fill
+                      className="object-cover rounded-lg"
+                    />
+                  </motion.div>
+                )}
+              </>
+            )}
+          </AnimatePresence>
+        </div>
+      </div>
 
       {/* ✅ Tagline */}
       <p className="mt-6 text-center text-gray-700 text-sm md:text-base">
