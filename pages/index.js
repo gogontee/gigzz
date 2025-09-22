@@ -14,7 +14,13 @@ import AddTestimonial from "../components/AddTestimonial";
 import { supabase } from "../utils/supabaseClient";
 
 export default function Home() {
-  const [media, setMedia] = useState([]);
+  const [media, setMedia] = useState([
+    // ✅ Fallback media
+    "https://xatxjdsppcjgplmrtjcs.supabase.co/storage/v1/object/public/header/gigzz%20vid%201.mp4",
+    "https://xatxjdsppcjgplmrtjcs.supabase.co/storage/v1/object/public/header/hero%20vid.mp4",
+    "https://xatxjdsppcjgplmrtjcs.supabase.co/storage/v1/object/public/header/header3.jpg",
+    "https://xatxjdsppcjgplmrtjcs.supabase.co/storage/v1/object/public/header/header4.jpg",
+  ]);
   const [currentIndex, setCurrentIndex] = useState(0);
   const videoRef = useRef(null);
 
@@ -32,11 +38,12 @@ export default function Home() {
         console.error("Error fetching media:", error);
         return;
       }
-      if (data) {
+      if (data && data.length > 0) {
         const urls = data.map(
           (file) =>
             supabase.storage.from("header").getPublicUrl(file.name).data.publicUrl
         );
+        // ✅ Merge Supabase media with fallback (fallback shows first, supabase overrides if available)
         setMedia(urls);
       }
     };
