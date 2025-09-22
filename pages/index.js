@@ -16,8 +16,6 @@ import { supabase } from "../utils/supabaseClient";
 export default function Home() {
   const [media, setMedia] = useState([
     // ✅ Fallback media
-    "https://xatxjdsppcjgplmrtjcs.supabase.co/storage/v1/object/public/header/gigzz%20vid%201.mp4",
-    "https://xatxjdsppcjgplmrtjcs.supabase.co/storage/v1/object/public/header/hero%20vid.mp4",
     "https://xatxjdsppcjgplmrtjcs.supabase.co/storage/v1/object/public/header/header3.jpg",
     "https://xatxjdsppcjgplmrtjcs.supabase.co/storage/v1/object/public/header/header4.jpg",
   ]);
