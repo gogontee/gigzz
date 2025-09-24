@@ -174,17 +174,17 @@ export default function Profile({ userId }) {
           <div className="absolute bottom-4 right-4 flex gap-3">
             <Link
               href="/dashboard/applicant/edit"
-              className="bg-white text-black p-3 rounded-full shadow-lg hover:scale-110 transition transform duration-200 focus:outline-none group"
+              className="bg-white text-black p-2 sm:p-3 rounded-full shadow-lg hover:scale-110 transition transform duration-200 focus:outline-none group"
               aria-label="Edit Profile"
             >
-              <Edit3 className="w-6 h-6 group-hover:rotate-12 transition-transform" />
+              <Edit3 className="w-4 h-4 sm:w-6 sm:h-6 group-hover:rotate-12 transition-transform" />
             </Link>
             <Link
               href="/messages"
-              className="bg-white text-black p-3 rounded-full shadow-lg hover:scale-110 transition transform duration-200 focus:outline-none group"
+              className="bg-white text-black p-2 sm:p-3 rounded-full shadow-lg hover:scale-110 transition transform duration-200 focus:outline-none group"
               aria-label="View Messages"
             >
-              <MessageCircle className="w-6 h-6 group-hover:rotate-12 transition-transform" />
+              <MessageCircle className="w-4 h-4 sm:w-6 sm:h-6 group-hover:rotate-12 transition-transform" />
             </Link>
           </div>
         )}

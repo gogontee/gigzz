@@ -152,100 +152,124 @@ export default function Token() {
   }
 
   return (
-  <div className="px-4">
-    <h2 className="text-xl font-bold text-gray-900 pt-8 md:pt-20 mb-6">My Tokens</h2>
+    <div className="px-4">
+      <h2 className="text-xl font-bold text-gray-900 pt-8 md:pt-20 mb-6">My Tokens</h2>
 
-    {/* Balance Card */}
-    <div className="p-3 sm:p-5 border rounded-xl shadow-sm bg-gradient-to-r from-orange-500 to-red-500 text-white text-center">
-      <h3 className="text-sm sm:text-lg font-semibold mb-2">Token Balance</h3>
-      {loading ? (
-        <p className="text-xs sm:text-base">Loading...</p>
-      ) : (
-        <p className="text-2xl sm:text-3xl font-extrabold mb-3">{balance} 🎟️</p>
-      )}
-      <div className="flex gap-2 justify-center">
-        <button
-          onClick={() => setShowModal(true)}
-          className="bg-white text-black hover:bg-gray-200 text-xs sm:text-sm px-3 py-1.5 rounded-md"
-          disabled={funding}
-        >
-          Fund Tokens
-        </button>
-      </div>
-    </div>
-
-    {/* Transaction History */}
-    <div className="mt-6 p-3 sm:p-5 border rounded-xl shadow-sm bg-white overflow-x-auto">
-      <h3 className="text-sm sm:text-lg font-semibold mb-3">Transaction History</h3>
-      {transactions.length === 0 ? (
-        <p className="text-xs sm:text-sm text-gray-500">No transactions yet</p>
-      ) : (
-        <table className="w-full table-fixed text-xs sm:text-sm border-collapse">
-          <thead className="bg-gray-100">
-            <tr>
-              <th className="py-2 px-3 text-left w-1/4">Date</th>
-              <th className="py-2 px-3 text-left w-1/2">Description</th>
-              <th className="py-2 px-3 text-right text-green-600 w-1/8">In</th>
-              <th className="py-2 px-3 text-right text-red-600 w-1/8">Out</th>
-            </tr>
-          </thead>
-          <tbody>
-            {transactions.map((t) => (
-              <tr key={t.id} className="border-b last:border-0">
-                <td className="py-2 px-3 text-left">{new Date(t.created_at).toLocaleDateString()}</td>
-                <td className="py-2 px-3 text-left">{t.description}</td>
-                <td className="py-2 px-3 text-right text-green-600">{t.tokens_in}</td>
-                <td className="py-2 px-3 text-right text-red-600">{t.tokens_out}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      )}
-    </div>
-
-    {/* Modal for Funding */}
-    {showModal && (
-      <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50">
-        <div className="bg-white rounded-xl shadow-lg p-6 w-80">
-          <h3 className="text-lg font-semibold mb-4">💳 Fund Tokens</h3>
-          <input
-            type="number"
-            value={amount}
-            onChange={(e) => setAmount(e.target.value)}
-            placeholder="Enter amount (NGN)"
-            className="w-full border rounded-md px-3 py-2 mb-4 focus:outline-none focus:ring-2 focus:ring-orange-500"
-          />
-          <div className="flex justify-end gap-3">
-            <button
-              onClick={() => setShowModal(false)}
-              className="px-4 py-2 rounded-md border border-gray-300 hover:bg-gray-100"
-            >
-              Cancel
-            </button>
-            <button
-              onClick={handleFundTokens}
-              disabled={funding}
-              className="px-4 py-2 rounded-md bg-orange-500 text-white hover:bg-orange-600"
-            >
-              {funding ? "Processing..." : "Proceed"}
-            </button>
-          </div>
+      {/* Balance Card */}
+      <div className="p-3 sm:p-5 border rounded-xl shadow-sm bg-gradient-to-r from-orange-500 to-red-500 text-white text-center">
+        <h3 className="text-sm sm:text-lg font-semibold mb-2">Token Balance</h3>
+        {loading ? (
+          <p className="text-xs sm:text-base">Loading...</p>
+        ) : (
+          <p className="text-2xl sm:text-3xl font-extrabold mb-3">{balance} 🎟️</p>
+        )}
+        <div className="flex gap-2 justify-center">
+          <button
+            onClick={() => setShowModal(true)}
+            className="bg-white text-black hover:bg-gray-200 text-xs sm:text-sm px-3 py-1.5 rounded-md"
+            disabled={funding}
+          >
+            Fund Tokens
+          </button>
         </div>
       </div>
-    )}
 
-    {/* Alert Message */}
-    {alertMsg && (
-      <div className="fixed top-5 left-1/2 transform -translate-x-1/2 bg-white border border-red-400 text-red-600 px-4 py-2 rounded-lg shadow-lg z-50">
-        {alertMsg}
-        <button
-          className="ml-2 text-gray-500"
-          onClick={() => setAlertMsg("")}
-        >
-          ✖
-        </button>
+      {/* Transaction History */}
+      <div className="mt-6 p-3 sm:p-5 border rounded-xl shadow-sm bg-white">
+        <h3 className="text-sm sm:text-lg font-semibold mb-3">Transaction History</h3>
+
+        {transactions.length === 0 ? (
+          <p className="text-xs sm:text-sm text-gray-500">No transactions yet</p>
+        ) : (
+          <>
+            {/* Mobile stacked layout */}
+            <div className="space-y-3 sm:hidden">
+              {transactions.map((t) => (
+                <div key={t.id} className="border rounded-lg p-3 bg-gray-50">
+                  <p className="text-xs text-gray-500">
+                    {new Date(t.created_at).toLocaleDateString()}
+                  </p>
+                  <p className="text-sm font-medium">{t.description}</p>
+                  <div className="flex justify-between mt-2 text-xs">
+                    <span className="text-green-600">In: {t.tokens_in}</span>
+                    <span className="text-red-600">Out: {t.tokens_out}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* Desktop table */}
+            <div className="hidden sm:block overflow-x-auto">
+              <table className="w-full table-fixed text-sm border-collapse">
+                <thead className="bg-gray-100">
+                  <tr>
+                    <th className="py-2 px-3 text-left w-1/4">Date</th>
+                    <th className="py-2 px-3 text-left w-1/2">Description</th>
+                    <th className="py-2 px-3 text-right text-green-600 w-1/8">In</th>
+                    <th className="py-2 px-3 text-right text-red-600 w-1/8">Out</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {transactions.map((t) => (
+                    <tr key={t.id} className="border-b last:border-0">
+                      <td className="py-2 px-3 text-left">
+                        {new Date(t.created_at).toLocaleDateString()}
+                      </td>
+                      <td className="py-2 px-3 text-left">{t.description}</td>
+                      <td className="py-2 px-3 text-right text-green-600">{t.tokens_in}</td>
+                      <td className="py-2 px-3 text-right text-red-600">{t.tokens_out}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </>
+        )}
       </div>
-    )}
-  </div>
-);
+
+      {/* Modal for Funding */}
+      {showModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50">
+          <div className="bg-white rounded-xl shadow-lg p-6 w-80">
+            <h3 className="text-lg font-semibold mb-4">💳 Fund Tokens</h3>
+            <input
+              type="number"
+              value={amount}
+              onChange={(e) => setAmount(e.target.value)}
+              placeholder="Enter amount (NGN)"
+              className="w-full border rounded-md px-3 py-2 mb-4 focus:outline-none focus:ring-2 focus:ring-orange-500"
+            />
+            <div className="flex justify-end gap-3">
+              <button
+                onClick={() => setShowModal(false)}
+                className="px-4 py-2 rounded-md border border-gray-300 hover:bg-gray-100"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleFundTokens}
+                disabled={funding}
+                className="px-4 py-2 rounded-md bg-orange-500 text-white hover:bg-orange-600"
+              >
+                {funding ? "Processing..." : "Proceed"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Alert Message */}
+      {alertMsg && (
+        <div className="fixed top-5 left-1/2 transform -translate-x-1/2 bg-white border border-red-400 text-red-600 px-4 py-2 rounded-lg shadow-lg z-50">
+          {alertMsg}
+          <button
+            className="ml-2 text-gray-500"
+            onClick={() => setAlertMsg("")}
+          >
+            ✖
+          </button>
+        </div>
+      )}
+    </div>
+  );
 }
