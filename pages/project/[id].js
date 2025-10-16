@@ -359,6 +359,11 @@ const handlePromote = async () => {
   }
 };
 
+  // Get promotion icon color based on project status
+  const getPromotionIconColor = () => {
+    return project?.promote ? 'text-green-500' : 'text-orange-500';
+  };
+
   // render
   if (loading) return <p className="text-center py-10">Loading project...</p>;
   if (!project) return <p className="text-center py-10 text-red-600">Project not found.</p>;
@@ -431,148 +436,147 @@ const handlePromote = async () => {
               onClick={() => setPromotionOpen(true)}
               className="bg-white p-2 rounded-full shadow hover:bg-gray-100"
             >
-              <Megaphone className="w-5 h-5 text-orange-500" />
+              <Megaphone className={`w-5 h-5 ${getPromotionIconColor()}`} />
             </button>
           </div>
         )}
       </div>
 
-      {/* Title & Details */}
-<div className="mt-20 text-center">
-  {isEditing ? (
-    <input
-      type="text"
-      value={editData.title}
-      onChange={(e) =>
-        setEditData((p) => ({ ...p, title: e.target.value }))
-      }
-      className="text-xl font-bold border-b p-2 w-full text-center"
-    />
-  ) : (
-    <h1 className="text-xl font-bold">{project.title}</h1>
-  )}
+      {/* Title & Details - Centered */}
+      <div className="mt-20 text-center mx-auto max-w-3xl px-4">
+        {isEditing ? (
+          <input
+            type="text"
+            value={editData.title}
+            onChange={(e) =>
+              setEditData((p) => ({ ...p, title: e.target.value }))
+            }
+            className="text-xl font-bold border-b p-2 w-full text-center"
+          />
+        ) : (
+          <h1 className="text-xl font-bold">{project.title}</h1>
+        )}
 
-  {isEditing ? (
-    // ✅ Use Quill editor for details instead of textarea
-    <div className="mt-4">
-      <ReactQuill
-        theme="snow"
-        value={editData.details}
-        onChange={(val) =>
-          setEditData((p) => ({ ...p, details: val }))
-        }
-        className="bg-white rounded"
-      />
-    </div>
-  ) : (
-    project.details && (
-      <div className="mt-4 text-gray-700 prose text-left">
-        <div
-          dangerouslySetInnerHTML={{
-            __html: DOMPurify.sanitize(
-              expandedDesc
-                ? project.details
-                : project.details
-                    ?.split(" ")
-                    .slice(0, 50)
-                    .join(" ") + "..."
-            ),
-          }}
-        />
-        {project.details?.split(" ").length > 50 && (
-          <button
-            onClick={() => setExpandedDesc((prev) => !prev)}
-            className="ml-2 text-orange-600 text-sm hover:underline"
-          >
-            {expandedDesc ? "Read less" : "Read more"}
-          </button>
+        {isEditing ? (
+          // ✅ Use Quill editor for details instead of textarea
+          <div className="mt-4">
+            <ReactQuill
+              theme="snow"
+              value={editData.details}
+              onChange={(val) =>
+                setEditData((p) => ({ ...p, details: val }))
+              }
+              className="bg-white rounded"
+            />
+          </div>
+        ) : (
+          project.details && (
+            <div className="mt-4 text-gray-700 prose text-center mx-auto">
+              <div
+                dangerouslySetInnerHTML={{
+                  __html: DOMPurify.sanitize(
+                    expandedDesc
+                      ? project.details
+                      : project.details
+                          ?.split(" ")
+                          .slice(0, 50)
+                          .join(" ") + "..."
+                  ),
+                }}
+              />
+              {project.details?.split(" ").length > 50 && (
+                <button
+                  onClick={() => setExpandedDesc((prev) => !prev)}
+                  className="ml-2 text-orange-600 text-sm hover:underline"
+                >
+                  {expandedDesc ? "Read less" : "Read more"}
+                </button>
+              )}
+            </div>
+          )
+        )}
+
+        {project.location && (
+          <p className="mt-2 text-gray-500 text-sm">📍 {project.location}</p>
         )}
       </div>
-    )
-  )}
-
-  {project.location && (
-    <p className="mt-2 text-gray-500 text-sm">📍 {project.location}</p>
-  )}
-</div>
 
       {/* Gallery */}
-<div className="mt-8">
-  <h2 className="text-xl font-semibold mb-4">Gallery</h2>
-  <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-    {(isEditing ? editData.gallery : galleryFromDB)
-      .filter((item) => isEditing || item.image)
-      .map((item) => (
-        <div key={item.index} className="flex flex-col">
-          {isEditing ? (
-            <>
-              <img
-                src={item.preview || item.image || '/placeholder.jpg'}
-                alt={`Preview ${item.index}`}
-                className="w-full h-32 object-cover rounded mb-2"
-              />
-              <input
-                type="file"
-                accept="image/*"
-                onChange={(e) => {
-                  const file = e.target.files?.[0];
-                  if (!file) return;
-                  setEditData((prev) => {
-                    const next = prev.gallery.map((g) => {
-                      if (g.index !== item.index) return g;
-                      if (g.preview) URL.revokeObjectURL(g.preview);
-                      return { ...g, preview: URL.createObjectURL(file), file };
-                    });
-                    return { ...prev, gallery: next };
-                  });
-                }}
-              />
+      <div className="mt-8">
+        <h2 className="text-xl font-semibold mb-4 text-center">Gallery</h2>
+        <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+          {(isEditing ? editData.gallery : galleryFromDB)
+            .filter((item) => isEditing || item.image)
+            .map((item) => (
+              <div key={item.index} className="flex flex-col">
+                {isEditing ? (
+                  <>
+                    <img
+                      src={item.preview || item.image || '/placeholder.jpg'}
+                      alt={`Preview ${item.index}`}
+                      className="w-full h-32 object-cover rounded mb-2"
+                    />
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (!file) return;
+                        setEditData((prev) => {
+                          const next = prev.gallery.map((g) => {
+                            if (g.index !== item.index) return g;
+                            if (g.preview) URL.revokeObjectURL(g.preview);
+                            return { ...g, preview: URL.createObjectURL(file), file };
+                          });
+                          return { ...prev, gallery: next };
+                        });
+                      }}
+                    />
 
-              {/* Multiline textarea for description */}
-              <textarea
-                placeholder="Write your description"
-                value={item.desc || ''}
-                onChange={(e) => {
-                  const val = e.target.value;
-                  setEditData((prev) => {
-                    const next = prev.gallery.map((g) =>
-                      g.index === item.index ? { ...g, desc: val } : g
-                    );
-                    return { ...prev, gallery: next };
-                  });
-                }}
-                className="w-full border p-2 rounded mt-2 h-32"
-              />
-            </>
-          ) : (
-            <>
-              {item.image && (
-                <img
-                  src={item.image}
-                  alt={item.desc || `Gallery image ${item.index}`}
-                  className="w-full h-48 object-cover rounded-lg"
-                />
-              )}
-              {item.desc && (
-                <p className="mt-2 text-gray-600 text-sm whitespace-pre-line">
-                  {renderWithReadMore(
-                    item.desc,
-                    !!expandedGallery[item.index],
-                    () =>
-                      setExpandedGallery((prev) => ({
-                        ...prev,
-                        [item.index]: !prev[item.index],
-                      }))
-                  )}
-                </p>
-              )}
-            </>
-          )}
+                    {/* Multiline textarea for description */}
+                    <textarea
+                      placeholder="Write your description"
+                      value={item.desc || ''}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        setEditData((prev) => {
+                          const next = prev.gallery.map((g) =>
+                            g.index === item.index ? { ...g, desc: val } : g
+                          );
+                          return { ...prev, gallery: next };
+                        });
+                      }}
+                      className="w-full border p-2 rounded mt-2 h-32"
+                    />
+                  </>
+                ) : (
+                  <>
+                    {item.image && (
+                      <img
+                        src={item.image}
+                        alt={item.desc || `Gallery image ${item.index}`}
+                        className="w-full h-48 object-cover rounded-lg"
+                      />
+                    )}
+                    {item.desc && (
+                      <p className="mt-2 text-gray-600 text-sm whitespace-pre-line text-center">
+                        {renderWithReadMore(
+                          item.desc,
+                          !!expandedGallery[item.index],
+                          () =>
+                            setExpandedGallery((prev) => ({
+                              ...prev,
+                              [item.index]: !prev[item.index],
+                            }))
+                        )}
+                      </p>
+                    )}
+                  </>
+                )}
+              </div>
+            ))}
         </div>
-      ))}
-  </div>
-</div>
-
+      </div>
 
       {/* Show See Profile button only if viewer is NOT the owner */}
       {user && user.id !== project.user_id && (
@@ -605,18 +609,18 @@ const handlePromote = async () => {
       )}
 
       {successMsg && (
-  <div className="fixed inset-0 flex items-center justify-center z-50">
-    <div className="bg-green-500 text-white px-6 py-3 rounded-lg shadow-lg text-lg font-semibold">
-      {successMsg}
-    </div>
-  </div>
-)}
+        <div className="fixed inset-0 flex items-center justify-center z-50">
+          <div className="bg-green-500 text-white px-6 py-3 rounded-lg shadow-lg text-lg font-semibold">
+            {successMsg}
+          </div>
+        </div>
+      )}
 
       {/* External links */}
       {externalLinks.length > 0 && (
-        <div className="mt-8">
+        <div className="mt-8 text-center">
           <h2 className="text-xl font-semibold mb-2">External Links</h2>
-          <ul className="flex flex-wrap gap-3">
+          <ul className="flex flex-wrap gap-3 justify-center">
             {externalLinks.map((link, idx) => (
               <li key={idx}>
                 <a href={link} target="_blank" rel="noopener noreferrer" className="text-orange-600 hover:underline">

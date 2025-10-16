@@ -62,25 +62,53 @@ export default function ProfilePage() {
   const [profile, setProfile] = useState(null);
   const [projects, setProjects] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [tokenBalance, setTokenBalance] = useState(0);
 
   const [chatOpen, setChatOpen] = useState(false);
   const [chatId, setChatId] = useState(null);
-  const [clientId, setClientId] = useState(null);
+  const [currentUserId, setCurrentUserId] = useState(null);
   const [chatLoading, setChatLoading] = useState(false);
 
-  // Load logged-in client id
+  // Check if current user is the profile owner
+  const isProfileOwner = currentUserId === applicantId;
+
+  // Load logged-in current user id
   useEffect(() => {
     const getUser = async () => {
       try {
         const { data: { user }, error } = await supabase.auth.getUser();
         if (error) console.error("Supabase auth error:", error.message);
-        if (user) setClientId(user.id);
+        if (user) setCurrentUserId(user.id);
       } catch (err) {
         console.error("Error getting auth user:", err);
       }
     };
     getUser();
   }, []);
+
+  // Load token balance for the profile owner
+  const loadTokenBalance = useCallback(async () => {
+    if (!applicantId) return;
+    
+    try {
+      const { data: wallet, error } = await supabase
+        .from('token_wallets')
+        .select('balance')
+        .eq('user_id', applicantId)
+        .single();
+
+      if (error) {
+        console.error('Error fetching token balance:', error);
+        setTokenBalance(0);
+        return;
+      }
+
+      setTokenBalance(wallet?.balance || 0);
+    } catch (err) {
+      console.error('Unexpected error loading token balance:', err);
+      setTokenBalance(0);
+    }
+  }, [applicantId]);
 
   // Load profile + projects
   const loadProfileAndProjects = useCallback(async () => {
@@ -126,25 +154,54 @@ export default function ProfilePage() {
 
       if (projectsErr) console.error("Error fetching projects:", projectsErr);
       else if (projectsData) setProjects(projectsData);
+
+      // Load token balance after profile is loaded
+      await loadTokenBalance();
     } catch (err) {
       console.error("Unexpected error loading profile:", err);
     } finally {
       setLoading(false);
     }
-  }, [applicantId]);
+  }, [applicantId, loadTokenBalance]);
 
   useEffect(() => {
     loadProfileAndProjects();
   }, [loadProfileAndProjects]);
 
-  // Open chat
-  const openChat = async () => {
-    if (!clientId) {
+  // Get profile tag based on token balance
+  const getProfileTag = () => {
+    if (!isProfileOwner) return null;
+    
+    if (tokenBalance > 1) {
+      return {
+        text: "Promoted",
+        color: "bg-green-500",
+        tooltip: `You have ${tokenBalance} tokens available`
+      };
+    } else {
+      return {
+        text: "Your Profile",
+        color: "bg-orange-500",
+        tooltip: "Earn more tokens to get promoted"
+      };
+    }
+  };
+
+  // Handle chat button click
+  const handleChatClick = async () => {
+    // If user is not logged in, redirect to login
+    if (!currentUserId) {
       router.push("/auth/login");
       return;
     }
-    if (!applicantId) return;
 
+    // If current user is the profile owner, redirect to messages page
+    if (isProfileOwner) {
+      router.push("/messages");
+      return;
+    }
+
+    // If current user is viewing someone else's profile, open chat modal
     setChatLoading(true);
     try {
       // Look for existing chat
@@ -152,7 +209,7 @@ export default function ProfilePage() {
         .from("chats")
         .select("id")
         .or(
-          `and(client_id.eq.${clientId},applicant_id.eq.${applicantId}),and(client_id.eq.${applicantId},applicant_id.eq.${clientId})`
+          `and(client_id.eq.${currentUserId},applicant_id.eq.${applicantId}),and(client_id.eq.${applicantId},applicant_id.eq.${currentUserId})`
         )
         .limit(1);
 
@@ -164,7 +221,7 @@ export default function ProfilePage() {
       if (!cId) {
         const { data: newChat, error: insertError } = await supabase
           .from("chats")
-          .insert([{ client_id: clientId, applicant_id: applicantId }])
+          .insert([{ client_id: currentUserId, applicant_id: applicantId }])
           .select()
           .single();
 
@@ -181,6 +238,15 @@ export default function ProfilePage() {
       setChatLoading(false);
     }
   };
+
+  // Get chat button tooltip text based on user scenario
+  const getChatButtonTooltip = () => {
+    if (!currentUserId) return "Login to chat";
+    if (isProfileOwner) return "View your messages";
+    return "Start chat";
+  };
+
+  const profileTag = getProfileTag();
 
   if (loading)
     return (
@@ -218,6 +284,14 @@ export default function ProfilePage() {
             <span className="text-xs uppercase bg-white/20 px-3 py-1 rounded-full">
               {profile.role === "employer" ? "Client" : "Creative"}
             </span>
+            {profileTag && (
+              <span 
+                className={`text-xs uppercase ${profileTag.color} px-3 py-1 rounded-full text-white`}
+                title={profileTag.tooltip}
+              >
+                {profileTag.text}
+              </span>
+            )}
           </div>
 
           <p className="mt-1 text-sm opacity-90">{profile.email}</p>
@@ -230,14 +304,31 @@ export default function ProfilePage() {
               profile.country || ""
             }`}
           </p>
+          
+          {/* Token balance display for profile owner */}
+          {isProfileOwner && (
+            <div className="mt-2 flex items-center gap-2">
+              <span className="text-xs bg-black/30 px-2 py-1 rounded-full">
+                🪙 Tokens: {tokenBalance}
+              </span>
+              {tokenBalance <= 1 && (
+                <Link
+                  href="/dashboard/wallet"
+                  className="text-xs bg-yellow-500 text-black px-2 py-1 rounded-full hover:bg-yellow-600 transition"
+                >
+                  Get More Tokens
+                </Link>
+              )}
+            </div>
+          )}
         </div>
 
         {/* Chat button */}
         <button
-          onClick={openChat}
+          onClick={handleChatClick}
           className="absolute bottom-4 right-4 bg-white text-black p-3 rounded-full shadow-lg hover:scale-110 transition flex items-center justify-center"
           aria-label="Chat"
-          title={clientId ? "Open chat" : "Login to chat"}
+          title={getChatButtonTooltip()}
           disabled={chatLoading}
         >
           {chatLoading ? (
@@ -288,72 +379,78 @@ export default function ProfilePage() {
       </div>
 
       {/* Portfolio */}
-<div className="mt-10">
-  <h2 className="text-xl font-semibold mb-4">Portfolio</h2>
-  {projects.length === 0 ? (
-    <div className="flex flex-col items-center justify-center border border-dashed border-gray-300 rounded-2xl p-8 text-center">
-      <p className="text-gray-600 mb-2">No portfolio to show.</p>
-    </div>
-  ) : (
-    <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
-      {projects.map((project, idx) => {
-        // Truncate description to first 15 words
-        const truncateHTML = (html, wordLimit = 15) => {
-          if (!html) return "";
-          // Remove HTML tags for counting words
-          const text = html.replace(/<[^>]+>/g, "");
-          const words = text.split(" ").slice(0, wordLimit).join(" ");
-          const truncated = words + (text.split(" ").length > wordLimit ? "..." : "");
-          return truncated;
-        };
-
-        return (
-          <motion.div
-            key={project.id}
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: idx * 0.1 }}
-            className="bg-white rounded-2xl shadow-md hover:shadow-xl transition overflow-hidden group"
-          >
-            <div className="relative h-40 w-full overflow-hidden">
-              <img
-                src={project.profile || "/placeholder.png"}
-                alt={project.title}
-                className="h-full w-full object-cover transform group-hover:scale-105 transition duration-500"
-              />
+      <div className="mt-10">
+        <h2 className="text-xl font-semibold mb-4">Portfolio</h2>
+        {projects.length === 0 ? (
+          <div className="flex flex-col items-center justify-center border border-dashed border-gray-300 rounded-2xl p-8 text-center">
+            <p className="text-gray-600 mb-2">No portfolio to show.</p>
+            {isProfileOwner && (
               <Link
-                href={`/project/${project.id}`}
-                className="absolute top-3 right-3 bg-white/80 backdrop-blur-md rounded-full p-2 shadow hover:bg-white transition"
+                href="/dashboard/projects"
+                className="text-orange-500 hover:underline font-medium"
               >
-                <Eye className="w-5 h-5 text-gray-700" />
+                Add your first project
               </Link>
-            </div>
+            )}
+          </div>
+        ) : (
+          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
+            {projects.map((project, idx) => {
+              // Truncate description to first 15 words
+              const truncateHTML = (html, wordLimit = 15) => {
+                if (!html) return "";
+                // Remove HTML tags for counting words
+                const text = html.replace(/<[^>]+>/g, "");
+                const words = text.split(" ").slice(0, wordLimit).join(" ");
+                const truncated = words + (text.split(" ").length > wordLimit ? "..." : "");
+                return truncated;
+              };
 
-            <div className="p-4">
-              <h3 className="font-semibold text-lg mb-1 line-clamp-1">
-                {project.title}
-              </h3>
-              <p
-                className="text-gray-600 text-sm"
-                dangerouslySetInnerHTML={{
-                  __html: truncateHTML(project.details, 15),
-                }}
-              />
-            </div>
-          </motion.div>
-        );
-      })}
-    </div>
-  )}
-</div>
+              return (
+                <motion.div
+                  key={project.id}
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: idx * 0.1 }}
+                  className="bg-white rounded-2xl shadow-md hover:shadow-xl transition overflow-hidden group"
+                >
+                  <div className="relative h-40 w-full overflow-hidden">
+                    <img
+                      src={project.profile || "/placeholder.png"}
+                      alt={project.title}
+                      className="h-full w-full object-cover transform group-hover:scale-105 transition duration-500"
+                    />
+                    <Link
+                      href={`/project/${project.id}`}
+                      className="absolute top-3 right-3 bg-white/80 backdrop-blur-md rounded-full p-2 shadow hover:bg-white transition"
+                    >
+                      <Eye className="w-5 h-5 text-gray-700" />
+                    </Link>
+                  </div>
 
+                  <div className="p-4">
+                    <h3 className="font-semibold text-lg mb-1 line-clamp-1">
+                      {project.title}
+                    </h3>
+                    <p
+                      className="text-gray-600 text-sm"
+                      dangerouslySetInnerHTML={{
+                        __html: truncateHTML(project.details, 15),
+                      }}
+                    />
+                  </div>
+                </motion.div>
+              );
+            })}
+          </div>
+        )}
+      </div>
 
-
-      {/* Chat Modal */}
-      {chatOpen && chatId && (
+      {/* Chat Modal - Only show when viewing someone else's profile */}
+      {chatOpen && chatId && !isProfileOwner && (
         <ChatModal
           chatId={chatId}
-          userId={clientId}
+          userId={currentUserId}
           isOpen={chatOpen}
           onClose={() => setChatOpen(false)}
         />

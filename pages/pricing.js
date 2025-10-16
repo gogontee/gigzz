@@ -93,15 +93,15 @@ export default function PricingPage() {
 
               {/* Premium */}
               <motion.div
-  whileHover={{ scale: 1.03 }}
-  className="border border-gray-200 rounded-xl p-6 shadow-md hover:shadow-xl transition duration-300 md:col-span-2"
->
-  <h3 className="text-lg font-bold mb-2">Premium Promotion</h3>
-  <p className="text-gray-600 mb-2">
-    Urgent applications • Maximum exposure
-  </p>
-  <p className="text-black font-semibold text-lg">20 Tokens</p>
-</motion.div>
+                whileHover={{ scale: 1.03 }}
+                className="border border-gray-200 rounded-xl p-6 shadow-md hover:shadow-xl transition duration-300 md:col-span-2"
+              >
+                <h3 className="text-lg font-bold mb-2">Premium Promotion</h3>
+                <p className="text-gray-600 mb-2">
+                  Urgent applications • Maximum exposure
+                </p>
+                <p className="text-black font-semibold text-lg">20 Tokens</p>
+              </motion.div>
             </div>
           </motion.section>
 
@@ -144,6 +144,85 @@ export default function PricingPage() {
                 <h3 className="text-lg font-bold mb-2">Portfolio Promotion</h3>
                 <p className="text-gray-600 mb-2">Boost portfolio visibility</p>
                 <p className="text-black font-semibold text-lg">5 Tokens</p>
+              </motion.div>
+            </div>
+          </motion.section>
+
+          {/* Profile Boost Section */}
+          <motion.section
+            initial={{ opacity: 0, y: 15 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.7, delay: 0.5 }}
+            className="mb-12"
+          >
+            <h2 className="text-xl md:text-2xl font-semibold mb-6">
+              🚀 Profile Boost
+            </h2>
+            <div className="grid gap-6 md:grid-cols-3">
+              {/* Silver Boost */}
+              <motion.div
+                whileHover={{ scale: 1.03 }}
+                className="border border-gray-200 rounded-xl p-6 shadow-md hover:shadow-xl transition duration-300"
+              >
+                <div className="flex justify-between items-start mb-3">
+                  <h3 className="text-lg font-bold">Silver Boost</h3>
+                  <span className="bg-gray-100 text-gray-800 text-xs font-medium px-2 py-1 rounded">
+                    3 Days
+                  </span>
+                </div>
+                <p className="text-gray-600 mb-3 text-sm">
+                  Get listed on GigzzStars, making your profile visible to both authenticated and non-authenticated users
+                </p>
+                <div className="flex items-center justify-between">
+                  <p className="text-black font-semibold text-lg">3 Tokens</p>
+                  <span className="text-xs text-gray-500">⭐ Basic</span>
+                </div>
+              </motion.div>
+
+              {/* Gold Boost */}
+              <motion.div
+                whileHover={{ scale: 1.03 }}
+                className="border border-orange-200 rounded-xl p-6 shadow-md hover:shadow-xl transition duration-300 relative"
+              >
+                <div className="absolute -top-2 -right-2 bg-orange-500 text-white text-xs font-bold px-3 py-1 rounded-full">
+                  POPULAR
+                </div>
+                <div className="flex justify-between items-start mb-3">
+                  <h3 className="text-lg font-bold">Gold Boost</h3>
+                  <span className="bg-orange-100 text-orange-800 text-xs font-medium px-2 py-1 rounded">
+                    10 Days
+                  </span>
+                </div>
+                <p className="text-gray-600 mb-3 text-sm">
+                  Keep your profile afloat, making it easy for clients to discover and connect with you
+                </p>
+                <div className="flex items-center justify-between">
+                  <p className="text-black font-semibold text-lg">5 Tokens</p>
+                  <span className="text-xs text-orange-500">⭐⭐ Medium</span>
+                </div>
+              </motion.div>
+
+              {/* Premium Boost */}
+              <motion.div
+                whileHover={{ scale: 1.03 }}
+                className="border border-purple-200 rounded-xl p-6 shadow-md hover:shadow-xl transition duration-300 relative"
+              >
+                <div className="absolute -top-2 -right-2 bg-purple-500 text-white text-xs font-bold px-3 py-1 rounded-full">
+                  BEST VALUE
+                </div>
+                <div className="flex justify-between items-start mb-3">
+                  <h3 className="text-lg font-bold">Premium Boost</h3>
+                  <span className="bg-purple-100 text-purple-800 text-xs font-medium px-2 py-1 rounded">
+                    30 Days
+                  </span>
+                </div>
+                <p className="text-gray-600 mb-3 text-sm">
+                  Stay in the top list consistently, making it easy to land direct contracts and high-value opportunities
+                </p>
+                <div className="flex items-center justify-between">
+                  <p className="text-black font-semibold text-lg">10 Tokens</p>
+                  <span className="text-xs text-purple-500">⭐⭐⭐ Premium</span>
+                </div>
               </motion.div>
             </div>
           </motion.section>
