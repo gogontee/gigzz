@@ -8,6 +8,7 @@ import { useRouter } from 'next/router';
 import { createPagesBrowserClient } from "@supabase/auth-helpers-nextjs";
 import { motion, AnimatePresence } from 'framer-motion';
 import Head from 'next/head';
+
 import {
   BarChart,
   Bar,
@@ -28,6 +29,7 @@ export default function AdminDashboard() {
   const [isAuthorized, setIsAuthorized] = useState(false);
   const [loading, setLoading] = useState(true);
   const [sharesModalOpen, setSharesModalOpen] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
   
   // Data states
   const [tokenTransactions, setTokenTransactions] = useState([]);
@@ -41,11 +43,13 @@ export default function AdminDashboard() {
     weeklyGrowth: 0
   });
 
-  // Helena's user ID and share percentage
+  // User IDs and share percentages
   const HELENA_USER_ID = '1552cf64-4004-404e-ba4a-8b1dd8fd5923';
   const HELENA_SHARE_PERCENTAGE = 20;
+  const JERRY_USER_ID = '34d48b8d-2e99-4cc9-8ea4-48124cde8de0';
+  const JERRY_SHARE_PERCENTAGE = 80;
 
-  // Check authorization
+  // Check authorization and screen size
   useEffect(() => {
     const checkAuthorization = async () => {
       const { data: { user } } = await supabase.auth.getUser();
@@ -75,7 +79,16 @@ export default function AdminDashboard() {
       setLoading(false);
     };
 
+    // Check screen size
+    const checkScreenSize = () => {
+      setIsMobile(window.innerWidth < 768);
+    };
+
+    checkScreenSize();
+    window.addEventListener('resize', checkScreenSize);
     checkAuthorization();
+
+    return () => window.removeEventListener('resize', checkScreenSize);
   }, [router]);
 
   const loadAllData = useCallback(async () => {
@@ -204,6 +217,9 @@ export default function AdminDashboard() {
     if (user?.id === HELENA_USER_ID) {
       userSharePercentage = HELENA_SHARE_PERCENTAGE;
       userName = 'Helena';
+    } else if (user?.id === JERRY_USER_ID) {
+      userSharePercentage = JERRY_SHARE_PERCENTAGE;
+      userName = 'Jerry';
     }
 
     const userShareAmount = (stats.totalRevenue * userSharePercentage) / 100;
@@ -225,43 +241,49 @@ export default function AdminDashboard() {
     <motion.div
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
-      className="bg-white rounded-xl p-6 shadow-lg border border-gray-100"
+      className={`bg-white rounded-xl p-4 ${isMobile ? 'p-3' : 'p-6'} shadow-lg border border-gray-100 hover:shadow-md transition-shadow duration-200`}
     >
       <div className="flex items-center justify-between">
-        <div>
-          <p className="text-sm text-gray-600 mb-1">{title}</p>
-          <p className="text-2xl font-bold text-gray-900">{value}</p>
-          {subtitle && <p className="text-xs text-gray-500 mt-1">{subtitle}</p>}
+        <div className={`${isMobile ? 'flex-1' : ''}`}>
+          <p className={`text-gray-600 mb-1 ${isMobile ? 'text-xs' : 'text-sm'}`}>{title}</p>
+          <p className={`font-bold text-gray-900 ${isMobile ? 'text-lg' : 'text-2xl'}`}>{value}</p>
+          {subtitle && (
+            <p className={`text-gray-500 mt-1 ${isMobile ? 'text-xs' : 'text-sm'}`}>
+              {subtitle}
+            </p>
+          )}
         </div>
-        <div className="text-3xl text-orange-500">
+        <div className={`text-orange-500 ${isMobile ? 'text-2xl' : 'text-3xl'}`}>
           {icon}
         </div>
       </div>
     </motion.div>
   );
 
-  const HelenaSharesModal = () => {
+  const SharesModal = () => {
     // Real-time calculation state
     const [customTokens, setCustomTokens] = useState(sharesData.totalTokens);
     const [customRevenue, setCustomRevenue] = useState(customTokens * 250);
-    const [customShare, setCustomShare] = useState((customRevenue * HELENA_SHARE_PERCENTAGE) / 100);
+    const [customShare, setCustomShare] = useState((customRevenue * sharesData.percentage) / 100);
 
     // Update real-time calculation when tokens change
     useEffect(() => {
       const newRevenue = customTokens * 250;
-      const newShare = (newRevenue * HELENA_SHARE_PERCENTAGE) / 100;
+      const newShare = (newRevenue * sharesData.percentage) / 100;
       setCustomRevenue(newRevenue);
       setCustomShare(newShare);
-    }, [customTokens]);
+    }, [customTokens, sharesData.percentage]);
+
+    const isJerry = user?.id === JERRY_USER_ID;
 
     return (
       <AnimatePresence>
-        {sharesModalOpen && user?.id === HELENA_USER_ID && (
+        {sharesModalOpen && (user?.id === HELENA_USER_ID || user?.id === JERRY_USER_ID) && (
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 pt-4"
+            className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4"
           >
             <motion.div
               initial={{ opacity: 0, scale: 0.9, y: 20 }}
@@ -273,7 +295,7 @@ export default function AdminDashboard() {
               <div className="bg-gradient-to-r from-orange-500 to-orange-600 rounded-t-2xl p-6 text-white flex-shrink-0">
                 <div className="flex items-center justify-between">
                   <div>
-                    <h2 className="text-2xl font-bold">Helena's Shares</h2>
+                    <h2 className="text-2xl font-bold">{sharesData.userName}'s Shares</h2>
                     <p className="text-orange-100 mt-1">Revenue Distribution</p>
                   </div>
                   <div className="text-3xl">👑</div>
@@ -288,18 +310,20 @@ export default function AdminDashboard() {
                     <div className="text-4xl font-bold text-gray-900 mb-2">
                       {sharesData.formattedAmount}
                     </div>
-                    <p className="text-gray-600">Your {HELENA_SHARE_PERCENTAGE}% Share of Total Revenue</p>
+                    <p className="text-gray-600">Your {sharesData.percentage}% Share of Total Revenue</p>
                   </div>
 
                   {/* Personal Welcome */}
-                  <div className="bg-purple-50 border border-orange-200 rounded-lg p-4 mb-6">
+                  <div className="bg-orange-50 border border-orange-200 rounded-lg p-4 mb-6">
                     <div className="flex items-center space-x-3">
                       <div className="w-12 h-12 bg-orange-100 rounded-full flex items-center justify-center">
                         <span className="text-orange-600 text-xl">👑</span>
                       </div>
                       <div>
-                        <p className="font-semibold text-orange-900">Hello Helena!</p>
-                        <p className="text-sm text-orange-700">As a key partner, you receive {HELENA_SHARE_PERCENTAGE}% of all platform revenue.</p>
+                        <p className="font-semibold text-orange-900">Hello {sharesData.userName}!</p>
+                        <p className="text-sm text-orange-700">
+                          As a key partner, you receive {sharesData.percentage}% of all platform revenue.
+                        </p>
                       </div>
                     </div>
                   </div>
@@ -321,7 +345,7 @@ export default function AdminDashboard() {
                         <span className="font-semibold">{sharesData.formattedTotalRevenue}</span>
                       </div>
                       <div className="flex justify-between border-t border-gray-200 pt-2">
-                        <span className="text-gray-600">Your Share ({HELENA_SHARE_PERCENTAGE}%):</span>
+                        <span className="text-gray-600">Your Share ({sharesData.percentage}%):</span>
                         <span className="font-semibold text-green-600">{sharesData.formattedAmount}</span>
                       </div>
                     </div>
@@ -330,26 +354,26 @@ export default function AdminDashboard() {
                   {/* Progress Visualization */}
                   <div className="mb-6">
                     <div className="flex justify-between text-sm text-gray-600 mb-2">
-                      <span>Platform Revenue ({100 - HELENA_SHARE_PERCENTAGE}%)</span>
-                      <span>Your Share ({HELENA_SHARE_PERCENTAGE}%)</span>
+                      <span>Platform Revenue ({100 - sharesData.percentage}%)</span>
+                      <span>Your Share ({sharesData.percentage}%)</span>
                     </div>
                     <div className="w-full bg-gray-200 rounded-full h-4 flex overflow-hidden">
                       <motion.div
                         initial={{ width: 0 }}
-                        animate={{ width: `${100 - HELENA_SHARE_PERCENTAGE}%` }}
+                        animate={{ width: `${100 - sharesData.percentage}%` }}
                         transition={{ duration: 1, ease: "easeOut" }}
                         className="bg-gray-400 h-4"
                       />
                       <motion.div
                         initial={{ width: 0 }}
-                        animate={{ width: `${HELENA_SHARE_PERCENTAGE}%` }}
+                        animate={{ width: `${sharesData.percentage}%` }}
                         transition={{ duration: 1, ease: "easeOut", delay: 0.5 }}
                         className="bg-orange-500 h-4"
                       />
                     </div>
                     <div className="flex justify-between text-xs text-gray-500 mt-1">
-                      <span>{100 - HELENA_SHARE_PERCENTAGE}% Platform</span>
-                      <span>{HELENA_SHARE_PERCENTAGE}% Helena's Share</span>
+                      <span>{100 - sharesData.percentage}% Platform</span>
+                      <span>{sharesData.percentage}% {sharesData.userName}'s Share</span>
                     </div>
                   </div>
 
@@ -387,7 +411,7 @@ export default function AdminDashboard() {
                             <span className="font-semibold">₦{customRevenue.toLocaleString()}</span>
                           </div>
                           <div className="flex justify-between border-t border-blue-200 pt-1">
-                            <span className="text-blue-600">Your Share ({HELENA_SHARE_PERCENTAGE}%):</span>
+                            <span className="text-blue-600">Your Share ({sharesData.percentage}%):</span>
                             <span className="font-semibold text-green-600">₦{customShare.toLocaleString()}</span>
                           </div>
                         </div>
@@ -452,50 +476,51 @@ export default function AdminDashboard() {
 
       <div className="min-h-screen bg-gray-50">
         {/* Global Header */}
-        <motion.header
-          initial={{ opacity: 0, y: -20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="bg-white shadow-sm border-b pt-20 border-gray-200"
-        >
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div className="flex justify-between items-center py-4">
-              <div className="flex items-center space-x-3">
-                <img
-                  src="https://xatxjdsppcjgplmrtjcs.supabase.co/storage/v1/object/public/avatars/icon.png"
-                  alt="Gigzz Logo"
-                  className="w-8 h-8"
-                />
-                <h1 className="text-xl font-bold text-gray-900">Gigzz Admin</h1>
-              </div>
-              <div className="flex items-center space-x-4">
-                <div className="text-sm text-gray-600">
-                  Welcome, {user?.email}
+         
+          <motion.header
+            initial={{ opacity: 0, y: -20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="bg-white shadow-sm border-b pt-20 border-gray-200"
+          >
+            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+              <div className="flex justify-between items-center py-4">
+                <div className="flex items-center space-x-3">
+                  <h1 className="text-xl font-bold text-gray-900">Gigzz Admin</h1>
                 </div>
-                {/* My Shares Button - Only show for Helena */}
-                {user?.id === HELENA_USER_ID && (
-                  <motion.button
-                    whileHover={{ scale: 1.05 }}
-                    whileTap={{ scale: 0.95 }}
-                    onClick={() => setSharesModalOpen(true)}
-                    className="bg-orange-500 text-white px-6 py-2 rounded-lg font-semibold hover:bg-orange-600 transition-colors duration-200 shadow-md flex items-center space-x-2"
-                  >
-                    <span>👑</span>
-                    <span>My Shares</span>
-                  </motion.button>
-                )}
+                <div className="flex items-center space-x-4">
+                  <div className="text-sm text-gray-600">
+                    Welcome, {user?.email}
+                  </div>
+                  {/* My Shares Button - Only show for Helena or Jerry */}
+                  {(user?.id === HELENA_USER_ID || user?.id === JERRY_USER_ID) && (
+                    <motion.button
+                      whileHover={{ scale: 1.05 }}
+                      whileTap={{ scale: 0.95 }}
+                      onClick={() => setSharesModalOpen(true)}
+                      className="bg-orange-500 text-white px-6 py-2 rounded-lg font-semibold hover:bg-orange-600 transition-colors duration-200 shadow-md flex items-center space-x-2"
+                    >
+                      <span>👑</span>
+                      <span>My Shares</span>
+                    </motion.button>
+                  )}
+                </div>
               </div>
             </div>
-          </div>
-        </motion.header>
+          </motion.header>
+    
 
         {/* Main Content */}
-        <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 lg:py-8">
+        <main className={`max-w-7xl mx-auto ${isMobile ? 'px-3' : 'px-4 sm:px-6 lg:px-8'} ${isMobile ? 'py-4' : 'py-8'}`}>
           {/* Stats Overview */}
           <motion.section
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.1 }}
-            className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8"
+            className={`grid gap-4 mb-6 ${
+              isMobile 
+                ? 'grid-cols-2' 
+                : 'grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6'
+            }`}
           >
             <StatCard
               title="Total Revenue"
@@ -528,16 +553,24 @@ export default function AdminDashboard() {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.2 }}
-            className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8"
+            className={`gap-6 mb-8 ${
+              isMobile 
+                ? 'grid grid-cols-1' 
+                : 'grid grid-cols-1 lg:grid-cols-2'
+            }`}
           >
             {/* Revenue Chart */}
-            <div className="bg-white rounded-xl p-6 shadow-lg border border-gray-100">
-              <h3 className="text-lg font-semibold mb-4">Weekly Revenue (₦)</h3>
-              <ResponsiveContainer width="100%" height={300}>
+            <div className={`bg-white rounded-xl p-4 shadow-lg border border-gray-100 ${
+              isMobile ? 'p-3' : 'p-6'
+            }`}>
+              <h3 className={`font-semibold mb-4 ${
+                isMobile ? 'text-base' : 'text-lg'
+              }`}>Weekly Revenue (₦)</h3>
+              <ResponsiveContainer width="100%" height={isMobile ? 250 : 300}>
                 <BarChart data={weeklyData}>
                   <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="date" />
-                  <YAxis />
+                  <XAxis dataKey="date" fontSize={isMobile ? 10 : 12} />
+                  <YAxis fontSize={isMobile ? 10 : 12} />
                   <Tooltip formatter={(value) => [`₦${value.toLocaleString()}`, 'Revenue']} />
                   <Bar dataKey="revenue" fill="#f97316" radius={[4, 4, 0, 0]} />
                 </BarChart>
@@ -545,13 +578,17 @@ export default function AdminDashboard() {
             </div>
 
             {/* Tokens Chart */}
-            <div className="bg-white rounded-xl p-6 shadow-lg border border-gray-100">
-              <h3 className="text-lg font-semibold mb-4">Weekly Token Distribution</h3>
-              <ResponsiveContainer width="100%" height={300}>
+            <div className={`bg-white rounded-xl p-4 shadow-lg border border-gray-100 ${
+              isMobile ? 'p-3' : 'p-6'
+            }`}>
+              <h3 className={`font-semibold mb-4 ${
+                isMobile ? 'text-base' : 'text-lg'
+              }`}>Weekly Token Distribution</h3>
+              <ResponsiveContainer width="100%" height={isMobile ? 250 : 300}>
                 <LineChart data={weeklyData}>
                   <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="date" />
-                  <YAxis />
+                  <XAxis dataKey="date" fontSize={isMobile ? 10 : 12} />
+                  <YAxis fontSize={isMobile ? 10 : 12} />
                   <Tooltip />
                   <Line 
                     type="monotone" 
@@ -572,26 +609,38 @@ export default function AdminDashboard() {
             transition={{ delay: 0.3 }}
             className="bg-white rounded-xl shadow-lg border border-gray-100 mb-8"
           >
-            <div className="p-6 border-b border-gray-200">
-              <h3 className="text-lg font-semibold">Token Transactions (All Top-ups)</h3>
+            <div className="p-4 border-b border-gray-200">
+              <h3 className={`font-semibold ${
+                isMobile ? 'text-base' : 'text-lg'
+              }`}>Token Transactions (All Top-ups)</h3>
             </div>
-            <div className="overflow-x-auto">
+            <div className="overflow-x-auto max-h-96"> {/* Added max height and scroll */}
               <table className="w-full">
-                <thead className="bg-gray-50">
+                <thead className="bg-gray-50 sticky top-0">
                   <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className={`text-left font-medium text-gray-500 uppercase tracking-wider ${
+                      isMobile ? 'px-3 py-2 text-xs' : 'px-6 py-3 text-xs'
+                    }`}>
                       ID
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className={`text-left font-medium text-gray-500 uppercase tracking-wider ${
+                      isMobile ? 'px-3 py-2 text-xs' : 'px-6 py-3 text-xs'
+                    }`}>
                       User
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className={`text-left font-medium text-gray-500 uppercase tracking-wider ${
+                      isMobile ? 'px-3 py-2 text-xs' : 'px-6 py-3 text-xs'
+                    }`}>
                       Tokens
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className={`text-left font-medium text-gray-500 uppercase tracking-wider ${
+                      isMobile ? 'px-3 py-2 text-xs' : 'px-6 py-3 text-xs'
+                    }`}>
                       Value (₦)
                     </th>
-                    <th className="px-6-py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className={`text-left font-medium text-gray-500 uppercase tracking-wider ${
+                      isMobile ? 'px-3 py-2 text-xs' : 'px-6 py-3 text-xs'
+                    }`}>
                       Date
                     </th>
                   </tr>
@@ -603,21 +652,35 @@ export default function AdminDashboard() {
                       initial={{ opacity: 0 }}
                       animate={{ opacity: 1 }}
                       transition={{ delay: index * 0.1 }}
-                      className="hover:bg-gray-50 transition-colors"
+                      className="hover:bg-gray-50 transition-colors duration-150"
                     >
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                        {transaction.id}
+                      <td className={`text-gray-900 ${
+                        isMobile ? 'px-3 py-2 text-xs' : 'px-6 py-4 text-sm'
+                      }`}>
+                        <span className="truncate max-w-[80px] block">
+                          {transaction.id}
+                        </span>
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                        {transaction.user_name}
+                      <td className={`text-gray-900 ${
+                        isMobile ? 'px-3 py-2 text-xs' : 'px-6 py-4 text-sm'
+                      }`}>
+                        <span className="truncate max-w-[100px] block">
+                          {transaction.user_name}
+                        </span>
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                      <td className={`text-gray-900 ${
+                        isMobile ? 'px-3 py-2 text-xs' : 'px-6 py-4 text-sm'
+                      }`}>
                         {transaction.tokens_in || 0}
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                      <td className={`text-gray-900 ${
+                        isMobile ? 'px-3 py-2 text-xs' : 'px-6 py-4 text-sm'
+                      }`}>
                         ₦{((transaction.tokens_in || 0) * 250).toLocaleString()}
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                      <td className={`text-gray-500 ${
+                        isMobile ? 'px-3 py-2 text-xs' : 'px-6 py-4 text-sm'
+                      }`}>
                         {transaction.created_at ? new Date(transaction.created_at).toLocaleDateString() : 'N/A'}
                       </td>
                     </motion.tr>
@@ -632,12 +695,18 @@ export default function AdminDashboard() {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.4 }}
-            className="grid grid-cols-1 lg:grid-cols-2 gap-8"
+            className={`gap-6 ${
+              isMobile 
+                ? 'grid grid-cols-1' 
+                : 'grid grid-cols-1 lg:grid-cols-2 gap-8'
+            }`}
           >
             {/* Applicants */}
             <div className="bg-white rounded-xl shadow-lg border border-gray-100">
-              <div className="p-6 border-b border-gray-200">
-                <h3 className="text-lg font-semibold">Creatives ({applicants.length})</h3>
+              <div className="p-4 border-b border-gray-200">
+                <h3 className={`font-semibold ${
+                  isMobile ? 'text-base' : 'text-lg'
+                }`}>Creatives ({applicants.length})</h3>
               </div>
               <div className="overflow-y-auto max-h-96">
                 {applicants.map((applicant, index) => (
@@ -646,26 +715,36 @@ export default function AdminDashboard() {
                     initial={{ opacity: 0, x: -20 }}
                     animate={{ opacity: 1, x: 0 }}
                     transition={{ delay: index * 0.05 }}
-                    className="p-4 border-b border-gray-100 hover:bg-gray-50 transition-colors"
+                    className="p-3 border-b border-gray-100 hover:bg-gray-50 transition-colors duration-150"
                   >
                     <div className="flex items-center space-x-3">
                       <img
                         src={applicant.avatar_url || "https://xatxjdsppcjgplmrtjcs.supabase.co/storage/v1/object/public/avatars/icon.png"}
                         alt={applicant.full_name}
-                        className="w-10 h-10 rounded-full object-cover"
+                        className={`rounded-full object-cover ${
+                          isMobile ? 'w-8 h-8' : 'w-10 h-10'
+                        }`}
                       />
                       <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium text-gray-900 truncate">
+                        <p className={`font-medium text-gray-900 truncate ${
+                          isMobile ? 'text-sm' : 'text-sm'
+                        }`}>
                           {applicant.full_name}
                         </p>
-                        <p className="text-sm text-gray-500 truncate">
+                        <p className={`text-gray-500 truncate ${
+                          isMobile ? 'text-xs' : 'text-sm'
+                        }`}>
                           {applicant.specialties}
                         </p>
-                        <p className="text-xs text-gray-400">
+                        <p className={`text-gray-400 ${
+                          isMobile ? 'text-xs' : 'text-xs'
+                        }`}>
                           {[applicant.city, applicant.state, applicant.country].filter(Boolean).join(', ')}
                         </p>
                       </div>
-                      <div className="text-xs text-gray-500">
+                      <div className={`text-gray-500 ${
+                        isMobile ? 'text-xs' : 'text-xs'
+                      }`}>
                         {applicant.created_at ? new Date(applicant.created_at).toLocaleDateString() : 'N/A'}
                       </div>
                     </div>
@@ -676,8 +755,10 @@ export default function AdminDashboard() {
 
             {/* Employers */}
             <div className="bg-white rounded-xl shadow-lg border border-gray-100">
-              <div className="p-6 border-b border-gray-200">
-                <h3 className="text-lg font-semibold">Clients ({employers.length})</h3>
+              <div className="p-4 border-b border-gray-200">
+                <h3 className={`font-semibold ${
+                  isMobile ? 'text-base' : 'text-lg'
+                }`}>Clients ({employers.length})</h3>
               </div>
               <div className="overflow-y-auto max-h-96">
                 {employers.map((employer, index) => (
@@ -686,26 +767,36 @@ export default function AdminDashboard() {
                     initial={{ opacity: 0, x: 20 }}
                     animate={{ opacity: 1, x: 0 }}
                     transition={{ delay: index * 0.05 }}
-                    className="p-4 border-b border-gray-100 hover:bg-gray-50 transition-colors"
+                    className="p-3 border-b border-gray-100 hover:bg-gray-50 transition-colors duration-150"
                   >
                     <div className="flex items-center space-x-3">
                       <img
                         src={employer.avatar || "https://xatxjdsppcjgplmrtjcs.supabase.co/storage/v1/object/public/avatars/icon.png"}
                         alt={employer.name}
-                        className="w-10 h-10 rounded-full object-cover"
+                        className={`rounded-full object-cover ${
+                          isMobile ? 'w-8 h-8' : 'w-10 h-10'
+                        }`}
                       />
                       <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium text-gray-900 truncate">
+                        <p className={`font-medium text-gray-900 truncate ${
+                          isMobile ? 'text-sm' : 'text-sm'
+                        }`}>
                           {employer.name}
                         </p>
-                        <p className="text-sm text-gray-500 truncate">
+                        <p className={`text-gray-500 truncate ${
+                          isMobile ? 'text-xs' : 'text-sm'
+                        }`}>
                           {employer.company}
                         </p>
-                        <p className="text-xs text-gray-400 truncate">
+                        <p className={`text-gray-400 truncate ${
+                          isMobile ? 'text-xs' : 'text-xs'
+                        }`}>
                           {employer.full_address}
                         </p>
                       </div>
-                      <div className="text-xs text-gray-500">
+                      <div className={`text-gray-500 ${
+                        isMobile ? 'text-xs' : 'text-xs'
+                      }`}>
                         {employer.created_at ? new Date(employer.created_at).toLocaleDateString() : 'N/A'}
                       </div>
                     </div>
@@ -716,8 +807,8 @@ export default function AdminDashboard() {
           </motion.section>
         </main>
 
-        {/* Helena's Shares Modal */}
-        <HelenaSharesModal />
+        {/* Shares Modal */}
+        <SharesModal />
       </div>
     </>
   );

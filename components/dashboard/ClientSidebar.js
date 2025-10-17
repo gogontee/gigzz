@@ -14,8 +14,9 @@ import {
   ChevronLeft,
   ChevronRight,
   ShieldCheck,
+  Crown, // Added Crown icon for director
 } from 'lucide-react';
-import useUnreadMessages from '../../hooks/useUnreadMessages'; // ✅ correct default import
+import useUnreadMessages from '../../hooks/useUnreadMessages';
 
 export const supabase = createPagesBrowserClient();
 
@@ -39,6 +40,7 @@ export default function ClientSidebar({ active, onChange, employer }) {
   const [expanded, setExpanded] = useState(false);
   const [avatarUrl, setAvatarUrl] = useState(null);
   const [isMobile, setIsMobile] = useState(false);
+  const [isDirector, setIsDirector] = useState(false); // New state for director status
 
   // ✅ unread count from hook
   const unreadCount = useUnreadMessages();
@@ -55,6 +57,30 @@ export default function ClientSidebar({ active, onChange, employer }) {
     if (employer?.avatar_url) setAvatarUrl(employer.avatar_url);
     else setAvatarUrl(null);
   }, [employer?.avatar_url]);
+
+  // Check if user is a director
+  useEffect(() => {
+    const checkDirectorStatus = async () => {
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user) {
+          const { data, error } = await supabase
+            .from('directors')
+            .select('user_id')
+            .eq('user_id', user.id)
+            .single();
+
+          if (data && !error) {
+            setIsDirector(true);
+          }
+        }
+      } catch (error) {
+        console.error('Error checking director status:', error);
+      }
+    };
+
+    checkDirectorStatus();
+  }, []);
 
   const handleMouseEnter = () => !isMobile && setExpanded(true);
   const handleMouseLeave = () => !isMobile && setExpanded(false);
@@ -150,11 +176,24 @@ export default function ClientSidebar({ active, onChange, employer }) {
         <div className="mt-3 px-2 lg:px-3 py-3 border-t border-gray-800 flex flex-col gap-2">
           {employer && (
             <div className="flex items-center gap-2">
-              <img
-                src={avatarUrl || '/placeholder-user.png'}
-                alt="Profile"
-                className="w-8 h-8 rounded-full object-cover border-2 border-white"
-              />
+              <div className="relative">
+                <img
+                  src={avatarUrl || '/placeholder-user.png'}
+                  alt="Profile"
+                  className="w-8 h-8 rounded-full object-cover border-2 border-white"
+                />
+                {/* Director Icon */}
+                {isDirector && (
+                  <Link 
+                    href="/admin/dashboard" 
+                    onClick={handleLinkClick}
+                    className="absolute -top-1 -right-1 bg-purple-600 p-0.5 rounded-full border-2 border-white hover:bg-purple-700 transition"
+                    title="Director Dashboard"
+                  >
+                    <Crown size={12} className="text-white" />
+                  </Link>
+                )}
+              </div>
               {expanded && (
                 <div className="flex flex-col text-xs">
                   <div className="font-semibold">{employer.name || 'Client'}</div>
