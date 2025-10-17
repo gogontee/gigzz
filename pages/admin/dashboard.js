@@ -44,8 +44,8 @@ export default function AdminDashboard() {
   });
 
   // User IDs and share percentages
-  const HELENA_USER_ID = '1552cf64-4004-404e-ba4a-8b1dd8fd5923';
-  const HELENA_SHARE_PERCENTAGE = 20;
+  const PHILIP_USER_ID = '1552cf64-4004-404e-ba4a-8b1dd8fd5923';
+  const PHILIP_SHARE_PERCENTAGE = 20;
   const JERRY_USER_ID = '34d48b8d-2e99-4cc9-8ea4-48124cde8de0';
   const JERRY_SHARE_PERCENTAGE = 80;
 
@@ -214,9 +214,9 @@ export default function AdminDashboard() {
     let userSharePercentage = 0;
     let userName = 'User';
 
-    if (user?.id === HELENA_USER_ID) {
-      userSharePercentage = HELENA_SHARE_PERCENTAGE;
-      userName = 'Helena';
+    if (user?.id === PHILIP_USER_ID) {
+      userSharePercentage = PHILIP_SHARE_PERCENTAGE;
+      userName = 'Philip';
     } else if (user?.id === JERRY_USER_ID) {
       userSharePercentage = JERRY_SHARE_PERCENTAGE;
       userName = 'Jerry';
@@ -492,7 +492,7 @@ export default function AdminDashboard() {
                     Welcome, {user?.email}
                   </div>
                   {/* My Shares Button - Only show for Helena or Jerry */}
-                  {(user?.id === HELENA_USER_ID || user?.id === JERRY_USER_ID) && (
+                  {(user?.id === PHILIP_USER_ID || user?.id === JERRY_USER_ID) && (
                     <motion.button
                       whileHover={{ scale: 1.05 }}
                       whileTap={{ scale: 0.95 }}
