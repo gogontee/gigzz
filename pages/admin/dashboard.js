@@ -1,4 +1,8 @@
 // pages/admin/dashboard.js
+
+// ⚠️ IMPORTANT: Always import this component when visiting the admin dashboard page
+// This provides comprehensive analytics and revenue tracking for Gigzz platform
+
 import { useEffect, useState, useCallback } from 'react';
 import { useRouter } from 'next/router';
 import { createPagesBrowserClient } from "@supabase/auth-helpers-nextjs";
@@ -37,6 +41,10 @@ export default function AdminDashboard() {
     weeklyGrowth: 0
   });
 
+  // Helena's user ID and share percentage
+  const HELENA_USER_ID = '1552cf64-4004-404e-ba4a-8b1dd8fd5923';
+  const HELENA_SHARE_PERCENTAGE = 20;
+
   // Check authorization
   useEffect(() => {
     const checkAuthorization = async () => {
@@ -72,11 +80,10 @@ export default function AdminDashboard() {
 
   const loadAllData = useCallback(async () => {
     try {
-      // Load token transactions
+      // Load ALL token transactions with tokens_in values
       const { data: transactions } = await supabase
         .from('token_transactions')
         .select('*')
-        .or('description.eq.Top up from paystack,description.eq.top up from paystack')
         .order('created_at', { ascending: false });
 
       // Load applicants
@@ -120,7 +127,9 @@ export default function AdminDashboard() {
 
           return {
             ...transaction,
-            user_name: userName
+            user_name: userName,
+            // Calculate monetary value for each transaction
+            monetary_value: (transaction.tokens_in || 0) * 250
           };
         })
       );
@@ -147,12 +156,12 @@ export default function AdminDashboard() {
 
     const dailyData = last7Days.map(date => {
       const dayTransactions = transactions.filter(t => 
-        t.created_at.split('T')[0] === date
+        t.created_at && t.created_at.split('T')[0] === date
       );
       
-      // Calculate revenue from token_in (1 token = ₦250)
-      const revenue = dayTransactions.reduce((sum, t) => sum + (t.token_in * 250), 0);
-      const tokens = dayTransactions.reduce((sum, t) => sum + t.token_in, 0);
+      // Calculate revenue from ALL tokens_in values with null checks
+      const revenue = dayTransactions.reduce((sum, t) => sum + ((t.tokens_in || 0) * 250), 0);
+      const tokens = dayTransactions.reduce((sum, t) => sum + (t.tokens_in || 0), 0);
       
       return {
         date: new Date(date).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }),
@@ -166,8 +175,8 @@ export default function AdminDashboard() {
   };
 
   const calculateStats = (transactions, applicants, employers) => {
-    // Calculate total tokens from ALL token_transactions.token_in
-    const totalTokens = transactions.reduce((sum, t) => sum + t.token_in, 0);
+    // Calculate total tokens from ALL token_transactions.tokens_in with null checks
+    const totalTokens = transactions.reduce((sum, t) => sum + (t.tokens_in || 0), 0);
     
     // Calculate total revenue: total tokens * ₦250
     const totalRevenue = totalTokens * 250;
@@ -177,7 +186,7 @@ export default function AdminDashboard() {
     // Calculate weekly growth (simplified)
     const thisWeekRevenue = totalRevenue;
     const lastWeekRevenue = totalRevenue * 0.8; // Mock data for demo
-    const weeklyGrowth = ((thisWeekRevenue - lastWeekRevenue) / lastWeekRevenue) * 100;
+    const weeklyGrowth = lastWeekRevenue > 0 ? ((thisWeekRevenue - lastWeekRevenue) / lastWeekRevenue) * 100 : 0;
 
     setStats({
       totalRevenue,
@@ -187,17 +196,26 @@ export default function AdminDashboard() {
     });
   };
 
-  // Calculate user shares (20% of total revenue)
+  // Calculate user shares based on user ID
   const calculateUserShares = () => {
-    const userSharePercentage = 20;
+    let userSharePercentage = 0;
+    let userName = 'User';
+
+    if (user?.id === HELENA_USER_ID) {
+      userSharePercentage = HELENA_SHARE_PERCENTAGE;
+      userName = 'Helena';
+    }
+
     const userShareAmount = (stats.totalRevenue * userSharePercentage) / 100;
     
     return {
+      userName,
       percentage: userSharePercentage,
       amount: userShareAmount,
       formattedAmount: `₦${userShareAmount.toLocaleString()}`,
       totalRevenue: stats.totalRevenue,
-      formattedTotalRevenue: `₦${stats.totalRevenue.toLocaleString()}`
+      formattedTotalRevenue: `₦${stats.totalRevenue.toLocaleString()}`,
+      totalTokens: stats.totalTokens
     };
   };
 
@@ -222,121 +240,186 @@ export default function AdminDashboard() {
     </motion.div>
   );
 
-  const SharesModal = () => (
-    <AnimatePresence>
-      {sharesModalOpen && (
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-          className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4"
-        >
+  const HelenaSharesModal = () => {
+    // Real-time calculation state
+    const [customTokens, setCustomTokens] = useState(sharesData.totalTokens);
+    const [customRevenue, setCustomRevenue] = useState(customTokens * 250);
+    const [customShare, setCustomShare] = useState((customRevenue * HELENA_SHARE_PERCENTAGE) / 100);
+
+    // Update real-time calculation when tokens change
+    useEffect(() => {
+      const newRevenue = customTokens * 250;
+      const newShare = (newRevenue * HELENA_SHARE_PERCENTAGE) / 100;
+      setCustomRevenue(newRevenue);
+      setCustomShare(newShare);
+    }, [customTokens]);
+
+    return (
+      <AnimatePresence>
+        {sharesModalOpen && user?.id === HELENA_USER_ID && (
           <motion.div
-            initial={{ opacity: 0, scale: 0.9, y: 20 }}
-            animate={{ opacity: 1, scale: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.9, y: 20 }}
-            className="bg-white rounded-2xl shadow-2xl max-w-md w-full"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 pt-4"
           >
-            {/* Header */}
-            <div className="bg-gradient-to-r from-orange-500 to-orange-600 rounded-t-2xl p-6 text-white">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h2 className="text-2xl font-bold">My Shares</h2>
-                  <p className="text-orange-100 mt-1">Revenue Distribution</p>
-                </div>
-                <div className="text-3xl">💰</div>
-              </div>
-            </div>
-
-            {/* Content */}
-            <div className="p-6">
-              {/* Share Calculation */}
-              <div className="text-center mb-6">
-                <div className="text-4xl font-bold text-gray-900 mb-2">
-                  {sharesData.formattedAmount}
-                </div>
-                <p className="text-gray-600">Your 20% Share of Total Revenue</p>
-              </div>
-
-              {/* Calculation Breakdown */}
-              <div className="bg-gray-50 rounded-lg p-4 mb-6">
-                <h4 className="font-semibold text-gray-900 mb-3">Calculation Breakdown:</h4>
-                <div className="space-y-2 text-sm">
-                  <div className="flex justify-between">
-                    <span className="text-gray-600">Total Tokens Purchased:</span>
-                    <span className="font-semibold">{stats.totalTokens.toLocaleString()} tokens</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-gray-600">Token Value:</span>
-                    <span className="font-semibold">₦250 per token</span>
-                  </div>
-                  <div className="flex justify-between border-t border-gray-200 pt-2">
-                    <span className="text-gray-600">Total Revenue:</span>
-                    <span className="font-semibold">{sharesData.formattedTotalRevenue}</span>
-                  </div>
-                  <div className="flex justify-between border-t border-gray-200 pt-2">
-                    <span className="text-gray-600">Your Share (20%):</span>
-                    <span className="font-semibold text-green-600">{sharesData.formattedAmount}</span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Progress Visualization */}
-              <div className="mb-6">
-                <div className="flex justify-between text-sm text-gray-600 mb-2">
-                  <span>Platform Revenue</span>
-                  <span>Your Share (20%)</span>
-                </div>
-                <div className="w-full bg-gray-200 rounded-full h-4 flex overflow-hidden">
-                  <motion.div
-                    initial={{ width: 0 }}
-                    animate={{ width: '80%' }}
-                    transition={{ duration: 1, ease: "easeOut" }}
-                    className="bg-gray-400 h-4"
-                  />
-                  <motion.div
-                    initial={{ width: 0 }}
-                    animate={{ width: '20%' }}
-                    transition={{ duration: 1, ease: "easeOut", delay: 0.5 }}
-                    className="bg-orange-500 h-4"
-                  />
-                </div>
-                <div className="flex justify-between text-xs text-gray-500 mt-1">
-                  <span>80% Platform</span>
-                  <span>20% Your Share</span>
-                </div>
-              </div>
-
-              {/* Example Calculation */}
-              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                <div className="flex items-start space-x-3">
-                  <div className="text-blue-500 text-lg">📊</div>
+            <motion.div
+              initial={{ opacity: 0, scale: 0.9, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.9, y: 20 }}
+              className="bg-white rounded-2xl shadow-2xl max-w-md w-full max-h-[90vh] flex flex-col"
+            >
+              {/* Header */}
+              <div className="bg-gradient-to-r from-orange-500 to-orange-600 rounded-t-2xl p-6 text-white flex-shrink-0">
+                <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-sm text-blue-800 font-medium">
-                      Real-time Calculation Example
-                    </p>
-                    <p className="text-xs text-blue-600 mt-1">
-                      Total Revenue: {sharesData.formattedTotalRevenue} × 20% = {sharesData.formattedAmount}
-                    </p>
+                    <h2 className="text-2xl font-bold">Helena's Shares</h2>
+                    <p className="text-orange-100 mt-1">Revenue Distribution</p>
+                  </div>
+                  <div className="text-3xl">👑</div>
+                </div>
+              </div>
+
+              {/* Scrollable Content */}
+              <div className="flex-1 overflow-y-auto">
+                <div className="p-6">
+                  {/* Share Calculation */}
+                  <div className="text-center mb-6">
+                    <div className="text-4xl font-bold text-gray-900 mb-2">
+                      {sharesData.formattedAmount}
+                    </div>
+                    <p className="text-gray-600">Your {HELENA_SHARE_PERCENTAGE}% Share of Total Revenue</p>
+                  </div>
+
+                  {/* Personal Welcome */}
+                  <div className="bg-purple-50 border border-orange-200 rounded-lg p-4 mb-6">
+                    <div className="flex items-center space-x-3">
+                      <div className="w-12 h-12 bg-orange-100 rounded-full flex items-center justify-center">
+                        <span className="text-orange-600 text-xl">👑</span>
+                      </div>
+                      <div>
+                        <p className="font-semibold text-orange-900">Hello Helena!</p>
+                        <p className="text-sm text-orange-700">As a key partner, you receive {HELENA_SHARE_PERCENTAGE}% of all platform revenue.</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Calculation Breakdown */}
+                  <div className="bg-gray-50 rounded-lg p-4 mb-6">
+                    <h4 className="font-semibold text-gray-900 mb-3">Calculation Breakdown:</h4>
+                    <div className="space-y-2 text-sm">
+                      <div className="flex justify-between">
+                        <span className="text-gray-600">Total Tokens Purchased:</span>
+                        <span className="font-semibold">{sharesData.totalTokens.toLocaleString()} tokens</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-gray-600">Token Value:</span>
+                        <span className="font-semibold">₦250 per token</span>
+                      </div>
+                      <div className="flex justify-between border-t border-gray-200 pt-2">
+                        <span className="text-gray-600">Total Revenue:</span>
+                        <span className="font-semibold">{sharesData.formattedTotalRevenue}</span>
+                      </div>
+                      <div className="flex justify-between border-t border-gray-200 pt-2">
+                        <span className="text-gray-600">Your Share ({HELENA_SHARE_PERCENTAGE}%):</span>
+                        <span className="font-semibold text-green-600">{sharesData.formattedAmount}</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Progress Visualization */}
+                  <div className="mb-6">
+                    <div className="flex justify-between text-sm text-gray-600 mb-2">
+                      <span>Platform Revenue ({100 - HELENA_SHARE_PERCENTAGE}%)</span>
+                      <span>Your Share ({HELENA_SHARE_PERCENTAGE}%)</span>
+                    </div>
+                    <div className="w-full bg-gray-200 rounded-full h-4 flex overflow-hidden">
+                      <motion.div
+                        initial={{ width: 0 }}
+                        animate={{ width: `${100 - HELENA_SHARE_PERCENTAGE}%` }}
+                        transition={{ duration: 1, ease: "easeOut" }}
+                        className="bg-gray-400 h-4"
+                      />
+                      <motion.div
+                        initial={{ width: 0 }}
+                        animate={{ width: `${HELENA_SHARE_PERCENTAGE}%` }}
+                        transition={{ duration: 1, ease: "easeOut", delay: 0.5 }}
+                        className="bg-orange-500 h-4"
+                      />
+                    </div>
+                    <div className="flex justify-between text-xs text-gray-500 mt-1">
+                      <span>{100 - HELENA_SHARE_PERCENTAGE}% Platform</span>
+                      <span>{HELENA_SHARE_PERCENTAGE}% Helena's Share</span>
+                    </div>
+                  </div>
+
+                  {/* Real-time Calculation Example */}
+                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
+                    <div className="flex items-start space-x-3">
+                      <div className="text-blue-500 text-lg">📊</div>
+                      <div className="flex-1">
+                        <p className="text-sm text-blue-800 font-medium mb-3">
+                          Real-time Calculation Tool
+                        </p>
+                        
+                        {/* Token Input */}
+                        <div className="mb-3">
+                          <label className="block text-xs text-blue-700 mb-1">
+                            Enter token amount to calculate:
+                          </label>
+                          <input
+                            type="number"
+                            value={customTokens}
+                            onChange={(e) => setCustomTokens(Number(e.target.value) || 0)}
+                            className="w-full px-3 py-2 border border-blue-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            placeholder="Enter token amount"
+                          />
+                        </div>
+
+                        {/* Real-time Results */}
+                        <div className="space-y-1 text-xs">
+                          <div className="flex justify-between">
+                            <span className="text-blue-600">Tokens:</span>
+                            <span className="font-semibold">{customTokens.toLocaleString()}</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-blue-600">Revenue:</span>
+                            <span className="font-semibold">₦{customRevenue.toLocaleString()}</span>
+                          </div>
+                          <div className="flex justify-between border-t border-blue-200 pt-1">
+                            <span className="text-blue-600">Your Share ({HELENA_SHARE_PERCENTAGE}%):</span>
+                            <span className="font-semibold text-green-600">₦{customShare.toLocaleString()}</span>
+                          </div>
+                        </div>
+
+                        {/* Reset Button */}
+                        <button
+                          onClick={() => setCustomTokens(sharesData.totalTokens)}
+                          className="mt-3 w-full bg-blue-500 text-white py-2 rounded-lg text-xs font-medium hover:bg-blue-600 transition-colors duration-200"
+                        >
+                          Reset to Actual Tokens
+                        </button>
+                      </div>
+                    </div>
                   </div>
                 </div>
               </div>
-            </div>
 
-            {/* Footer */}
-            <div className="border-t border-gray-200 p-4">
-              <button
-                onClick={() => setSharesModalOpen(false)}
-                className="w-full bg-gray-900 text-white py-3 rounded-xl font-semibold hover:bg-black transition-colors duration-200"
-              >
-                Close
-              </button>
-            </div>
+              {/* Footer */}
+              <div className="border-t border-gray-200 p-4 flex-shrink-0">
+                <button
+                  onClick={() => setSharesModalOpen(false)}
+                  className="w-full bg-gray-900 text-white py-3 rounded-xl font-semibold hover:bg-black transition-colors duration-200"
+                >
+                  Close
+                </button>
+              </div>
+            </motion.div>
           </motion.div>
-        </motion.div>
-      )}
-    </AnimatePresence>
-  );
+        )}
+      </AnimatePresence>
+    );
+  };
 
   if (loading) {
     return (
@@ -368,11 +451,11 @@ export default function AdminDashboard() {
       </Head>
 
       <div className="min-h-screen bg-gray-50">
-        {/* Header */}
+        {/* Global Header */}
         <motion.header
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
-          className="bg-white shadow-sm border-b border-gray-200"
+          className="bg-white shadow-sm border-b pt-20 border-gray-200"
         >
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div className="flex justify-between items-center py-4">
@@ -388,15 +471,15 @@ export default function AdminDashboard() {
                 <div className="text-sm text-gray-600">
                   Welcome, {user?.email}
                 </div>
-                {/* My Shares Button - Only show for specific user ID */}
-                {user?.id === '1552cf64-4004-404e-ba4a-8b1dd8fd5923' && (
+                {/* My Shares Button - Only show for Helena */}
+                {user?.id === HELENA_USER_ID && (
                   <motion.button
                     whileHover={{ scale: 1.05 }}
                     whileTap={{ scale: 0.95 }}
                     onClick={() => setSharesModalOpen(true)}
                     className="bg-orange-500 text-white px-6 py-2 rounded-lg font-semibold hover:bg-orange-600 transition-colors duration-200 shadow-md flex items-center space-x-2"
                   >
-                    <span>💰</span>
+                    <span>👑</span>
                     <span>My Shares</span>
                   </motion.button>
                 )}
@@ -405,7 +488,8 @@ export default function AdminDashboard() {
           </div>
         </motion.header>
 
-        <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {/* Main Content */}
+        <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 lg:py-8">
           {/* Stats Overview */}
           <motion.section
             initial={{ opacity: 0, y: 20 }}
@@ -489,7 +573,7 @@ export default function AdminDashboard() {
             className="bg-white rounded-xl shadow-lg border border-gray-100 mb-8"
           >
             <div className="p-6 border-b border-gray-200">
-              <h3 className="text-lg font-semibold">Token Transactions (PayStack Top-ups)</h3>
+              <h3 className="text-lg font-semibold">Token Transactions (All Top-ups)</h3>
             </div>
             <div className="overflow-x-auto">
               <table className="w-full">
@@ -507,7 +591,7 @@ export default function AdminDashboard() {
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Value (₦)
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="px-6-py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Date
                     </th>
                   </tr>
@@ -528,13 +612,13 @@ export default function AdminDashboard() {
                         {transaction.user_name}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                        {transaction.token_in}
+                        {transaction.tokens_in || 0}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                        ₦{(transaction.token_in * 250).toLocaleString()}
+                        ₦{((transaction.tokens_in || 0) * 250).toLocaleString()}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        {new Date(transaction.created_at).toLocaleDateString()}
+                        {transaction.created_at ? new Date(transaction.created_at).toLocaleDateString() : 'N/A'}
                       </td>
                     </motion.tr>
                   ))}
@@ -582,7 +666,7 @@ export default function AdminDashboard() {
                         </p>
                       </div>
                       <div className="text-xs text-gray-500">
-                        {new Date(applicant.created_at).toLocaleDateString()}
+                        {applicant.created_at ? new Date(applicant.created_at).toLocaleDateString() : 'N/A'}
                       </div>
                     </div>
                   </motion.div>
@@ -622,7 +706,7 @@ export default function AdminDashboard() {
                         </p>
                       </div>
                       <div className="text-xs text-gray-500">
-                        {new Date(employer.created_at).toLocaleDateString()}
+                        {employer.created_at ? new Date(employer.created_at).toLocaleDateString() : 'N/A'}
                       </div>
                     </div>
                   </motion.div>
@@ -632,8 +716,8 @@ export default function AdminDashboard() {
           </motion.section>
         </main>
 
-        {/* My Shares Modal */}
-        <SharesModal />
+        {/* Helena's Shares Modal */}
+        <HelenaSharesModal />
       </div>
     </>
   );
