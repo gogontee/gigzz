@@ -213,7 +213,7 @@ setErrorMsg('Database error: ' + JSON.stringify(profileError));
         <input
           type="email"
           name="email"
-          placeholder="Work email address"
+          placeholder="example@gmail.com"
           required
           value={form.email}
           onChange={handleChange}
@@ -281,7 +281,7 @@ setErrorMsg('Database error: ' + JSON.stringify(profileError));
           className="w-full p-3 border rounded-lg bg-white text-black focus:outline-none focus:border-orange-500"
         >
           <option value="client">I'm a Client</option>
-          <option value="creative">I'm a Creative</option>
+          <option value="creative">I'm a Creative/Applicant</option>
         </select>
 
         <div className="flex items-start space-x-2 text-sm">
