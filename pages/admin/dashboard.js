@@ -44,7 +44,7 @@ export default function AdminDashboard() {
   });
 
   // User IDs and share percentages
-  const PHILIP_USER_ID = '1552cf64-4004-404e-ba4a-8b1dd8fd5923';
+  const PHILIP_USER_ID = '9d83be2a-de87-4387-87e9-a0e52103a914';
   const PHILIP_SHARE_PERCENTAGE = 20;
   const JERRY_USER_ID = '34d48b8d-2e99-4cc9-8ea4-48124cde8de0';
   const JERRY_SHARE_PERCENTAGE = 80;
@@ -278,7 +278,7 @@ export default function AdminDashboard() {
 
     return (
       <AnimatePresence>
-        {sharesModalOpen && (user?.id === HELENA_USER_ID || user?.id === JERRY_USER_ID) && (
+        {sharesModalOpen && (user?.id === PHILIP_USER_ID || user?.id === JERRY_USER_ID) && (
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
