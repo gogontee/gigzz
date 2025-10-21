@@ -1,5 +1,5 @@
 import React from "react";
-import { FaTwitter, FaFacebook, FaLinkedin, FaInstagram, FaTiktok } from "react-icons/fa";
+import { FaYoutube, FaFacebook, FaInstagram, FaTiktok } from "react-icons/fa";
 
 export default function Footer() {
   const handleDownloadClick = () => {
@@ -58,11 +58,38 @@ export default function Footer() {
         <div>
           <h3 className="text-base font-semibold mb-4">Follow us</h3>
           <div className="flex items-center gap-4 mb-6">
-            <a href="#" className="text-white hover:text-orange-400"><FaLinkedin size={20} /></a>
-            <a href="#" className="text-white hover:text-orange-400"><FaFacebook size={20} /></a>
-            <a href="#" className="text-white hover:text-orange-400"><FaTwitter size={20} /></a>
-            <a href="#" className="text-white hover:text-orange-400"><FaInstagram size={20} /></a>
-            <a href="#" className="text-white hover:text-orange-400"><FaTiktok size={20} /></a>
+            <a 
+              href="https://www.facebook.com/mygigzz" 
+              target="_blank" 
+              rel="noopener noreferrer" 
+              className="text-white hover:text-orange-400"
+            >
+              <FaFacebook size={20} />
+            </a>
+            <a 
+              href="https://www.youtube.com/@Gigzzafrica" 
+              target="_blank" 
+              rel="noopener noreferrer" 
+              className="text-white hover:text-orange-400"
+            >
+              <FaYoutube size={20} />
+            </a>
+            <a 
+              href="https://www.instagram.com/mygigzz" 
+              target="_blank" 
+              rel="noopener noreferrer" 
+              className="text-white hover:text-orange-400"
+            >
+              <FaInstagram size={20} />
+            </a>
+            <a 
+              href="https://www.tiktok.com/@mygigzz.com" 
+              target="_blank" 
+              rel="noopener noreferrer" 
+              className="text-white hover:text-orange-400"
+            >
+              <FaTiktok size={20} />
+            </a>
           </div>
           <button
             onClick={handleDownloadClick}
@@ -77,11 +104,9 @@ export default function Footer() {
       <div className="mt-12 border-t border-gray-800 pt-6 flex justify-between text-xs text-gray-400 flex-wrap gap-4">
         <div>© 2015 - {new Date().getFullYear()} Gigzz® Global Inc.</div>
         <div className="flex gap-6">
-          <a href="#" className="hover:text-orange-400">Terms of Service</a>
-          <a href="#" className="hover:text-orange-400">Privacy Policy</a>
-          <a href="#" className="hover:text-orange-400">CA Notice</a>
-          <a href="#" className="hover:text-orange-400">Cookie Settings</a>
-          <a href="#" className="hover:text-orange-400">Accessibility</a>
+          <a href="/terms" className="hover:text-orange-400">Terms of Service</a>
+          <a href="/policy" className="hover:text-orange-400">Privacy Policy</a>
+          <a href="/cookie" className="hover:text-orange-400">Cookie Settings</a>
         </div>
       </div>
     </footer>
