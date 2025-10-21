@@ -1,6 +1,6 @@
 'use client';
 import React, { useState, useEffect } from 'react';
-import { Calendar, Tag, ClipboardList, CheckCircle, X, Activity, FileText, ArrowRight, Sparkles } from 'lucide-react';
+import { Calendar, Tag, ClipboardList, CheckCircle, X, Activity, FileText, ArrowRight, Sparkles, Briefcase } from 'lucide-react';
 import { supabase } from '../../utils/supabaseClient';
 import dayjs from 'dayjs';
 
@@ -240,18 +240,18 @@ export default function JobPostForm({ employerId, onPosted }) {
         </div>
       )}
 
-      {/* Success Popup Modal */}
+      {/* Success Popup Modal - Centered */}
       {showSuccessPopup && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl p-8 max-w-md w-full border border-gray-200 shadow-2xl">
+          <div className="bg-white rounded-2xl p-8 max-w-md w-full border border-gray-200 shadow-2xl transform transition-all duration-300 scale-100">
             <div className="text-center">
               {/* Success Icon */}
-              <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                <Sparkles className="w-8 h-8 text-green-500" />
+              <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-6">
+                <Sparkles className="w-10 h-10 text-green-500" />
               </div>
               
               {/* Title */}
-              <h3 className="text-2xl font-bold text-gray-900 mb-3">
+              <h3 className="text-2xl font-bold text-gray-900 mb-4">
                 Job Posted Successfully!
               </h3>
               
@@ -261,36 +261,39 @@ export default function JobPostForm({ employerId, onPosted }) {
                 Applicants can now view and apply for your position.
               </p>
               
-              {/* Action Section */}
-              <div className="bg-gray-50 rounded-lg p-4 mb-6">
-                <div className="flex items-center justify-center gap-2 text-sm text-gray-700">
-                  <ClipboardList className="w-4 h-4" />
-                  <span>Want to manage your job posts?</span>
+              {/* Sidebar Instructions */}
+              <div className="bg-blue-50 rounded-xl p-4 mb-6 border border-blue-200">
+                <div className="flex items-center justify-center gap-3 mb-3">
+                  <Briefcase className="w-5 h-5 text-blue-500" />
+                  <span className="font-semibold text-blue-800">View Your Job</span>
                 </div>
-                <p className="text-sm text-gray-600 mt-2">
-                  Go to <strong>"My Jobs"</strong> to view, edit, or manage all your posted jobs.
+                <p className="text-sm text-blue-700">
+                  Click on <strong>"My Jobs"</strong> in your sidebar to see your new post and manage all your job listings.
                 </p>
               </div>
               
-              {/* Action Buttons */}
-              <div className="flex gap-3">
+              {/* Action Button */}
+              <div className="space-y-3">
                 <button
                   onClick={() => setShowSuccessPopup(false)}
-                  className="flex-1 px-4 py-3 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition font-medium"
+                  className="w-full px-6 py-3 bg-black text-white rounded-xl hover:bg-gray-800 transition font-medium flex items-center justify-center gap-2 shadow-lg hover:shadow-xl"
                 >
-                  Continue Posting
+                  <Briefcase className="w-4 h-4" />
+                  Continue to My Jobs
                 </button>
                 <button
-                  onClick={() => {
-                    setShowSuccessPopup(false);
-                    // You can add navigation to "My Jobs" here if needed
-                    window.location.href = '/employer/jobs'; // Adjust the path as needed
-                  }}
-                  className="flex-1 px-4 py-3 bg-black text-white rounded-lg hover:bg-gray-800 transition font-medium flex items-center justify-center gap-2"
+                  onClick={() => setShowSuccessPopup(false)}
+                  className="w-full px-6 py-3 border border-gray-300 text-gray-700 rounded-xl hover:bg-gray-50 transition font-medium"
                 >
-                  Go to My Jobs
-                  <ArrowRight className="w-4 h-4" />
+                  Post Another Job
                 </button>
+              </div>
+
+              {/* Additional Info */}
+              <div className="mt-6 pt-4 border-t border-gray-200">
+                <p className="text-xs text-gray-500">
+                  💡 <strong>Tip:</strong> You can edit, promote, or close your job anytime from the "My Jobs" section.
+                </p>
               </div>
             </div>
           </div>

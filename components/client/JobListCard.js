@@ -12,8 +12,10 @@ export default function JobListCard({ job, onDelete, onUpdate }) {
   const router = useRouter();
   const [isEditing, setIsEditing] = useState(false);
   const [isDetailsOpen, setIsDetailsOpen] = useState(false);
+  const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
   const [formData, setFormData] = useState({});
   const [loading, setLoading] = useState(false); 
+  const [deleteLoading, setDeleteLoading] = useState(false);
   const [applicantsCount, setApplicantsCount] = useState(0);
 
   // ✅ Fetch applicants COUNT
@@ -112,6 +114,43 @@ export default function JobListCard({ job, onDelete, onUpdate }) {
     }
   };
 
+  // ✅ Delete job function
+  const handleDeleteJob = async () => {
+    try {
+      setDeleteLoading(true);
+      
+      const { error } = await supabase
+        .from('jobs')
+        .delete()
+        .eq('id', job.id);
+
+      if (error) throw error;
+
+      // Close confirmation modal
+      setIsDeleteConfirmOpen(false);
+      
+      // Call parent callback to update UI
+      onDelete?.(job.id);
+      
+      alert('Job deleted successfully!');
+    } catch (err) {
+      console.error('Error deleting job:', err.message);
+      alert('Failed to delete job: ' + err.message);
+    } finally {
+      setDeleteLoading(false);
+    }
+  };
+
+  // ✅ Open delete confirmation
+  const handleDeleteClick = () => {
+    setIsDeleteConfirmOpen(true);
+  };
+
+  // ✅ Close delete confirmation
+  const handleCancelDelete = () => {
+    setIsDeleteConfirmOpen(false);
+  };
+
   return (
     <div className="rounded-xl bg-white shadow-md border p-4 flex flex-col gap-2 hover:shadow-lg transition h-full">
       {isEditing ? (
@@ -183,7 +222,7 @@ export default function JobListCard({ job, onDelete, onUpdate }) {
               <Pencil size={16} /> 
             </button>
             <button 
-              onClick={() => alert("You cannot delete your job at the moment.")} 
+              onClick={handleDeleteClick}
               className="flex items-center gap-1 text-sm text-red-600 hover:text-red-800"
             >
               <Trash2 size={16} /> 
@@ -194,8 +233,8 @@ export default function JobListCard({ job, onDelete, onUpdate }) {
 
       {/* ✅ Job Details Modal */}
       {isDetailsOpen && (
-<div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center z-40 overflow-y-auto">
-<div className="bg-white p-6 rounded-xl max-w-lg w-full relative max-h-[85vh] overflow-y-auto mt-20">
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center z-40 overflow-y-auto">
+          <div className="bg-white p-6 rounded-xl max-w-lg w-full relative max-h-[85vh] overflow-y-auto mt-20">
             <button onClick={() => setIsDetailsOpen(false)} className="absolute top-2 right-2 text-gray-600 hover:text-black">
               <X size={18} />
             </button>
@@ -208,6 +247,48 @@ export default function JobListCard({ job, onDelete, onUpdate }) {
             <p><strong>Qualification:</strong> {job.educational_qualification || 'N/A'}</p>
             <p><strong>Salary:</strong> ₦{job.min_price?.toLocaleString()} - ₦{job.max_price?.toLocaleString()} ({job.price_frequency || 'one-time'})</p>
             <p className="mt-2"><strong>Applicants:</strong> {applicantsCount}</p>
+          </div>
+        </div>
+      )}
+
+      {/* ✅ Delete Confirmation Modal */}
+      {isDeleteConfirmOpen && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-50">
+          <div className="bg-white p-6 rounded-xl max-w-md w-full mx-4">
+            <div className="text-center">
+              <div className="w-12 h-12 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                <Trash2 className="text-red-600" size={24} />
+              </div>
+              
+              <h3 className="text-lg font-bold text-gray-900 mb-2">Delete Job</h3>
+              <p className="text-gray-600 mb-6">
+                Are you sure you want to delete "<strong>{job.title}</strong>"? This action cannot be undone and all applications will be lost.
+              </p>
+              
+              <div className="flex gap-3 justify-center">
+                <button
+                  onClick={handleCancelDelete}
+                  disabled={deleteLoading}
+                  className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition disabled:opacity-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleDeleteJob}
+                  disabled={deleteLoading}
+                  className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition disabled:opacity-50 flex items-center gap-2"
+                >
+                  {deleteLoading ? (
+                    <>
+                      <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                      Deleting...
+                    </>
+                  ) : (
+                    'Delete Job'
+                  )}
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}
