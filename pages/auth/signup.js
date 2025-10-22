@@ -3,9 +3,9 @@ import { useState } from 'react';
 import { supabase } from '../../utils/supabaseClient';
 import Image from 'next/image';
 import { motion } from 'framer-motion';
-import { useRouter } from 'next/router';
+import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { Eye, EyeOff } from 'lucide-react';
+import { Eye, EyeOff, MailCheck, AlertCircle } from 'lucide-react';
 
 function PasswordInput({ value, onChange }) {
   const [showPassword, setShowPassword] = useState(false);
@@ -30,6 +30,16 @@ function PasswordInput({ value, onChange }) {
   );
 }
 
+// Helper function to convert file to base64
+const convertFileToBase64 = (file) => {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.readAsDataURL(file);
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = error => reject(error);
+  });
+};
+
 export default function Signup() {
   const router = useRouter();
 
@@ -49,6 +59,7 @@ export default function Signup() {
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
+  const [verificationSent, setVerificationSent] = useState(false);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -63,111 +74,236 @@ export default function Signup() {
     e.preventDefault();
     setErrorMsg('');
     setSuccessMsg('');
+    setVerificationSent(false);
 
     if (!agreedToTerms) {
       setErrorMsg('You must agree to the Terms of Service to continue.');
       return;
     }
 
-    setLoading(true);
-    const { email, password, firstName, lastName, role, country, state, city } = form;
-
-    const userRole = role === 'client' ? 'employer' : 'applicant';
-    const profileTable = role === 'client' ? 'employers' : 'applicants';
-
-    // 1️⃣ Sign up user
-    const { data: authData, error: signUpError } = await supabase.auth.signUp({
-      email,
-      password,
-      options: { data: { role: userRole } }
-    });
-
-    if (signUpError || !authData?.user?.id) {
-      setErrorMsg(signUpError?.message || 'Failed to sign up.');
-      setLoading(false);
+    if (form.password.length < 8) {
+      setErrorMsg('Password must be at least 8 characters long.');
       return;
     }
 
-    const userId = authData.user.id;
-    const fullName = `${firstName} ${lastName}`;
+    setLoading(true);
 
-    // 2️⃣ Upload profile picture if provided
-    let avatarUrl = null;
-    if (avatarFile) {
-      const folder = role === 'client' ? 'clients_profile' : 'talents_profile';
-      const filePath = `${folder}/${userId}-${Date.now()}-${avatarFile.name}`;
-      const { error: uploadError } = await supabase.storage
-        .from('profilephoto')
-        .upload(filePath, avatarFile);
+    const { email, password, firstName, lastName, role, country, state, city } = form;
+    const userRole = role === 'client' ? 'employer' : 'applicant';
+    const profileTable = role === 'client' ? 'employers' : 'applicants';
 
-      if (uploadError) {
-        setErrorMsg(`Image upload failed: ${uploadError.message}`);
+    try {
+      // 1️⃣ Convert file to base64 if exists
+      let photoData = null;
+      if (avatarFile) {
+        try {
+          photoData = await convertFileToBase64(avatarFile);
+        } catch (fileError) {
+          setErrorMsg('Failed to process profile picture. Please try again.');
+          setLoading(false);
+          return;
+        }
+      }
+
+      // 2️⃣ Sign up user with email confirmation
+      const { data: authData, error: signUpError } = await supabase.auth.signUp({
+        email,
+        password,
+        options: { 
+          data: { 
+            role: userRole,
+            has_pending_photo: !!avatarFile, // Flag to track pending upload
+          },
+          emailRedirectTo: `${window.location.origin}/auth/callback`
+        }
+      });
+
+      if (signUpError) {
+        if (signUpError.message.includes('already registered')) {
+          setErrorMsg('An account with this email already exists. Please sign in instead.');
+        } else {
+          setErrorMsg(signUpError.message || 'Failed to sign up.');
+        }
         setLoading(false);
         return;
       }
 
-      const { data: publicUrlData } = supabase.storage
-        .from('profilephoto')
-        .getPublicUrl(filePath);
-      avatarUrl = publicUrlData.publicUrl;
-    }
+      if (!authData?.user?.id) {
+        setErrorMsg('Failed to create user account.');
+        setLoading(false);
+        return;
+      }
 
-    // 3️⃣ Upsert into users table
-    const { error: userTableError } = await supabase.from('users').upsert(
-      [{ id: userId, role: userRole }],
-      { onConflict: ['id'] }
-    );
-    if (userTableError) {
-      setErrorMsg('Failed to assign user role.');
+      const userId = authData.user.id;
+      const fullName = `${firstName} ${lastName}`;
+
+      // 3️⃣ Store photo data locally for later upload
+      if (avatarFile && photoData) {
+        const pendingPhotoData = {
+          fileData: photoData,
+          fileName: avatarFile.name,
+          fileType: avatarFile.type,
+          folder: role === 'client' ? 'clients_profile' : 'talents_profile'
+        };
+        
+        localStorage.setItem(`pending_photo_${userId}`, JSON.stringify(pendingPhotoData));
+      }
+
+      // 4️⃣ Upsert into users table
+      const { error: userTableError } = await supabase.from('users').upsert(
+        [{ id: userId, role: userRole }],
+        { onConflict: ['id'] }
+      );
+      if (userTableError) {
+        setErrorMsg('Failed to assign user role.');
+        setLoading(false);
+        return;
+      }
+
+      // 5️⃣ Insert into profile table WITHOUT avatar_url initially
+      let profilePayload;
+      if (userRole === 'applicant') {
+        profilePayload = {
+          id: userId,
+          full_name: fullName,
+          email,
+          phone: '',
+          full_address: '',
+          avatar_url: null, // Will be updated after email confirmation
+          bio: '',
+          specialties: null,
+          country: country || null,
+          state: state || null,
+          city: city || null,
+          tags: [],
+        };
+      } else {
+        profilePayload = {
+          id: userId,
+          name: fullName,
+          company: 'N/A',
+          email,
+          phone: '',
+          full_address: '',
+          avatar_url: null, // Will be updated after email confirmation
+          bio: '',
+          id_card_url: null,
+        };
+      }
+
+      const { error: profileError } = await supabase.from(profileTable).insert([profilePayload]);
+      if (profileError) {
+        console.error(profileError);
+        setErrorMsg('Database error: ' + profileError.message);
+        setLoading(false);
+        return;
+      }
+
+      // Success - show verification message
+      setVerificationSent(true);
+      setSuccessMsg(`Verification email sent to ${email}`);
+
+    } catch (err) {
+      console.error('Signup error:', err);
+      setErrorMsg('An unexpected error occurred. Please try again.');
+    } finally {
       setLoading(false);
-      return;
     }
-
-    // 4️⃣ Insert into profile table
-    let profilePayload;
-    if (userRole === 'applicant') {
-      profilePayload = {
-        id: userId,
-        full_name: fullName,
-        email,
-        phone: '',
-        full_address: '',
-        avatar_url: avatarUrl,
-        bio: '',
-        specialties: null,
-        country: country || null,
-        state: state || null,
-        city: city || null,
-        tags: [],
-      };
-    } else {
-      profilePayload = {
-        id: userId,
-        name: fullName,
-        company: 'N/A',
-        email,
-        phone: '',
-        full_address: '',
-        avatar_url: avatarUrl,
-        bio: '',
-        id_card_url: null,
-      };
-    }
-
-    const { error: profileError } = await supabase.from(profileTable).insert([profilePayload]);
-    if (profileError) {
-      console.error(profileError);
-setErrorMsg('Database error: ' + JSON.stringify(profileError));
-
-      setLoading(false);
-      return;
-    }
-
-    setSuccessMsg('Account created successfully!');
-    setLoading(false);
-
-    setTimeout(() => router.push('/auth/login'), 1500);
   };
+
+  // If verification was sent, show success message
+  if (verificationSent) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-start bg-white px-4 pt-20 pb-10">
+        <div className="mb-8">
+          <Image
+            src="https://xatxjdsppcjgplmrtjcs.supabase.co/storage/v1/object/public/avatars/icon.png"
+            alt="Gigzz Logo"
+            width={100}
+            height={30}
+            priority
+          />
+        </div>
+
+        <div className="w-full max-w-md bg-white border rounded-xl shadow p-8 space-y-6 text-center">
+          {/* Success Icon */}
+          <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto">
+            <MailCheck className="w-10 h-10 text-green-500" />
+          </div>
+
+          {/* Title */}
+          <h2 className="text-2xl font-bold text-gray-900">
+            Verify Your Email
+          </h2>
+
+          {/* Message */}
+          <div className="space-y-4">
+            <p className="text-gray-700 leading-relaxed">
+              We've sent a verification email to <strong>{form.email}</strong>. 
+              Please check your inbox and click the verification link to activate your account.
+            </p>
+            
+            {avatarFile && (
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                <div className="flex items-start gap-3">
+                  <AlertCircle className="w-5 h-5 text-blue-500 mt-0.5 flex-shrink-0" />
+                  <div className="text-left">
+                    <p className="text-blue-800 text-sm font-medium mb-1">Profile Photo:</p>
+                    <p className="text-blue-700 text-sm">
+                      Your profile photo will be automatically uploaded after you verify your email and log in for the first time.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            <div className="bg-orange-50 border border-orange-200 rounded-lg p-4">
+              <p className="text-orange-800 text-sm">
+                💡 <strong>Can't find the email?</strong> Check your spam folder or request a new verification email from the login page.
+              </p>
+            </div>
+          </div>
+
+          {/* Action Buttons */}
+          <div className="flex flex-col gap-3 pt-4">
+            <button
+              onClick={() => router.push('/auth/login')}
+              className="w-full p-3 rounded-lg bg-black text-white hover:bg-gray-800 transition font-medium"
+            >
+              Go to Login
+            </button>
+            <button
+              onClick={() => {
+                setVerificationSent(false);
+                setForm({
+                  firstName: '',
+                  lastName: '',
+                  email: '',
+                  password: '',
+                  country: '',
+                  state: '',
+                  city: '',
+                  role: 'client',
+                });
+                setAvatarFile(null);
+                setAgreedToTerms(false);
+              }}
+              className="w-full p-3 rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-50 transition font-medium"
+            >
+              Sign Up Again
+            </button>
+          </div>
+
+          {/* Support Info */}
+          <div className="pt-4 border-t border-gray-200">
+            <p className="text-xs text-gray-500">
+              Need help? Contact <a href="mailto:support@gigzz.com" className="text-orange-600 hover:underline">support@gigzz.com</a>
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-start bg-white px-4 pt-20 pb-10">
@@ -175,8 +311,9 @@ setErrorMsg('Database error: ' + JSON.stringify(profileError));
         <Image
           src="https://xatxjdsppcjgplmrtjcs.supabase.co/storage/v1/object/public/avatars/icon.png"
           alt="Gigzz Logo"
-          width={100}
-          height={30}
+          width={50}
+          height={50}
+          style={{ width: "auto", height: "auto" }}
           priority
         />
       </div>
@@ -223,12 +360,22 @@ setErrorMsg('Database error: ' + JSON.stringify(profileError));
         <PasswordInput value={form.password} onChange={handleChange} />
 
         {/* Profile picture upload */}
-        <input
-          type="file"
-          accept="image/*"
-          onChange={handleFileChange}
-          className="w-full p-2 border rounded-lg bg-white text-black focus:outline-none focus:border-orange-500"
-        />
+        <div>
+          <label className="block text-sm text-gray-700 mb-2">
+            Profile Picture (Optional)
+          </label>
+          <input
+            type="file"
+            accept="image/*"
+            onChange={handleFileChange}
+            className="w-full p-2 border rounded-lg bg-white text-black focus:outline-none focus:border-orange-500"
+          />
+          {avatarFile && (
+            <p className="text-xs text-gray-500 mt-1">
+              ✓ Photo will be uploaded after email verification
+            </p>
+          )}
+        </div>
 
         {/* Country dropdown with datalist */}
         <input
@@ -294,22 +441,43 @@ setErrorMsg('Database error: ' + JSON.stringify(profileError));
           />
           <label className="text-gray-700">
             Yes, I understand and agree to Gigzz&nbsp;
-            <Link href="/terms" className="text-orange-600 hover:text-black underline">Terms of Service</Link>, including the&nbsp;
-            <Link href="/user-agreement" className="text-orange-600 hover:text-black underline">User Agreement</Link>&nbsp;and&nbsp;
-            <Link href="/privacy-policy" className="text-orange-600 hover:text-black underline">Privacy Policy</Link>.
+            <Link href="/terms" className="text-orange-600 hover:text-black underline">Terms of Service</Link>&nbsp;and&nbsp;
+            <Link href="/policy" className="text-orange-600 hover:text-black underline">Privacy Policy</Link>.
           </label>
         </div>
 
-        {errorMsg && <p className="text-red-600 text-sm">{errorMsg}</p>}
-        {successMsg && <p className="text-green-600 text-sm">{successMsg}</p>}
+        {errorMsg && (
+          <div className="bg-red-50 border border-red-200 rounded-lg p-3">
+            <p className="text-red-700 text-sm flex items-center gap-2">
+              <AlertCircle className="w-4 h-4 flex-shrink-0" />
+              {errorMsg}
+            </p>
+          </div>
+        )}
+        
+        {successMsg && (
+          <div className="bg-green-50 border border-green-200 rounded-lg p-3">
+            <p className="text-green-700 text-sm flex items-center gap-2">
+              <MailCheck className="w-4 h-4 flex-shrink-0" />
+              {successMsg}
+            </p>
+          </div>
+        )}
 
         <motion.button
           whileTap={{ scale: 0.95 }}
           type="submit"
           disabled={loading || !agreedToTerms}
-          className="w-full p-3 rounded-lg bg-black text-white hover:bg-orange-600 transition disabled:opacity-50"
+          className="w-full p-3 rounded-lg bg-black text-white hover:bg-orange-600 transition disabled:opacity-50 font-medium"
         >
-          {loading ? 'Creating...' : 'Create my account'}
+          {loading ? (
+            <span className="flex items-center justify-center gap-2">
+              <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+              Creating Account...
+            </span>
+          ) : (
+            'Create my account'
+          )}
         </motion.button>
 
         <div className="text-sm text-center text-gray-600">

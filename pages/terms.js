@@ -548,9 +548,7 @@ export default function Terms() {
                       If you have questions about these Terms or need support, please contact us through any of the following channels:
                     </p>
                     <ul className="space-y-2 text-gray-700">
-                      <li><strong>Email:</strong> legal@mygigzz.com</li>
-                      <li><strong>Support:</strong> support@mygigzz.com</li>
-                      <li><strong>Help Center:</strong> Available in your account dashboard</li>
+                      <li><strong>Support:</strong> gigzzafrica@gmail.com</li>
                       <li><strong>Business Hours:</strong> Monday - Friday, 9:00 AM - 6:00 PM WAT</li>
                     </ul>
                   </div>

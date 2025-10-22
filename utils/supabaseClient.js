@@ -1,6 +1,8 @@
 // utils/supabaseClient.js
 import { createPagesBrowserClient } from "@supabase/auth-helpers-nextjs";
 
-// ✅ This automatically uses NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY
-// from your environment variables — you don’t need to pass them manually.
+// ✅ Keep your existing imports working
 export const supabase = createPagesBrowserClient();
+
+// ✅ Add this as an alternative for new components
+export const createClient = () => createPagesBrowserClient();

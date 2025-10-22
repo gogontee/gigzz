@@ -128,7 +128,7 @@ export default function ContactPage() {
               href="mailto:support@gigzz.com"
               className="text-orange-600 underline"
             >
-              support@gigzz.com
+              gigzzafrica@gmail.com
             </a>
           </div>
         </main>
