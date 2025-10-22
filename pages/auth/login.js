@@ -82,30 +82,25 @@ export default function LoginPage() {
 
   // Function to handle pending photo upload
   const handlePendingPhotoUpload = async (user) => {
-    const pendingPhotoKey = `pending_photo_${user.id}`;
-    const pendingPhotoData = localStorage.getItem(pendingPhotoKey);
-    
-    if (pendingPhotoData && user.email_confirmed_at) {
-      try {
-        setUploadingPhoto(true);
-        const { fileData, fileName, fileType, folder } = JSON.parse(pendingPhotoData);
-        
-        // Convert base64 back to file
-        const file = base64ToFile(fileData, fileName, fileType);
-        
-        const filePath = `${folder}/${user.id}-${Date.now()}-${fileName}`;
-        
-        // Upload to Supabase Storage
-        const { error: uploadError } = await supabase.storage
-          .from('profilephoto')
-          .upload(filePath, file);
+  const pendingPhotoKey = `pending_photo_${user.id}`;
+  const pendingPhotoData = localStorage.getItem(pendingPhotoKey);
+  
+  if (pendingPhotoData && user.email_confirmed_at) {
+    try {
+      setUploadingPhoto(true);
+      const { fileData, fileName, fileType, folder } = JSON.parse(pendingPhotoData);
+      
+      // Convert base64 back to file
+      const file = base64ToFile(fileData, fileName, fileType);
+      
+      const filePath = `${folder}/${user.id}-${Date.now()}-${fileName}`;
+      
+      // Upload to Supabase Storage
+      const { error: uploadError } = await supabase.storage
+        .from('profilephoto')
+        .upload(filePath, file);
 
-        if (uploadError) {
-          console.error('Photo upload failed:', uploadError);
-          // Don't show error to user - they can upload manually later
-          return;
-        }
-
+      if (!uploadError) {
         // Get public URL
         const { data: publicUrlData } = supabase.storage
           .from('profilephoto')
@@ -126,20 +121,28 @@ export default function LoginPage() {
             .eq('id', user.id);
 
           if (!updateError) {
-            // Success - clean up local storage
+            // ✅ ADDED: Force refresh of user data
+            await supabase.auth.refreshSession();
+            
+            // Clean up
             localStorage.removeItem(pendingPhotoKey);
             setHasPendingPhoto(false);
-            setSuccessMsg(prev => prev ? `${prev} Profile photo uploaded successfully!` : 'Profile photo uploaded successfully!');
+            setSuccessMsg('Profile photo uploaded successfully!');
+            
+            // ✅ ADDED: Optional - small delay then refresh page
+            setTimeout(() => {
+              window.location.reload();
+            }, 1000);
           }
         }
-      } catch (error) {
-        console.error('Pending photo upload failed:', error);
-        // Don't show error to user - they can upload manually later
-      } finally {
-        setUploadingPhoto(false);
       }
+    } catch (error) {
+      console.error('Pending photo upload failed:', error);
+    } finally {
+      setUploadingPhoto(false);
     }
-  };
+  }
+};
 
   const handleLogin = async (e) => {
     e.preventDefault();
