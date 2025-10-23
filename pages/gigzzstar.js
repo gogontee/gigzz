@@ -12,7 +12,7 @@ export default function GigzzStarsPage() {
   const [page, setPage] = useState(0);
   const [hasMoreApplicants, setHasMoreApplicants] = useState(true);
 
-  const [activeTab, setActiveTab] = useState("stars"); // "stars" | "portfolios"
+  const [activeTab, setActiveTab] = useState("portfolios"); // "stars" | "portfolios"
   const [searchTerm, setSearchTerm] = useState("");
 
   /** Fetch Applicants (All star) */
