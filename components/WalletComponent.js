@@ -17,6 +17,11 @@ export default function WalletComponent() {
   const [activeTab, setActiveTab] = useState("wallet");
   const [showSuccessPopup, setShowSuccessPopup] = useState(false);
   const [successMessage, setSuccessMessage] = useState("");
+  const [inputError, setInputError] = useState("");
+
+  const TOKEN_PRICE = 250; // 1 token = ₦250
+  const MINIMUM_AMOUNT = 5000; // Minimum funding amount in Naira
+  const MINIMUM_TOKENS = 20; // 20 tokens = ₦5000
 
   // Initialize client-side
   useEffect(() => {
@@ -66,11 +71,51 @@ export default function WalletComponent() {
     }
   };
 
+  // Calculate Naira amount
+  const calculateNairaAmount = (tokens) => tokens * TOKEN_PRICE;
+
+  // Handle input change with validation
+  const handleTokenAmountChange = (value) => {
+    const numValue = parseInt(value) || 0;
+    setTokenAmount(numValue);
+
+    if (numValue > 0 && numValue < MINIMUM_TOKENS) {
+      setInputError(`Minimum funding is ${MINIMUM_TOKENS} tokens (₦${MINIMUM_AMOUNT.toLocaleString()})`);
+    } else {
+      setInputError("");
+    }
+  };
+
+  // Handle input arrow clicks
+  const handleIncrement = () => {
+    if (tokenAmount === 0) {
+      // First click jumps to minimum tokens
+      setTokenAmount(MINIMUM_TOKENS);
+      setInputError("");
+    } else {
+      // Subsequent clicks increment by 1
+      setTokenAmount(prev => prev + 1);
+      setInputError("");
+    }
+  };
+
+  const handleDecrement = () => {
+    if (tokenAmount > MINIMUM_TOKENS) {
+      setTokenAmount(prev => prev - 1);
+      setInputError("");
+    } else if (tokenAmount === MINIMUM_TOKENS) {
+      // Can't go below minimum
+      setInputError(`Minimum funding is ${MINIMUM_TOKENS} tokens (₦${MINIMUM_AMOUNT.toLocaleString()})`);
+    }
+  };
+
   // SIMPLE & RELIABLE PAYSTACK INTEGRATION
   const handleProceedToPay = () => {
+    const nairaAmount = calculateNairaAmount(tokenAmount);
+
     // Basic validation
-    if (tokenAmount < 1) {
-      alert("Please enter at least 1 token");
+    if (tokenAmount < MINIMUM_TOKENS) {
+      setInputError(`Minimum funding is ${MINIMUM_TOKENS} tokens (₦${MINIMUM_AMOUNT.toLocaleString()})`);
       return;
     }
 
@@ -89,14 +134,14 @@ export default function WalletComponent() {
     console.log("Starting payment process...");
     setPaystackLoading(true);
 
-    // Calculate amount in kobo (1 token = ₦250)
-    const amountInKobo = tokenAmount * 250 * 100;
+    // Calculate amount in kobo
+    const amountInKobo = nairaAmount * 100;
     const reference = `GIGZZ_${userId}_${Date.now()}`;
 
     console.log("Payment details:", {
       amountInKobo,
       tokenAmount,
-      nairaAmount: tokenAmount * 250,
+      nairaAmount,
       userEmail,
       reference
     });
@@ -210,6 +255,7 @@ export default function WalletComponent() {
       setSuccessMessage(`Payment successful! ${tokenAmount} tokens added to your wallet. 👍`);
       setShowSuccessPopup(true);
       setTokenAmount(0);
+      setInputError("");
       
       console.log("Payment processing completed successfully");
 
@@ -229,6 +275,8 @@ export default function WalletComponent() {
     return <div>Loading...</div>;
   }
 
+  const nairaAmount = calculateNairaAmount(tokenAmount);
+
   return (
     <>
       <div className="w-full max-w-4xl mx-auto space-y-6">
@@ -241,12 +289,10 @@ export default function WalletComponent() {
               </div>
               <div>
                 <p className="text-sm font-medium text-gray-600">Token Balance</p>
-                <p className="text-2xl font-bold text-orange-400">
+                <p className="text-2xl font-bold text-orange-500">
                   {loadingBalance ? "Loading..." : `${balance} Tokens`}
                 </p>
-                <p className="text-sm text-gray-500">
-                  ₦{(balance * 250).toLocaleString()}
-                </p>
+                {/* Naira equivalent removed from balance display as requested */}
               </div>
             </div>
           </div>
@@ -293,33 +339,72 @@ export default function WalletComponent() {
                 <div className="p-2 bg-orange-100 rounded-lg">
                   <TrendingUp className="w-5 h-5 text-orange-400" />
                 </div>
-                <h3 className="text-lg font-semibold text-gray-900">Fund Wallet</h3>
+                <div>
+                  <h3 className="text-lg font-semibold text-gray-900">Fund Wallet</h3>
+                  <p className="text-sm text-gray-600">Minimum funding: {MINIMUM_TOKENS} tokens = ₦{MINIMUM_AMOUNT.toLocaleString()}</p>
+                </div>
               </div>
               
               <div className="space-y-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Enter Tokens (1 token = ₦250)
+                    Enter Number of Tokens
                   </label>
-                  <input
-                    type="number"
-                    min="1"
-                    value={tokenAmount || ""}
-                    onChange={(e) => setTokenAmount(parseInt(e.target.value) || 0)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-400 focus:border-transparent"
-                    placeholder="Enter number of tokens"
-                  />
-                  {tokenAmount > 0 && (
-                    <p className="text-sm text-gray-600 mt-2">
-                      Amount: <span className="font-semibold">₦{(tokenAmount * 250).toLocaleString()}</span>
+                  
+                  {/* Custom number input with arrows */}
+                  <div className="relative">
+                    <input
+                      type="number"
+                      min={MINIMUM_TOKENS}
+                      value={tokenAmount || ""}
+                      onChange={(e) => handleTokenAmountChange(e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-400 focus:border-transparent pr-16"
+                      placeholder={`Enter ${MINIMUM_TOKENS} or more tokens`}
+                    />
+                    <div className="absolute right-1 top-1 bottom-1 flex flex-col">
+                      <button
+                        type="button"
+                        onClick={handleIncrement}
+                        className="flex-1 px-2 bg-gray-100 hover:bg-gray-200 rounded-t-md border-b border-gray-300 flex items-center justify-center"
+                      >
+                        <span className="text-sm font-bold">▲</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleDecrement}
+                        className="flex-1 px-2 bg-gray-100 hover:bg-gray-200 rounded-b-md flex items-center justify-center"
+                      >
+                        <span className="text-sm font-bold">▼</span>
+                      </button>
+                    </div>
+                  </div>
+                  
+                  {/* Error message */}
+                  {inputError && (
+                    <p className="text-red-600 text-sm mt-2 font-medium">
+                      {inputError}
                     </p>
+                  )}
+                  
+                  {/* Amount display during funding process */}
+                  {tokenAmount >= MINIMUM_TOKENS && (
+                    <div className="mt-3 p-3 bg-gray-50 rounded-lg border border-gray-200">
+                      <div className="flex justify-between items-center">
+                        <span className="text-sm font-medium text-gray-700">Token Amount:</span>
+                        <span className="text-sm font-semibold">{tokenAmount} Tokens</span>
+                      </div>
+                      <div className="flex justify-between items-center mt-1">
+                        <span className="text-sm font-medium text-gray-700">Naira Equivalent:</span>
+                        <span className="text-sm font-semibold">₦{nairaAmount.toLocaleString()}</span>
+                      </div>
+                    </div>
                   )}
                 </div>
                 
                 <button
                   onClick={handleProceedToPay}
-                  disabled={paystackLoading || tokenAmount < 1}
-                  className="w-full py-3 rounded-lg bg-orange-400 text-white hover:bg-black disabled:bg-gray-300 font-semibold flex items-center justify-center gap-2 transition-colors"
+                  disabled={paystackLoading || tokenAmount < MINIMUM_TOKENS || inputError}
+                  className="w-full py-3 rounded-lg bg-orange-400 text-white hover:bg-black disabled:bg-gray-300 disabled:cursor-not-allowed font-semibold flex items-center justify-center gap-2 transition-colors"
                 >
                   {paystackLoading ? (
                     <>
@@ -329,7 +414,7 @@ export default function WalletComponent() {
                   ) : (
                     <>
                       <PlusCircle className="w-5 h-5" />
-                      <span>Pay ₦{(tokenAmount * 250).toLocaleString()}</span>
+                      <span>Pay ₦{nairaAmount.toLocaleString()}</span>
                     </>
                   )}
                 </button>
@@ -354,70 +439,70 @@ export default function WalletComponent() {
       </div>
 
       {/* Custom Success Popup */}
-<AnimatePresence>
-  {showSuccessPopup && (
-    <div className="fixed inset-0 flex items-center justify-center z-50 p-4 bg-black bg-opacity-50">
-      <motion.div
-        initial={{ opacity: 0, scale: 0.8 }}
-        animate={{ opacity: 1, scale: 1 }}
-        exit={{ opacity: 0, scale: 0.8 }}
-        transition={{ type: "spring", damping: 25, stiffness: 300 }}
-        className="bg-white rounded-2xl shadow-2xl max-w-xs w-full mx-auto p-4 md:max-w-sm md:p-8 relative"
-      >
-        {/* Close Button */}
-        <button
-          onClick={closeSuccessPopup}
-          className="absolute top-2 right-2 md:top-4 md:right-4 text-gray-400 hover:text-gray-600 transition-colors"
-        >
-          <X className="w-4 h-4 md:w-5 md:h-5" />
-        </button>
+      <AnimatePresence>
+        {showSuccessPopup && (
+          <div className="fixed inset-0 flex items-center justify-center z-50 p-4 bg-black bg-opacity-50">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.8 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.8 }}
+              transition={{ type: "spring", damping: 25, stiffness: 300 }}
+              className="bg-white rounded-2xl shadow-2xl max-w-xs w-full mx-auto p-4 md:max-w-sm md:p-8 relative"
+            >
+              {/* Close Button */}
+              <button
+                onClick={closeSuccessPopup}
+                className="absolute top-2 right-2 md:top-4 md:right-4 text-gray-400 hover:text-gray-600 transition-colors"
+              >
+                <X className="w-4 h-4 md:w-5 md:h-5" />
+              </button>
 
-        {/* Success Content */}
-        <div className="text-center">
-          {/* Success Icon */}
-          <motion.div
-            initial={{ scale: 0 }}
-            animate={{ scale: 1 }}
-            transition={{ delay: 0.2, type: "spring", stiffness: 200 }}
-            className="w-12 h-12 md:w-16 md:h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-3 md:mb-4"
-          >
-            <CheckCircle className="w-6 h-6 md:w-8 md:h-8 text-green-500" />
-          </motion.div>
+              {/* Success Content */}
+              <div className="text-center">
+                {/* Success Icon */}
+                <motion.div
+                  initial={{ scale: 0 }}
+                  animate={{ scale: 1 }}
+                  transition={{ delay: 0.2, type: "spring", stiffness: 200 }}
+                  className="w-12 h-12 md:w-16 md:h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-3 md:mb-4"
+                >
+                  <CheckCircle className="w-6 h-6 md:w-8 md:h-8 text-green-500" />
+                </motion.div>
 
-          {/* Thumbs Up Emoji */}
-          <motion.div
-            initial={{ scale: 0, rotate: -20 }}
-            animate={{ scale: 1, rotate: 0 }}
-            transition={{ delay: 0.3, type: "spring", stiffness: 200 }}
-            className="text-2xl md:text-4xl mb-3 md:mb-4"
-          >
-            👍
-          </motion.div>
+                {/* Thumbs Up Emoji */}
+                <motion.div
+                  initial={{ scale: 0, rotate: -20 }}
+                  animate={{ scale: 1, rotate: 0 }}
+                  transition={{ delay: 0.3, type: "spring", stiffness: 200 }}
+                  className="text-2xl md:text-4xl mb-3 md:mb-4"
+                >
+                  👍
+                </motion.div>
 
-          {/* Title */}
-          <h3 className="text-lg md:text-xl font-bold text-gray-900 mb-1 md:mb-2">
-            Payment Successful!
-          </h3>
+                {/* Title */}
+                <h3 className="text-lg md:text-xl font-bold text-gray-900 mb-1 md:mb-2">
+                  Payment Successful!
+                </h3>
 
-          {/* Message */}
-          <p className="text-gray-600 mb-4 md:mb-6 text-xs md:text-base">
-            {successMessage}
-          </p>
+                {/* Message */}
+                <p className="text-gray-600 mb-4 md:mb-6 text-xs md:text-base">
+                  {successMessage}
+                </p>
 
-          {/* Continue Button */}
-          <motion.button
-            whileHover={{ scale: 1.05 }}
-            whileTap={{ scale: 0.95 }}
-            onClick={closeSuccessPopup}
-            className="w-full py-2 md:py-3 bg-orange-400 text-white rounded-lg font-semibold hover:bg-black transition-colors text-sm md:text-base"
-          >
-            Continue
-          </motion.button>
-        </div>
-      </motion.div>
-    </div>
-  )}
-</AnimatePresence>
+                {/* Continue Button */}
+                <motion.button
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                  onClick={closeSuccessPopup}
+                  className="w-full py-2 md:py-3 bg-orange-400 text-white rounded-lg font-semibold hover:bg-black transition-colors text-sm md:text-base"
+                >
+                  Continue
+                </motion.button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </>
   );
 }
