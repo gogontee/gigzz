@@ -137,7 +137,7 @@ export default function Signup() {
       // 2️⃣ Generate verification token
       const verificationToken = generateVerificationToken();
 
-      // 3️⃣ Sign up user WITHOUT Supabase email confirmation - FIXED VERSION
+      // 3️⃣ Sign up user WITHOUT Supabase email confirmation
       const { data: authData, error: signUpError } = await supabase.auth.signUp({
         email,
         password,
@@ -147,7 +147,7 @@ export default function Signup() {
             has_pending_photo: !!avatarFile,
             email_verified: false
           },
-          // ADD THIS to disable Supabase's automatic email confirmation
+          // Disable Supabase's automatic email confirmation
           emailRedirectTo: null
         }
       });
@@ -171,19 +171,19 @@ export default function Signup() {
       const userId = authData.user.id;
       const fullName = `${firstName} ${lastName}`;
 
-      // 4️⃣ Store verification token and user data in our custom table
+      // 4️⃣ Store verification token and user data in our custom table - FIXED COLUMN NAMES
       const verificationData = {
-        userId: userId,
+        user_id: userId,  // snake_case
         email: email,
         token: verificationToken,
-        expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(), // 24 hours
-        userRole: userRole,
-        userData: {
-          firstName,
-          lastName,
-          country,
-          state,
-          city
+        expires_at: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(), // snake_case
+        user_role: userRole,  // snake_case
+        user_data: {  // snake_case
+          first_name: firstName,
+          last_name: lastName,
+          country: country,
+          state: state,
+          city: city
         }
       };
 
@@ -221,6 +221,7 @@ export default function Signup() {
         { onConflict: ['id'] }
       );
       if (userTableError) {
+        console.error('User table error:', userTableError);
         setErrorMsg('Failed to assign user role.');
         setLoading(false);
         return;
@@ -259,7 +260,7 @@ export default function Signup() {
 
       const { error: profileError } = await supabase.from(profileTable).insert([profilePayload]);
       if (profileError) {
-        console.error(profileError);
+        console.error('Profile table error:', profileError);
         setErrorMsg('Database error: ' + profileError.message);
         setLoading(false);
         return;
