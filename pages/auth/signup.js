@@ -75,10 +75,9 @@ export default function Signup() {
     setAvatarFile(e.target.files[0]);
   };
 
-  // NEW: Updated email function that uses the new API route
   const sendVerificationEmail = async (email, firstName, verificationToken) => {
     try {
-      const response = await fetch("/api/send-signup-email", { // Changed to new API route
+      const response = await fetch("/api/send-signup-email", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ 
@@ -138,8 +137,7 @@ export default function Signup() {
       // 2️⃣ Generate verification token
       const verificationToken = generateVerificationToken();
 
-      // 3️⃣ Sign up user WITHOUT Supabase email confirmation
-      // CHANGED: Removed verification_token from user metadata since we're using custom system
+      // 3️⃣ Sign up user WITHOUT Supabase email confirmation - FIXED VERSION
       const { data: authData, error: signUpError } = await supabase.auth.signUp({
         email,
         password,
@@ -147,9 +145,10 @@ export default function Signup() {
           data: { 
             role: userRole,
             has_pending_photo: !!avatarFile,
-            email_verified: false // Mark as unverified initially
-            // Removed: verification_token - we're using our custom system
-          }
+            email_verified: false
+          },
+          // ADD THIS to disable Supabase's automatic email confirmation
+          emailRedirectTo: null
         }
       });
 
@@ -266,7 +265,7 @@ export default function Signup() {
         return;
       }
 
-      // 8️⃣ Send verification email via NEW custom API route
+      // 8️⃣ Send verification email via our custom API route
       try {
         await sendVerificationEmail(email, firstName, verificationToken);
         
