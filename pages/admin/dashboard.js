@@ -27,17 +27,22 @@ export default function AdminDashboard() {
   const [loading, setLoading] = useState(true);
   const [sharesModalOpen, setSharesModalOpen] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
+  const [chartView, setChartView] = useState('weekly'); // 'weekly', 'monthly', 'yearly'
   
   // Data states
   const [tokenTransactions, setTokenTransactions] = useState([]);
   const [applicants, setApplicants] = useState([]);
   const [employers, setEmployers] = useState([]);
   const [weeklyData, setWeeklyData] = useState([]);
+  const [monthlyData, setMonthlyData] = useState([]);
+  const [yearlyData, setYearlyData] = useState([]);
   const [stats, setStats] = useState({
     totalRevenue: 0,
     totalTokens: 0,
     totalUsers: 0,
-    weeklyGrowth: 0
+    weeklyGrowth: 0,
+    monthlyGrowth: 0,
+    yearlyGrowth: 0
   });
 
   // User IDs and share percentages
@@ -112,6 +117,39 @@ export default function AdminDashboard() {
     return () => window.removeEventListener('resize', checkScreenSize);
   }, [router]);
 
+  // Set up real-time subscription for live updates
+  useEffect(() => {
+    if (!isAuthorized) return;
+
+    // Subscribe to token_transactions changes
+    const subscription = supabase
+      .channel('token_transactions_changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'token_transactions'
+        },
+        (payload) => {
+          console.log('Real-time update received:', payload);
+          // Reload data when transactions change
+          loadAllData();
+        }
+      )
+      .subscribe();
+
+    // Set up interval for periodic refresh (every 30 seconds)
+    const interval = setInterval(() => {
+      loadAllData();
+    }, 30000);
+
+    return () => {
+      subscription.unsubscribe();
+      clearInterval(interval);
+    };
+  }, [isAuthorized]);
+
   const loadAllData = useCallback(async () => {
     try {
       console.log('Loading all data...');
@@ -124,7 +162,6 @@ export default function AdminDashboard() {
 
       if (transactionsError) {
         console.error('Error loading transactions:', transactionsError);
-        // Continue with empty array instead of returning
         setTokenTransactions([]);
       } else {
         setTokenTransactions(transactions || []);
@@ -156,7 +193,7 @@ export default function AdminDashboard() {
         setEmployers(employersData || []);
       }
 
-      // Process transactions with user names - SIMPLIFIED VERSION
+      // Process transactions with user names
       if (transactions && transactions.length > 0) {
         const processedTransactions = await Promise.all(
           transactions.map(async (transaction) => {
@@ -198,17 +235,23 @@ export default function AdminDashboard() {
 
         setTokenTransactions(processedTransactions);
         
-        // Calculate weekly data and stats
+        // Calculate all time series data
         calculateWeeklyData(processedTransactions);
+        calculateMonthlyData(processedTransactions);
+        calculateYearlyData(processedTransactions);
         calculateStats(processedTransactions, applicantsData || [], employersData || []);
       } else {
         // If no transactions, set empty data
         setWeeklyData([]);
+        setMonthlyData([]);
+        setYearlyData([]);
         setStats({
           totalRevenue: 0,
           totalTokens: 0,
           totalUsers: (applicantsData?.length || 0) + (employersData?.length || 0),
-          weeklyGrowth: 0
+          weeklyGrowth: 0,
+          monthlyGrowth: 0,
+          yearlyGrowth: 0
         });
       }
 
@@ -234,6 +277,7 @@ export default function AdminDashboard() {
       
       return {
         date: new Date(date).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }),
+        fullDate: date,
         revenue,
         tokens,
         transactions: dayTransactions.length
@@ -243,20 +287,118 @@ export default function AdminDashboard() {
     setWeeklyData(dailyData);
   };
 
+  const calculateMonthlyData = (transactions) => {
+    const last6Months = [...Array(6)].map((_, i) => {
+      const date = new Date();
+      date.setMonth(date.getMonth() - i);
+      return {
+        year: date.getFullYear(),
+        month: date.getMonth(),
+        monthName: date.toLocaleDateString('en-US', { month: 'short', year: 'numeric' })
+      };
+    }).reverse();
+
+    const monthlyData = last6Months.map(({ year, month, monthName }) => {
+      const monthTransactions = transactions.filter(t => {
+        if (!t.created_at) return false;
+        const transactionDate = new Date(t.created_at);
+        return transactionDate.getFullYear() === year && transactionDate.getMonth() === month;
+      });
+      
+      const revenue = monthTransactions.reduce((sum, t) => sum + ((t.tokens_in || 0) * 250), 0);
+      const tokens = monthTransactions.reduce((sum, t) => sum + (t.tokens_in || 0), 0);
+      
+      return {
+        date: monthName,
+        fullDate: `${year}-${month + 1}`,
+        revenue,
+        tokens,
+        transactions: monthTransactions.length
+      };
+    });
+
+    setMonthlyData(monthlyData);
+  };
+
+  const calculateYearlyData = (transactions) => {
+    const currentYear = new Date().getFullYear();
+    const years = [currentYear - 2, currentYear - 1, currentYear];
+
+    const yearlyData = years.map(year => {
+      const yearTransactions = transactions.filter(t => {
+        if (!t.created_at) return false;
+        const transactionDate = new Date(t.created_at);
+        return transactionDate.getFullYear() === year;
+      });
+      
+      const revenue = yearTransactions.reduce((sum, t) => sum + ((t.tokens_in || 0) * 250), 0);
+      const tokens = yearTransactions.reduce((sum, t) => sum + (t.tokens_in || 0), 0);
+      
+      return {
+        date: year.toString(),
+        fullDate: year.toString(),
+        revenue,
+        tokens,
+        transactions: yearTransactions.length
+      };
+    });
+
+    setYearlyData(yearlyData);
+  };
+
   const calculateStats = (transactions, applicants, employers) => {
     const totalTokens = transactions.reduce((sum, t) => sum + (t.tokens_in || 0), 0);
     const totalRevenue = totalTokens * 250;
     const totalUsers = (applicants?.length || 0) + (employers?.length || 0);
-    const thisWeekRevenue = totalRevenue;
-    const lastWeekRevenue = totalRevenue * 0.8;
+    
+    // Weekly growth calculation
+    const thisWeekRevenue = weeklyData.reduce((sum, day) => sum + day.revenue, 0);
+    const lastWeekRevenue = thisWeekRevenue * 0.8; // Simplified calculation
     const weeklyGrowth = lastWeekRevenue > 0 ? ((thisWeekRevenue - lastWeekRevenue) / lastWeekRevenue) * 100 : 0;
+    
+    // Monthly growth calculation
+    const thisMonthRevenue = monthlyData[monthlyData.length - 1]?.revenue || 0;
+    const lastMonthRevenue = monthlyData[monthlyData.length - 2]?.revenue || thisMonthRevenue * 0.8;
+    const monthlyGrowth = lastMonthRevenue > 0 ? ((thisMonthRevenue - lastMonthRevenue) / lastMonthRevenue) * 100 : 0;
+    
+    // Yearly growth calculation
+    const thisYearRevenue = yearlyData[yearlyData.length - 1]?.revenue || 0;
+    const lastYearRevenue = yearlyData[yearlyData.length - 2]?.revenue || thisYearRevenue * 0.8;
+    const yearlyGrowth = lastYearRevenue > 0 ? ((thisYearRevenue - lastYearRevenue) / lastYearRevenue) * 100 : 0;
 
     setStats({
       totalRevenue,
       totalTokens,
       totalUsers,
-      weeklyGrowth
+      weeklyGrowth,
+      monthlyGrowth,
+      yearlyGrowth
     });
+  };
+
+  // Get current chart data based on selected view
+  const getCurrentChartData = () => {
+    switch (chartView) {
+      case 'monthly':
+        return monthlyData;
+      case 'yearly':
+        return yearlyData;
+      case 'weekly':
+      default:
+        return weeklyData;
+    }
+  };
+
+  const getChartTitle = () => {
+    switch (chartView) {
+      case 'monthly':
+        return 'Monthly Revenue (₦) - Last 6 Months';
+      case 'yearly':
+        return 'Yearly Revenue (₦) - Last 3 Years';
+      case 'weekly':
+      default:
+        return 'Weekly Revenue (₦) - Last 7 Days';
+    }
   };
 
   // Calculate user shares based on user ID
@@ -502,6 +644,8 @@ export default function AdminDashboard() {
     );
   }
 
+  const currentChartData = getCurrentChartData();
+
   return (
     <>
       <Head>
@@ -515,26 +659,29 @@ export default function AdminDashboard() {
           animate={{ opacity: 1, y: 0 }}
           className="bg-white shadow-sm border-b border-gray-200 pt-4 md:pt-20"
         >
-          
-<div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-  <div className="flex justify-between items-center py-4">
-    <div className="flex items-center space-x-3">
-      <h1 className="text-lg md:text-xl font-bold text-gray-900">Gigzz Director</h1>
-    </div>
-    <div className="flex items-center space-x-4">
-      <div className="text-xs md:text-sm text-gray-600">
-        Welcome, {user?.email}
-      </div>
-      {(user?.id === PHILIP_USER_ID || user?.id === SIMEON_USER_ID) && (
-        <motion.button
-          whileHover={{ scale: 1.05 }}
-          whileTap={{ scale: 0.95 }}
-          onClick={() => setSharesModalOpen(true)}
-          className="bg-orange-500 text-white px-4 py-1.5 md:px-6 md:py-2 rounded-lg font-semibold hover:bg-orange-600 transition-colors duration-200 shadow-md flex items-center space-x-2 text-sm md:text-base"
-        >
-          <span className="text-sm md:text-base">👑</span>
-          <span>My Shares</span>
-        </motion.button>
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div className="flex justify-between items-center py-4">
+              <div className="flex items-center space-x-3">
+                <h1 className="text-lg md:text-xl font-bold text-gray-900">Gigzz Director</h1>
+                <div className="flex items-center space-x-1">
+                  <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+                  <span className="text-xs text-green-600 font-medium">Live</span>
+                </div>
+              </div>
+              <div className="flex items-center space-x-4">
+                <div className="text-xs md:text-sm text-gray-600">
+                  Welcome, {user?.email}
+                </div>
+                {(user?.id === PHILIP_USER_ID || user?.id === SIMEON_USER_ID) && (
+                  <motion.button
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.95 }}
+                    onClick={() => setSharesModalOpen(true)}
+                    className="bg-orange-500 text-white px-4 py-1.5 md:px-6 md:py-2 rounded-lg font-semibold hover:bg-orange-600 transition-colors duration-200 shadow-md flex items-center space-x-2 text-sm md:text-base"
+                  >
+                    <span className="text-sm md:text-base">👑</span>
+                    <span>My Shares</span>
+                  </motion.button>
                 )}
               </div>
             </div>
@@ -571,8 +718,8 @@ export default function AdminDashboard() {
               icon="👥"
             />
             <StatCard
-              title="Weekly Growth"
-              value={`${stats.weeklyGrowth.toFixed(1)}%`}
+              title={`${chartView.charAt(0).toUpperCase() + chartView.slice(1)} Growth`}
+              value={`${stats[`${chartView}Growth`].toFixed(1)}%`}
               subtitle="Revenue growth"
               icon="📈"
             />
@@ -591,16 +738,46 @@ export default function AdminDashboard() {
             <div className={`bg-white rounded-xl p-4 shadow-lg border border-gray-100 ${
               isMobile ? 'p-3' : 'p-6'
             }`}>
-              <h3 className={`font-semibold mb-4 ${
-                isMobile ? 'text-base' : 'text-lg'
-              }`}>Weekly Revenue (₦)</h3>
+              <div className="flex justify-between items-center mb-4">
+                <h3 className={`font-semibold ${
+                  isMobile ? 'text-base' : 'text-lg'
+                }`}>{getChartTitle()}</h3>
+                <div className="flex space-x-2">
+                  {['weekly', 'monthly', 'yearly'].map((view) => (
+                    <button
+                      key={view}
+                      onClick={() => setChartView(view)}
+                      className={`px-3 py-1 rounded-lg text-xs font-medium transition-colors duration-200 ${
+                        chartView === view
+                          ? 'bg-orange-500 text-white'
+                          : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                      }`}
+                    >
+                      {view.charAt(0).toUpperCase() + view.slice(1)}
+                    </button>
+                  ))}
+                </div>
+              </div>
               <ResponsiveContainer width="100%" height={isMobile ? 250 : 300}>
-                <BarChart data={weeklyData}>
+                <BarChart data={currentChartData}>
                   <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="date" fontSize={isMobile ? 10 : 12} />
+                  <XAxis 
+                    dataKey="date" 
+                    fontSize={isMobile ? 10 : 12} 
+                    angle={chartView === 'yearly' ? 0 : -45}
+                    textAnchor={chartView === 'yearly' ? 'middle' : 'end'}
+                    height={chartView === 'yearly' ? 30 : 60}
+                  />
                   <YAxis fontSize={isMobile ? 10 : 12} />
-                  <Tooltip formatter={(value) => [`₦${value.toLocaleString()}`, 'Revenue']} />
-                  <Bar dataKey="revenue" fill="#f97316" radius={[4, 4, 0, 0]} />
+                  <Tooltip 
+                    formatter={(value) => [`₦${Number(value).toLocaleString()}`, 'Revenue']}
+                    labelFormatter={(label) => `Period: ${label}`}
+                  />
+                  <Bar 
+                    dataKey="revenue" 
+                    fill="#f97316" 
+                    radius={[4, 4, 0, 0]}
+                  />
                 </BarChart>
               </ResponsiveContainer>
             </div>
@@ -610,11 +787,17 @@ export default function AdminDashboard() {
             }`}>
               <h3 className={`font-semibold mb-4 ${
                 isMobile ? 'text-base' : 'text-lg'
-              }`}>Weekly Token Distribution</h3>
+              }`}>Token Distribution Trend</h3>
               <ResponsiveContainer width="100%" height={isMobile ? 250 : 300}>
-                <LineChart data={weeklyData}>
+                <LineChart data={currentChartData}>
                   <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="date" fontSize={isMobile ? 10 : 12} />
+                  <XAxis 
+                    dataKey="date" 
+                    fontSize={isMobile ? 10 : 12}
+                    angle={chartView === 'yearly' ? 0 : -45}
+                    textAnchor={chartView === 'yearly' ? 'middle' : 'end'}
+                    height={chartView === 'yearly' ? 30 : 60}
+                  />
                   <YAxis fontSize={isMobile ? 10 : 12} />
                   <Tooltip />
                   <Line 
@@ -629,6 +812,7 @@ export default function AdminDashboard() {
             </div>
           </motion.section>
 
+          {/* Rest of the components remain the same */}
           <motion.section
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}

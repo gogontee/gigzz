@@ -666,12 +666,16 @@ export default function JobDetailPage() {
                       <h1 className="text-2xl md:text-4xl font-bold mb-2">{job.title}</h1>
                       <div className="flex flex-wrap items-center gap-2">
                         {isVerified && (
-                          <span className="inline-flex items-center gap-1 bg-green-600 px-3 py-1 rounded-full text-xs font-medium">
+                          <span className={`inline-flex items-center gap-1 bg-green-600 px-2 py-0.5 rounded-full font-medium ${
+                            isMobile ? 'text-xs' : 'text-xs'
+                          }`}>
                             ✔ Verified Employer
                           </span>
                         )}
                         {job.condition && (
-                          <span className="inline-flex items-center gap-1 bg-orange-400 px-3 py-1 rounded-full text-xs font-medium">
+                          <span className={`inline-flex items-center gap-1 bg-orange-400 px-2 py-0.5 rounded-full font-medium ${
+                            isMobile ? 'text-xs' : 'text-xs'
+                          }`}>
                             🤝 Agent Posted
                           </span>
                         )}
@@ -759,7 +763,11 @@ export default function JobDetailPage() {
               {similarJobs.length === 0 ? (
                 <p className="text-gray-500 text-center py-8">No similar jobs found.</p>
               ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className={`grid gap-4 ${
+                  isMobile 
+                    ? 'grid-cols-2' 
+                    : 'grid-cols-1 md:grid-cols-2'
+                }`}>
                   {similarJobs.map((similarJob) => (
                     <motion.div
                       key={similarJob.id}
