@@ -1,0 +1,128 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<urlset
+  xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"
+  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+  xsi:schemaLocation="http://www.sitemaps.org/schemas/sitemap/0.9
+                      http://www.sitemaps.org/schemas/sitemap/0.9/sitemap.xsd">
+
+  <!-- 🔹 Homepage -->
+  <url>
+    <loc>https://mygigzz.com/</loc>
+    <lastmod>2025-11-07</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>1.0</priority>
+  </url>
+  <!-- Title: Gigzz — Remote Jobs. Real Talent. -->
+  <!-- Description: Explore thousands of remote, hybrid, and onsite job opportunities. Gigzz connects top creative talents with clients and brands worldwide. -->
+
+  <!-- 🔹 All Jobs Listing -->
+  <url>
+    <loc>https://mygigzz.com/job/alljobs</loc>
+    <lastmod>2025-11-07</lastmod>
+    <changefreq>hourly</changefreq>
+    <priority>0.95</priority>
+  </url>
+  <!-- Title: All Jobs — Explore Every Opportunity on Gigzz -->
+  <!-- Description: Browse all available jobs from clients across the world. Filter by category, skills, and location to find your perfect creative gig. -->
+
+  <!-- 🔹 Remote Jobs -->
+  <url>
+    <loc>https://mygigzz.com/remote</loc>
+    <lastmod>2025-11-07</lastmod>
+    <changefreq>hourly</changefreq>
+    <priority>0.9</priority>
+  </url>
+  <!-- Title: Remote Jobs — Work from Anywhere with Gigzz -->
+  <!-- Description: Find verified remote jobs that let you work from anywhere. From design and tech to content and marketing, Gigzz has global opportunities waiting for you. -->
+
+  <!-- 🔹 Hybrid Jobs -->
+  <url>
+    <loc>https://mygigzz.com/hybrid</loc>
+    <lastmod>2025-11-07</lastmod>
+    <changefreq>hourly</changefreq>
+    <priority>0.9</priority>
+  </url>
+  <!-- Title: Hybrid Jobs — Flexible Work for the Modern Creative -->
+  <!-- Description: Discover hybrid jobs that blend in-office and remote flexibility. Perfect for creatives seeking work-life balance and collaboration. -->
+
+  <!-- 🔹 Onsite Jobs -->
+  <url>
+    <loc>https://mygigzz.com/onsite</loc>
+    <lastmod>2025-11-07</lastmod>
+    <changefreq>hourly</changefreq>
+    <priority>0.9</priority>
+  </url>
+  <!-- Title: Onsite Jobs — Local Opportunities for Creatives -->
+  <!-- Description: Explore onsite jobs near you. Join top companies, agencies, and brands that value creative talent and in-person collaboration. -->
+
+  <!-- 🔹 Employer Landing Page -->
+  <url>
+    <loc>https://mygigzz.com/employerlanding</loc>
+    <lastmod>2025-11-07</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.9</priority>
+  </url>
+  <!-- Title: Post Your Job on Gigzz — Hire Creative Professionals -->
+  <!-- Description: Looking for remote or onsite creative talent? Post your job on Gigzz and get connected to verified professionals ready to deliver results. -->
+
+  <!-- 🔹 Gigzz Star (Talent Showcase) -->
+  <url>
+    <loc>https://mygigzz.com/gigzzstar</loc>
+    <lastmod>2025-11-07</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.85</priority>
+  </url>
+  <!-- Title: Gigzz Star — Discover Top Creative Talents & Portfolios -->
+  <!-- Description: Explore portfolios from talented designers, developers, writers, and creators. See their work, connect, and collaborate through Gigzz. -->
+
+  <!-- 🔹 News & Updates -->
+  <url>
+    <loc>https://mygigzz.com/news</loc>
+    <lastmod>2025-11-07</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <!-- Title: Gigzz News — Latest Updates, Features & Industry Insights -->
+  <!-- Description: Stay informed with the latest job trends, creative success stories, and platform announcements from the Gigzz team. -->
+
+  <!-- 🔹 Pricing Page -->
+  <url>
+    <loc>https://mygigzz.com/pricing</loc>
+    <lastmod>2025-11-07</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.75</priority>
+  </url>
+  <!-- Title: Gigzz Pricing — Simple & Transparent Plans for Everyone -->
+  <!-- Description: Find the right plan to post jobs or apply for gigs. Choose between free and premium options for clients and creatives. -->
+
+  <!-- 🔹 About Page -->
+  <url>
+    <loc>https://mygigzz.com/about</loc>
+    <lastmod>2025-11-07</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <!-- Title: About Gigzz — Why Work or Hire with Us -->
+  <!-- Description: Discover how Gigzz connects clients with creative professionals across the globe. Learn about our mission and values. -->
+
+  <!-- 🔹 Learn More Page -->
+  <url>
+    <loc>https://mygigzz.com/learnmore</loc>
+    <lastmod>2025-11-07</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.75</priority>
+  </url>
+  <!-- Title: Learn How Gigzz Works — Simplifying Creative Collaboration -->
+  <!-- Description: Learn how Gigzz makes hiring and job applications seamless for both clients and creatives. Easy, secure, and built for modern work. -->
+
+  <!-- 🔹 Sign Up Page -->
+  <url>
+    <loc>https://mygigzz.com/auth/signup</loc>
+    <lastmod>2025-11-07</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.7</priority>
+  </url>
+  <!-- Title: Join Gigzz — Sign Up to Hire or Get Hired -->
+  <!-- Description: Create your free Gigzz account to start posting jobs, showcasing your talent, and landing creative gigs globally. -->
+
+</urlset>

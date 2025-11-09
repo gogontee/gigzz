@@ -1,0 +1,15 @@
+
+# Environment variables
+.env.local
+.env
+.env.production
+
+# Node modules
+node_modules/
+
+# Logs
+*.log
+
+# Next.js build
+.next/
+out/
