@@ -15,15 +15,29 @@ export default function UpdatePasswordPage() {
   const [success, setSuccess] = useState(false);
 
   useEffect(() => {
-    async function checkSession() {
-      const { data } = await supabase.auth.getSession();
-      if (!data?.session) {
-        setStatus("❌ Reset link expired or invalid.");
+    async function init() {
+      // Grab the access_token from the URL
+      const { access_token } = router.query;
+
+      if (!access_token) {
+        setStatus("❌ Reset link invalid or missing token.");
+        setLoading(false);
+        return;
       }
+
+      // Set session with the token
+      const { error } = await supabase.auth.setSession({ access_token });
+
+      if (error) {
+        setStatus(`❌ ${error.message}`);
+      }
+
       setLoading(false);
     }
-    checkSession();
-  }, []);
+
+    // Only run after router is ready
+    if (router.isReady) init();
+  }, [router.isReady, router.query]);
 
   const handleUpdatePassword = async (e) => {
     e.preventDefault();
@@ -41,7 +55,6 @@ export default function UpdatePasswordPage() {
     } else {
       setSuccess(true);
       setStatus("✅ Password updated successfully!");
-      // Redirect after animation
       setTimeout(() => router.push("/auth/login"), 2000);
     }
   };
@@ -57,13 +70,11 @@ export default function UpdatePasswordPage() {
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
       <div className="p-6 w-full max-w-md bg-white rounded-xl shadow-md relative">
-        
         <div className="text-center mb-6">
           <img src="https://mygigzz.com/images/gigzzblack.png" className="w-24 mx-auto" />
           <h1 className="text-2xl font-bold mt-3">Set a New Password</h1>
         </div>
 
-        {/* Success Animation */}
         <AnimatePresence>
           {success && (
             <motion.div
@@ -86,7 +97,6 @@ export default function UpdatePasswordPage() {
           )}
         </AnimatePresence>
 
-        {/* Form */}
         {!success && (
           <form onSubmit={handleUpdatePassword} className="space-y-4">
             <div className="relative">
