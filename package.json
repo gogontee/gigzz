@@ -32,6 +32,7 @@
     "react-slick": "^0.31.0",
     "react-webcam": "^7.2.0",
     "recharts": "^3.2.1",
+    "resend": "^6.4.2",
     "slick-carousel": "^1.8.1",
     "uuid": "^11.1.0"
   },

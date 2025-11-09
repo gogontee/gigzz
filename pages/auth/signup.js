@@ -40,6 +40,11 @@ const convertFileToBase64 = (file) => {
   });
 };
 
+// Generate email verification token
+const generateVerificationToken = () => {
+  return Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
+};
+
 export default function Signup() {
   const router = useRouter();
 
@@ -68,6 +73,31 @@ export default function Signup() {
 
   const handleFileChange = (e) => {
     setAvatarFile(e.target.files[0]);
+  };
+
+  const sendVerificationEmail = async (email, firstName, verificationToken) => {
+    try {
+      const response = await fetch("/api/send-email", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ 
+          email: email, 
+          type: "signup",
+          firstName: firstName,
+          verificationToken: verificationToken
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to send verification email');
+      }
+
+      return await response.json();
+    } catch (error) {
+      console.error('Email sending error:', error);
+      throw error;
+    }
   };
 
   const handleSignup = async (e) => {
@@ -105,16 +135,20 @@ export default function Signup() {
         }
       }
 
-      // 2️⃣ Sign up user with email confirmation
+      // 2️⃣ Generate verification token
+      const verificationToken = generateVerificationToken();
+
+      // 3️⃣ Sign up user WITHOUT Supabase email confirmation
       const { data: authData, error: signUpError } = await supabase.auth.signUp({
         email,
         password,
         options: { 
           data: { 
             role: userRole,
-            has_pending_photo: !!avatarFile, // Flag to track pending upload
-          },
-          emailRedirectTo: `${window.location.origin}/auth/callback`
+            has_pending_photo: !!avatarFile,
+            email_verified: false, // Mark as unverified initially
+            verification_token: verificationToken
+          }
         }
       });
 
@@ -137,7 +171,35 @@ export default function Signup() {
       const userId = authData.user.id;
       const fullName = `${firstName} ${lastName}`;
 
-      // 3️⃣ Store photo data locally for later upload
+      // 4️⃣ Store verification token and user data
+      const verificationData = {
+        userId: userId,
+        email: email,
+        token: verificationToken,
+        expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(), // 24 hours
+        userRole: userRole,
+        userData: {
+          firstName,
+          lastName,
+          country,
+          state,
+          city
+        }
+      };
+
+      // Store verification data in database
+      const { error: verificationError } = await supabase
+        .from('email_verifications')
+        .insert([verificationData]);
+
+      if (verificationError) {
+        console.error('Verification data storage error:', verificationError);
+        setErrorMsg('Failed to setup verification. Please try again.');
+        setLoading(false);
+        return;
+      }
+
+      // 5️⃣ Store photo data locally for later upload
       if (avatarFile && photoData) {
         const pendingPhotoData = {
           fileData: photoData,
@@ -149,9 +211,13 @@ export default function Signup() {
         localStorage.setItem(`pending_photo_${userId}`, JSON.stringify(pendingPhotoData));
       }
 
-      // 4️⃣ Upsert into users table
+      // 6️⃣ Upsert into users table
       const { error: userTableError } = await supabase.from('users').upsert(
-        [{ id: userId, role: userRole }],
+        [{ 
+          id: userId, 
+          role: userRole,
+          email_verified: false
+        }],
         { onConflict: ['id'] }
       );
       if (userTableError) {
@@ -160,7 +226,7 @@ export default function Signup() {
         return;
       }
 
-      // 5️⃣ Insert into profile table WITHOUT avatar_url initially
+      // 7️⃣ Insert into profile table WITHOUT avatar_url initially
       let profilePayload;
       if (userRole === 'applicant') {
         profilePayload = {
@@ -169,7 +235,7 @@ export default function Signup() {
           email,
           phone: '',
           full_address: '',
-          avatar_url: null, // Will be updated after email confirmation
+          avatar_url: null,
           bio: '',
           specialties: null,
           country: country || null,
@@ -185,7 +251,7 @@ export default function Signup() {
           email,
           phone: '',
           full_address: '',
-          avatar_url: null, // Will be updated after email confirmation
+          avatar_url: null,
           bio: '',
           id_card_url: null,
         };
@@ -199,9 +265,20 @@ export default function Signup() {
         return;
       }
 
-      // Success - show verification message
-      setVerificationSent(true);
-      setSuccessMsg(`Verification email sent to ${email}`);
+      // 8️⃣ Send verification email via Resend
+      try {
+        await sendVerificationEmail(email, firstName, verificationToken);
+        
+        // Success - show verification message
+        setVerificationSent(true);
+        setSuccessMsg(`Verification email sent to ${email}`);
+
+      } catch (emailError) {
+        console.error('Email sending failed:', emailError);
+        setErrorMsg('Account created but failed to send verification email. Please contact support.');
+        setLoading(false);
+        return;
+      }
 
     } catch (err) {
       console.error('Signup error:', err);

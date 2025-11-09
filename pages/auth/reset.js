@@ -1,54 +1,92 @@
-import { useState } from 'react';
-import { supabase } from '../../utils/supabaseClient';
+"use client";
+
+import { useState } from "react";
 
 export default function ResetPasswordPage() {
-  const [email, setEmail] = useState('');
-  const [status, setStatus] = useState('');
+  const [email, setEmail] = useState("");
+  const [status, setStatus] = useState("");
+  const [loading, setLoading] = useState(false);
 
   const handleResetPassword = async (e) => {
     e.preventDefault();
-    setStatus('');
+    setStatus("");
+    setLoading(true);
 
-    const { error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: `${window.location.origin}/auth/update-password`,
-    });
+    try {
+      const res = await fetch("/api/send-email", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, type: "reset" }), // ✅ type = reset
+      });
 
-    if (error) {
-      setStatus(`❌ ${error.message}`);
-    } else {
-      setStatus('✅ Password reset link sent. Check your email.');
+      const data = await res.json();
+
+      if (res.ok) {
+        setStatus("✅ Password reset link sent. Check your email.");
+      } else {
+        setStatus(`❌ ${data.error || "Something went wrong."}`);
+      }
+    } catch (err) {
+      console.error("Reset error:", err);
+      setStatus("❌ Network error. Please try again.");
+    } finally {
+      setLoading(false);
     }
   };
 
   return (
-    <div className="p-6 max-w-md mx-auto mt-20">
-      <h1 className="text-2xl font-bold mb-6 text-center">Reset Password</h1>
-      <form onSubmit={handleResetPassword} className="space-y-4">
-        <input
-          type="email"
-          className="w-full border px-4 py-2 rounded"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          placeholder="Enter your email"
-          required
-        />
+    <div className="min-h-screen flex items-center justify-center bg-gray-50 p-4">
+      <div className="max-w-md w-full bg-white rounded-xl shadow-md p-6">
+        <div className="text-center mb-6">
+          <img
+            src="https://mygigzz.com/images/gigzzblack.png"
+            alt="Gigzz Logo"
+            className="w-24 mx-auto"
+          />
+          <h1 className="text-2xl font-bold mt-3">Reset Password</h1>
+          <p className="text-gray-600 text-sm mt-1">
+            Enter your email to receive a password reset link.
+          </p>
+        </div>
 
-        <button
-          type="submit"
-          className="w-full bg-black text-white py-2 rounded hover:bg-orange-600 transition"
-        >
-          Send Reset Link
-        </button>
-      </form>
+        <form onSubmit={handleResetPassword} className="space-y-4">
+          <input
+            type="email"
+            placeholder="Enter your email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            required
+            className="w-full border border-gray-300 px-4 py-2 rounded focus:outline-none focus:ring-2 focus:ring-orange-600"
+          />
 
-      {status && (
-        <p className="mt-4 text-center text-sm text-gray-700">{status}</p>
-      )}
+          <button
+            type="submit"
+            disabled={loading}
+            className={`w-full py-2 rounded text-white font-semibold transition ${
+              loading
+                ? "bg-gray-400 cursor-not-allowed"
+                : "bg-black hover:bg-orange-600"
+            }`}
+          >
+            {loading ? "Sending..." : "Send Reset Link"}
+          </button>
+        </form>
 
-      <div className="mt-6 text-center text-sm text-gray-600">
-        <a href="/auth/login" className="text-orange-600 hover:underline">
-          Back to Login
-        </a>
+        {status && (
+          <p
+            className={`mt-4 text-center text-sm ${
+              status.startsWith("✅") ? "text-green-600" : "text-red-600"
+            }`}
+          >
+            {status}
+          </p>
+        )}
+
+        <div className="mt-6 text-center text-sm text-gray-600">
+          <a href="/auth/login" className="text-orange-600 hover:underline">
+            Back to Login
+          </a>
+        </div>
       </div>
     </div>
   );
