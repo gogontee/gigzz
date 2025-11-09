@@ -75,14 +75,14 @@ export default function Signup() {
     setAvatarFile(e.target.files[0]);
   };
 
+  // NEW: Updated email function that uses the new API route
   const sendVerificationEmail = async (email, firstName, verificationToken) => {
     try {
-      const response = await fetch("/api/send-email", {
+      const response = await fetch("/api/send-signup-email", { // Changed to new API route
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ 
           email: email, 
-          type: "signup",
           firstName: firstName,
           verificationToken: verificationToken
         }),
@@ -139,6 +139,7 @@ export default function Signup() {
       const verificationToken = generateVerificationToken();
 
       // 3️⃣ Sign up user WITHOUT Supabase email confirmation
+      // CHANGED: Removed verification_token from user metadata since we're using custom system
       const { data: authData, error: signUpError } = await supabase.auth.signUp({
         email,
         password,
@@ -146,8 +147,8 @@ export default function Signup() {
           data: { 
             role: userRole,
             has_pending_photo: !!avatarFile,
-            email_verified: false, // Mark as unverified initially
-            verification_token: verificationToken
+            email_verified: false // Mark as unverified initially
+            // Removed: verification_token - we're using our custom system
           }
         }
       });
@@ -171,7 +172,7 @@ export default function Signup() {
       const userId = authData.user.id;
       const fullName = `${firstName} ${lastName}`;
 
-      // 4️⃣ Store verification token and user data
+      // 4️⃣ Store verification token and user data in our custom table
       const verificationData = {
         userId: userId,
         email: email,
@@ -265,7 +266,7 @@ export default function Signup() {
         return;
       }
 
-      // 8️⃣ Send verification email via Resend
+      // 8️⃣ Send verification email via NEW custom API route
       try {
         await sendVerificationEmail(email, firstName, verificationToken);
         
@@ -336,7 +337,7 @@ export default function Signup() {
 
             <div className="bg-orange-50 border border-orange-200 rounded-lg p-4">
               <p className="text-orange-800 text-sm">
-                💡 <strong>Can't find the email?</strong> Check your spam folder or request a new verification email from the login page.
+                💡 <strong>Can't find the email?</strong> Check your spam folder. The verification link will expire in 24 hours.
               </p>
             </div>
           </div>
