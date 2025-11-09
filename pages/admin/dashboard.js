@@ -526,14 +526,14 @@ export default function AdminDashboard() {
                 </div>
                 {(user?.id === PHILIP_USER_ID || user?.id === SIMEON_USER_ID) && (
                   <motion.button
-                    whileHover={{ scale: 1.05 }}
-                    whileTap={{ scale: 0.95 }}
-                    onClick={() => setSharesModalOpen(true)}
-                    className="bg-orange-500 text-white px-6 py-2 rounded-lg font-semibold hover:bg-orange-600 transition-colors duration-200 shadow-md flex items-center space-x-2"
-                  >
-                    <span>👑</span>
-                    <span>My Shares</span>
-                  </motion.button>
+  whileHover={{ scale: 1.05 }}
+  whileTap={{ scale: 0.95 }}
+  onClick={() => setSharesModalOpen(true)}
+  className="bg-orange-500 text-white px-4 py-1.5 md:px-6 md:py-2 rounded-lg font-semibold hover:bg-orange-600 transition-colors duration-200 shadow-md flex items-center space-x-2 text-sm md:text-base"
+>
+  <span className="text-sm md:text-base">👑</span>
+  <span>My Shares</span>
+</motion.button>
                 )}
               </div>
             </div>
