@@ -23,15 +23,18 @@ export default async function handler(req, res) {
     if (!type || !["signup", "reset"].includes(type))
       return res.status(400).json({ error: "Invalid email type" });
 
-    // Check if the user exists for reset
+    // Check if the user exists in Supabase Auth (not a custom table)
     if (type === "reset") {
-      const { data: user, error: fetchUserError } = await supabaseAdmin
-        .from("users") // Replace with your auth table if custom
-        .select("*")
-        .eq("email", email)
-        .single();
+      const { data: { users }, error: fetchUserError } = await supabaseAdmin.auth.admin.listUsers();
+      
+      if (fetchUserError) {
+        console.error("Error fetching users:", fetchUserError);
+        return res.status(400).json({ error: "Error checking user existence" });
+      }
 
-      if (fetchUserError || !user) {
+      const userExists = users.some(user => user.email === email);
+      
+      if (!userExists) {
         return res.status(400).json({ error: "No user found with this email" });
       }
     }
@@ -73,7 +76,7 @@ export default async function handler(req, res) {
              border-radius:6px;
              margin-top:10px;
            ">Confirm Account</a>
-           <p>If you didn’t create an account, ignore this email.</p>
+           <p>If you didn't create an account, ignore this email.</p>
          </div>`
       : `<div style="font-family: Arial, sans-serif;">
            <h2>Reset your Gigzz password</h2>
@@ -87,16 +90,21 @@ export default async function handler(req, res) {
              border-radius:6px;
              margin-top:10px;
            ">Reset Password</a>
-           <p>If you didn’t request this, ignore this email.</p>
+           <p>If you didn't request this, ignore this email.</p>
          </div>`;
 
     // Send email via Resend
-    await resend.emails.send({
-      from: "hello@mygigzz.com", // Use a verified domain email
+    const { data: emailData, error: emailError } = await resend.emails.send({
+      from: "hello@mygigzz.com",
       to: email,
       subject,
       html,
     });
+
+    if (emailError) {
+      console.error("Resend error:", emailError);
+      return res.status(400).json({ error: emailError.message });
+    }
 
     return res.status(200).json({ message: `${type} email sent successfully` });
   } catch (err) {
