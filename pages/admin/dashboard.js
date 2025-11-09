@@ -515,25 +515,26 @@ export default function AdminDashboard() {
           animate={{ opacity: 1, y: 0 }}
           className="bg-white shadow-sm border-b border-gray-200 pt-4 md:pt-20"
         >
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div className="flex justify-between items-center py-4">
-              <div className="flex items-center space-x-3">
-                <h1 className="text-xl font-bold text-gray-900">Gigzz Director</h1>
-              </div>
-              <div className="flex items-center space-x-4">
-                <div className="text-sm text-gray-600">
-                  Welcome, {user?.email}
-                </div>
-                {(user?.id === PHILIP_USER_ID || user?.id === SIMEON_USER_ID) && (
-                  <motion.button
-  whileHover={{ scale: 1.05 }}
-  whileTap={{ scale: 0.95 }}
-  onClick={() => setSharesModalOpen(true)}
-  className="bg-orange-500 text-white px-4 py-1.5 md:px-6 md:py-2 rounded-lg font-semibold hover:bg-orange-600 transition-colors duration-200 shadow-md flex items-center space-x-2 text-sm md:text-base"
->
-  <span className="text-sm md:text-base">👑</span>
-  <span>My Shares</span>
-</motion.button>
+          
+<div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+  <div className="flex justify-between items-center py-4">
+    <div className="flex items-center space-x-3">
+      <h1 className="text-lg md:text-xl font-bold text-gray-900">Gigzz Director</h1>
+    </div>
+    <div className="flex items-center space-x-4">
+      <div className="text-xs md:text-sm text-gray-600">
+        Welcome, {user?.email}
+      </div>
+      {(user?.id === PHILIP_USER_ID || user?.id === SIMEON_USER_ID) && (
+        <motion.button
+          whileHover={{ scale: 1.05 }}
+          whileTap={{ scale: 0.95 }}
+          onClick={() => setSharesModalOpen(true)}
+          className="bg-orange-500 text-white px-4 py-1.5 md:px-6 md:py-2 rounded-lg font-semibold hover:bg-orange-600 transition-colors duration-200 shadow-md flex items-center space-x-2 text-sm md:text-base"
+        >
+          <span className="text-sm md:text-base">👑</span>
+          <span>My Shares</span>
+        </motion.button>
                 )}
               </div>
             </div>
