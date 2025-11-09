@@ -15,28 +15,23 @@ export default function UpdatePasswordPage() {
   const [success, setSuccess] = useState(false);
 
   useEffect(() => {
-    async function init() {
-      // Grab the access_token from the URL
-      const { access_token } = router.query;
+    if (!router.isReady) return;
 
-      if (!access_token) {
-        setStatus("❌ Reset link invalid or missing token.");
-        setLoading(false);
-        return;
-      }
+    const { access_token } = router.query;
 
-      // Set session with the token
-      const { error } = await supabase.auth.setSession({ access_token });
-
-      if (error) {
-        setStatus(`❌ ${error.message}`);
-      }
-
+    if (!access_token) {
+      setStatus("❌ Reset link invalid or missing token.");
       setLoading(false);
+      return;
     }
 
-    // Only run after router is ready
-    if (router.isReady) init();
+    // Set session with the token
+    supabase.auth
+      .setSession({ access_token })
+      .then(({ error }) => {
+        if (error) setStatus(`❌ ${error.message}`);
+        setLoading(false);
+      });
   }, [router.isReady, router.query]);
 
   const handleUpdatePassword = async (e) => {
@@ -70,11 +65,16 @@ export default function UpdatePasswordPage() {
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
       <div className="p-6 w-full max-w-md bg-white rounded-xl shadow-md relative">
+        {/* Header */}
         <div className="text-center mb-6">
-          <img src="https://mygigzz.com/images/gigzzblack.png" className="w-24 mx-auto" />
+          <img
+            src="https://mygigzz.com/images/gigzzblack.png"
+            className="w-24 mx-auto"
+          />
           <h1 className="text-2xl font-bold mt-3">Set a New Password</h1>
         </div>
 
+        {/* Success Animation */}
         <AnimatePresence>
           {success && (
             <motion.div
@@ -88,7 +88,14 @@ export default function UpdatePasswordPage() {
                 animate={{ scale: 1 }}
                 transition={{ type: "spring", stiffness: 500, damping: 20 }}
               >
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-16 w-16 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  className="h-16 w-16 text-green-600"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                  strokeWidth={2}
+                >
                   <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
                 </svg>
               </motion.div>
@@ -97,8 +104,10 @@ export default function UpdatePasswordPage() {
           )}
         </AnimatePresence>
 
+        {/* Form */}
         {!success && (
           <form onSubmit={handleUpdatePassword} className="space-y-4">
+            {/* Password */}
             <div className="relative">
               <input
                 type={showPassword ? "text" : "password"}
@@ -114,18 +123,46 @@ export default function UpdatePasswordPage() {
                 className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-500"
               >
                 {showPassword ? (
-                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.875 18.825A10.05 10.05 0 0112 19c-5.523 0-10-4.477-10-10 0-1.04.164-2.041.475-3M3 3l18 18" />
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    className="h-5 w-5"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M13.875 18.825A10.05 10.05 0 0112 19c-5.523 0-10-4.477-10-10 0-1.04.164-2.041.475-3M3 3l18 18"
+                    />
                   </svg>
                 ) : (
-                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.477 0 8.268 2.943 9.542 7-1.274 4.057-5.065 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    className="h-5 w-5"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
+                    />
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M2.458 12C3.732 7.943 7.523 5 12 5c4.477 0 8.268 2.943 9.542 7-1.274 4.057-5.065 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"
+                    />
                   </svg>
                 )}
               </button>
             </div>
 
+            {/* Confirm Password */}
             <div className="relative">
               <input
                 type={showPassword ? "text" : "password"}
@@ -146,6 +183,7 @@ export default function UpdatePasswordPage() {
           </form>
         )}
 
+        {/* Status Message */}
         {!success && status && (
           <p className="mt-4 text-center text-sm text-gray-700">{status}</p>
         )}
