@@ -17,7 +17,20 @@ export default function UpdatePasswordPage() {
   useEffect(() => {
     if (!router.isReady) return;
 
-    const { access_token } = router.query;
+    // Supabase password reset uses hash parameters, not query parameters
+    const hash = window.location.hash;
+    
+    if (!hash || !hash.includes('access_token')) {
+      setStatus("❌ Reset link invalid or missing token.");
+      setLoading(false);
+      return;
+    }
+
+    // Parse the hash parameters
+    const params = new URLSearchParams(hash.substring(1)); // Remove the # character
+    const access_token = params.get('access_token');
+    const refresh_token = params.get('refresh_token');
+    const type = params.get('type');
 
     if (!access_token) {
       setStatus("❌ Reset link invalid or missing token.");
@@ -25,14 +38,20 @@ export default function UpdatePasswordPage() {
       return;
     }
 
-    // Set session with the token
-    supabase.auth
-      .setSession({ access_token })
-      .then(({ error }) => {
-        if (error) setStatus(`❌ ${error.message}`);
-        setLoading(false);
-      });
-  }, [router.isReady, router.query]);
+    // Set session with both tokens
+    supabase.auth.setSession({
+      access_token,
+      refresh_token
+    }).then(({ error }) => {
+      if (error) {
+        console.error("Session error:", error);
+        setStatus(`❌ ${error.message}`);
+      } else {
+        setStatus("✅ Session verified. You can now update your password.");
+      }
+      setLoading(false);
+    });
+  }, [router.isReady]);
 
   const handleUpdatePassword = async (e) => {
     e.preventDefault();
@@ -43,6 +62,11 @@ export default function UpdatePasswordPage() {
       return;
     }
 
+    if (password.length < 6) {
+      setStatus("❌ Password must be at least 6 characters long.");
+      return;
+    }
+
     const { error } = await supabase.auth.updateUser({ password });
 
     if (error) {
@@ -50,6 +74,10 @@ export default function UpdatePasswordPage() {
     } else {
       setSuccess(true);
       setStatus("✅ Password updated successfully!");
+      
+      // Sign out after successful password update
+      await supabase.auth.signOut();
+      
       setTimeout(() => router.push("/auth/login"), 2000);
     }
   };
@@ -70,6 +98,7 @@ export default function UpdatePasswordPage() {
           <img
             src="https://mygigzz.com/images/gigzzblack.png"
             className="w-24 mx-auto"
+            alt="Gigzz Logo"
           />
           <h1 className="text-2xl font-bold mt-3">Set a New Password</h1>
         </div>
@@ -111,16 +140,17 @@ export default function UpdatePasswordPage() {
             <div className="relative">
               <input
                 type={showPassword ? "text" : "password"}
-                className="w-full border px-4 py-2 rounded"
+                className="w-full border px-4 py-2 rounded focus:outline-none focus:ring-2 focus:ring-orange-500"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="Enter new password"
                 required
+                minLength={6}
               />
               <button
                 type="button"
                 onClick={() => setShowPassword(!showPassword)}
-                className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-500"
+                className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-500 hover:text-gray-700"
               >
                 {showPassword ? (
                   <svg
@@ -166,17 +196,19 @@ export default function UpdatePasswordPage() {
             <div className="relative">
               <input
                 type={showPassword ? "text" : "password"}
-                className="w-full border px-4 py-2 rounded"
+                className="w-full border px-4 py-2 rounded focus:outline-none focus:ring-2 focus:ring-orange-500"
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}
                 placeholder="Confirm new password"
                 required
+                minLength={6}
               />
             </div>
 
             <button
               type="submit"
-              className="w-full bg-black text-white py-2 rounded hover:bg-orange-600 transition font-semibold"
+              className="w-full bg-black text-white py-2 rounded hover:bg-orange-600 transition font-semibold disabled:opacity-50"
+              disabled={loading}
             >
               Update Password
             </button>
@@ -185,7 +217,9 @@ export default function UpdatePasswordPage() {
 
         {/* Status Message */}
         {!success && status && (
-          <p className="mt-4 text-center text-sm text-gray-700">{status}</p>
+          <p className={`mt-4 text-center text-sm ${status.includes('❌') ? 'text-red-600' : 'text-green-600'}`}>
+            {status}
+          </p>
         )}
 
         <div className="mt-6 text-center text-sm text-gray-600">
