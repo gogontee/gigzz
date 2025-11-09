@@ -41,7 +41,7 @@ export default async function handler(req, res) {
 
     const redirectTo =
       type === "signup"
-        ? "https://mygigzz.com/auth/confirm-signup"
+        ? "https://mygigzz.com/auth/signup"
         : "https://mygigzz.com/auth/update-password";
 
     const subject =
