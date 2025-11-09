@@ -30,8 +30,8 @@ export default async function handler(req, res) {
     // Determine redirect URL and email subject
     const redirectTo =
       type === "signup"
-        ? "https://gigzz.com/auth/confirm-signup"
-        : "https://gigzz.com/auth/update-password";
+        ? "https://mygigzz.com/auth/confirm-signup"
+        : "https://mygigzz.com/auth/update-password";
 
     const subject =
       type === "signup"
