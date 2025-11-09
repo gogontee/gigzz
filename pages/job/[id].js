@@ -663,16 +663,16 @@ export default function JobDetailPage() {
                       )}
                     </div>
                     <div>
-                      <h1 className="text-2xl md:text-4xl font-bold mb-2">{job.title}</h1>
-                      <div className="flex flex-wrap items-center gap-2">
-                        {isVerified && (
-                          <span className={`inline-flex items-center gap-1 bg-green-600 px-2 py-0.5 rounded-full font-medium ${
-                            isMobile ? 'text-xs' : 'text-xs'
-                          }`}>
-                            ✔ Verified Employer
-                          </span>
-                        )}
-                        {job.condition && (
+                      
+<h1 className="text-2xl md:text-4xl font-bold mb-2">{job.title}</h1>
+<div className="flex flex-wrap items-center gap-1">
+  {isVerified && (
+    <span className={`inline-flex items-center gap-0.5 bg-green-600 px-1 py-0.5 rounded-full font-medium ${
+      isMobile ? 'text-[7px]' : 'text-[7px]'
+    }`}>
+      ✔ Verified Client
+    </span>
+  )}                  {job.condition && (
                           <span className={`inline-flex items-center gap-1 bg-orange-400 px-2 py-0.5 rounded-full font-medium ${
                             isMobile ? 'text-xs' : 'text-xs'
                           }`}>
