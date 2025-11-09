@@ -2,13 +2,13 @@
 import { createClient } from "@supabase/supabase-js";
 import { Resend } from "resend";
 
-// ✅ Server-side Supabase client (service role key only)
+// Server-side Supabase client (service role key only)
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL,
   process.env.SUPABASE_SERVICE_ROLE_KEY
 );
 
-// ✅ Resend email client
+// Resend email client
 const resend = new Resend(process.env.RESEND_API_KEY);
 
 export default async function handler(req, res) {
@@ -19,15 +19,23 @@ export default async function handler(req, res) {
   try {
     const { email, type } = req.body;
 
-    if (!email) {
-      return res.status(400).json({ error: "Email is required" });
-    }
-
-    if (!type || !["signup", "reset"].includes(type)) {
+    if (!email) return res.status(400).json({ error: "Email is required" });
+    if (!type || !["signup", "reset"].includes(type))
       return res.status(400).json({ error: "Invalid email type" });
+
+    // Check if the user exists for reset
+    if (type === "reset") {
+      const { data: user, error: fetchUserError } = await supabaseAdmin
+        .from("users") // Replace with your auth table if custom
+        .select("*")
+        .eq("email", email)
+        .single();
+
+      if (fetchUserError || !user) {
+        return res.status(400).json({ error: "No user found with this email" });
+      }
     }
 
-    // Determine redirect URL and email subject
     const redirectTo =
       type === "signup"
         ? "https://mygigzz.com/auth/confirm-signup"
@@ -38,19 +46,20 @@ export default async function handler(req, res) {
         ? "Confirm your Gigzz account"
         : "Reset your Gigzz password";
 
-    // Map frontend type to Supabase type
     const supabaseType = type === "signup" ? "signup" : "recovery";
 
     // Generate Supabase magic link
-    const { data, error } = await supabaseAdmin.auth.admin.generateLink({
+    const { data, error: linkError } = await supabaseAdmin.auth.admin.generateLink({
       type: supabaseType,
       email,
       options: { redirectTo },
     });
 
-    if (error) throw error;
+    if (linkError) {
+      console.error("Supabase generateLink error:", linkError);
+      return res.status(400).json({ error: linkError.message });
+    }
 
-    // Compose HTML email
     const html = type === "signup"
       ? `<div style="font-family: Arial, sans-serif;">
            <h2>Welcome to Gigzz!</h2>
@@ -83,7 +92,7 @@ export default async function handler(req, res) {
 
     // Send email via Resend
     await resend.emails.send({
-      from: "Gigzz <no-reply@gigzz.com>",
+      from: "hello@mygigzz.com", // Use a verified domain email
       to: email,
       subject,
       html,
@@ -92,8 +101,6 @@ export default async function handler(req, res) {
     return res.status(200).json({ message: `${type} email sent successfully` });
   } catch (err) {
     console.error("Resend/Supabase error:", err);
-    return res
-      .status(500)
-      .json({ error: err.message || "Failed to send email" });
+    return res.status(500).json({ error: err.message || "Failed to send email" });
   }
 }
