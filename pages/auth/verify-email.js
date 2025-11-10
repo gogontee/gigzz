@@ -33,14 +33,7 @@ export default function VerifyEmail() {
         .eq('token', verificationToken)
         .single();
 
-      if (fetchError) {
-        console.error('Database error:', fetchError);
-        setStatus('error');
-        setMessage('Invalid verification link - database error');
-        return;
-      }
-
-      if (!verificationData) {
+      if (fetchError || !verificationData) {
         setStatus('error');
         setMessage('Invalid or expired verification link');
         return;
@@ -55,70 +48,26 @@ export default function VerifyEmail() {
 
       const userId = verificationData.user_id;
 
-      // 3. Update user email verification status in users table
+      // 3. Update user email verification status (MAIN ACTION)
       const { error: updateError } = await supabase
         .from('users')
         .update({ email_verified: true })
         .eq('id', userId);
 
       if (updateError) {
-        console.error('User table update failed:', updateError);
         setStatus('error');
-        setMessage('Failed to verify email - database error');
+        setMessage('Failed to verify email. Please try signing up again.');
         return;
       }
 
-      // 4. Clean up verification record (don't block on this)
-      try {
-        await supabase
-          .from('email_verifications')
-          .delete()
-          .eq('token', verificationToken);
-      } catch (deleteError) {
-        console.log('⚠️ Failed to delete verification record (continuing):', deleteError);
-      }
-
-      // 5. Handle pending photo upload if exists
-      const pendingPhotoKey = `pending_photo_${userId}`;
-      const pendingPhoto = localStorage.getItem(pendingPhotoKey);
-      
-      if (pendingPhoto) {
-        try {
-          console.log('📸 Found pending photo, uploading...');
-          const photoData = JSON.parse(pendingPhoto);
-          const fileExtension = photoData.fileName.split('.').pop();
-          const fileName = `avatar.${fileExtension}`;
-          
-          const { error: uploadError } = await supabase.storage
-            .from('avatars')
-            .upload(`${userId}/${fileName}`, 
-              dataURLtoBlob(photoData.fileData), 
-              { upsert: true }
-            );
-
-          if (!uploadError) {
-            const { data: urlData } = supabase.storage
-              .from('avatars')
-              .getPublicUrl(`${userId}/${fileName}`);
-
-            const profileTable = verificationData.user_role === 'applicant' ? 'applicants' : 'employers';
-            await supabase
-              .from(profileTable)
-              .update({ avatar_url: urlData.publicUrl })
-              .eq('id', userId);
-          }
-
-          localStorage.removeItem(pendingPhotoKey);
-        } catch (photoError) {
-          console.error('⚠️ Photo upload error (continuing):', photoError);
-        }
-      }
-
-      // 6. SUCCESS - Only set success state once everything is done
-      console.log('🎉 ALL STEPS COMPLETED SUCCESSFULLY!');
+      // ✅ SUCCESS - Show success immediately (don't wait for photo upload)
       setStatus('success');
       setMessage('Email verified successfully! You can now log in.');
-      
+
+      // 4. Start background tasks (don't wait for them)
+      startBackgroundTasks(userId, verificationToken, verificationData.user_role);
+
+      // Redirect to login after 3 seconds
       setTimeout(() => {
         router.push('/auth/login');
       }, 3000);
@@ -126,7 +75,61 @@ export default function VerifyEmail() {
     } catch (error) {
       console.error('💥 UNEXPECTED ERROR:', error);
       setStatus('error');
-      setMessage('An unexpected error occurred. Please try logging in directly.');
+      setMessage('An unexpected error occurred. Please try signing up again.');
+    }
+  };
+
+  // Run background tasks without blocking the main verification
+  const startBackgroundTasks = (userId, verificationToken, userRole) => {
+    // Clean up verification record in background
+    supabase
+      .from('email_verifications')
+      .delete()
+      .eq('token', verificationToken)
+      .then(() => console.log('✅ Verification record cleaned up'))
+      .catch(err => console.log('⚠️ Cleanup failed:', err));
+
+    // Handle photo upload in background
+    handlePendingPhoto(userId, userRole);
+  };
+
+  // Handle photo upload completely in background
+  const handlePendingPhoto = async (userId, userRole) => {
+    try {
+      const pendingPhotoKey = `pending_photo_${userId}`;
+      const pendingPhoto = localStorage.getItem(pendingPhotoKey);
+      
+      if (!pendingPhoto) return;
+
+      console.log('📸 Uploading photo in background...');
+      const photoData = JSON.parse(pendingPhoto);
+      const fileExtension = photoData.fileName.split('.').pop();
+      const fileName = `avatar.${fileExtension}`;
+      
+      const { error: uploadError } = await supabase.storage
+        .from('avatars')
+        .upload(`${userId}/${fileName}`, 
+          dataURLtoBlob(photoData.fileData), 
+          { upsert: true }
+        );
+
+      if (!uploadError) {
+        const { data: urlData } = supabase.storage
+          .from('avatars')
+          .getPublicUrl(`${userId}/${fileName}`);
+
+        const profileTable = userRole === 'applicant' ? 'applicants' : 'employers';
+        await supabase
+          .from(profileTable)
+          .update({ avatar_url: urlData.publicUrl })
+          .eq('id', userId);
+        
+        console.log('✅ Photo uploaded successfully');
+      }
+
+      localStorage.removeItem(pendingPhotoKey);
+    } catch (photoError) {
+      console.error('⚠️ Photo upload error:', photoError);
     }
   };
 
@@ -172,16 +175,16 @@ export default function VerifyEmail() {
             <h2 className="text-2xl font-bold text-gray-900 mb-2">Verification Failed</h2>
             <p className="text-gray-600 mb-4">{message}</p>
             <button
-              onClick={() => router.push('/auth/login')}
+              onClick={() => router.push('/auth/signup')}
               className="w-full bg-black text-white py-2 rounded-lg hover:bg-orange-600 transition mb-2"
             >
-              Go to Login
+              Try Signing Up Again
             </button>
             <button
-              onClick={() => router.push('/auth/signup')}
+              onClick={() => router.push('/auth/login')}
               className="w-full bg-gray-200 text-gray-800 py-2 rounded-lg hover:bg-gray-300 transition"
             >
-              Try Signing Up Again
+              Go to Login
             </button>
           </>
         )}
