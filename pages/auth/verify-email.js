@@ -26,7 +26,7 @@ export default function VerifyEmail() {
     try {
       console.log('🔍 Verifying token:', verificationToken);
 
-      // 1. Get verification data from database - CORRECTED COLUMN NAMES
+      // 1. Get verification data from database
       const { data: verificationData, error: fetchError } = await supabase
         .from('email_verifications')
         .select('*')
@@ -42,10 +42,10 @@ export default function VerifyEmail() {
 
       console.log('✅ Found verification data:', verificationData);
 
-      const userId = verificationData.user_id; // CORRECTED: user_id instead of userId
+      const userId = verificationData.user_id;
 
-      // 2. Check if token is expired (24 hours) - CORRECTED COLUMN NAME
-      if (new Date() > new Date(verificationData.expires_at)) { // CORRECTED: expires_at instead of expiresAt
+      // 2. Check if token is expired (24 hours)
+      if (new Date() > new Date(verificationData.expires_at)) {
         setStatus('error');
         setMessage('Verification link has expired. Please sign up again.');
         return;
@@ -55,7 +55,7 @@ export default function VerifyEmail() {
       const { error: updateError } = await supabase
         .from('users')
         .update({ email_verified: true })
-        .eq('id', userId); // CORRECTED: userId instead of verificationData.userId
+        .eq('id', userId);
 
       if (updateError) {
         console.error('❌ User update error:', updateError);
@@ -64,57 +64,54 @@ export default function VerifyEmail() {
         return;
       }
 
-      // 4. Update auth user metadata
-      const { error: authUpdateError } = await supabase.auth.admin.updateUserById(
-        userId, // CORRECTED: userId instead of verificationData.userId
-        { 
-          user_metadata: { 
-            email_verified: true
-          } 
-        }
-      );
+      // 4. Use a server-side API to update auth metadata (FIXED)
+      const { error: apiError } = await fetch('/api/verify-user', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          userId: userId
+        }),
+      }).then(res => res.json());
 
-      if (authUpdateError) {
-        console.error('⚠️ Auth update error (continuing):', authUpdateError);
+      if (apiError) {
+        console.error('⚠️ Auth update error (continuing):', apiError);
         // Continue anyway - the main verification is done
       }
 
       // 5. Handle pending photo upload if exists
-      const pendingPhotoKey = `pending_photo_${userId}`; // CORRECTED: userId instead of verificationData.userId
+      const pendingPhotoKey = `pending_photo_${userId}`;
       const pendingPhoto = localStorage.getItem(pendingPhotoKey);
       
       if (pendingPhoto) {
         try {
           const photoData = JSON.parse(pendingPhoto);
-          // Upload photo to Supabase Storage
           const fileExtension = photoData.fileName.split('.').pop();
           const fileName = `avatar.${fileExtension}`;
           
           const { error: uploadError } = await supabase.storage
             .from('avatars')
-            .upload(`${userId}/${fileName}`, // CORRECTED: userId instead of verificationData.userId
+            .upload(`${userId}/${fileName}`, 
               dataURLtoBlob(photoData.fileData), 
               { upsert: true }
             );
 
           if (!uploadError) {
-            // Get public URL and update profile
             const { data: urlData } = supabase.storage
               .from('avatars')
-              .getPublicUrl(`${userId}/${fileName}`); // CORRECTED: userId instead of verificationData.userId
+              .getPublicUrl(`${userId}/${fileName}`);
 
-            const profileTable = verificationData.user_role === 'applicant' ? 'applicants' : 'employers'; // CORRECTED: user_role instead of userRole
+            const profileTable = verificationData.user_role === 'applicant' ? 'applicants' : 'employers';
             await supabase
               .from(profileTable)
               .update({ avatar_url: urlData.publicUrl })
-              .eq('id', userId); // CORRECTED: userId instead of verificationData.userId
+              .eq('id', userId);
           }
 
-          // Clean up localStorage
           localStorage.removeItem(pendingPhotoKey);
         } catch (photoError) {
           console.error('⚠️ Photo upload error (continuing):', photoError);
-          // Don't fail verification because of photo upload
         }
       }
 
@@ -135,7 +132,7 @@ export default function VerifyEmail() {
     } catch (error) {
       console.error('💥 Verification error:', error);
       setStatus('error');
-      setMessage('An error occurred during verification');
+      setMessage('An error occurred during verification. Please try logging in directly.');
     }
   };
 
@@ -177,9 +174,15 @@ export default function VerifyEmail() {
             <p className="text-gray-600 mb-4">{message}</p>
             <button
               onClick={() => router.push('/auth/login')}
-              className="w-full bg-black text-white py-2 rounded-lg hover:bg-orange-600 transition"
+              className="w-full bg-black text-white py-2 rounded-lg hover:bg-orange-600 transition mb-2"
             >
               Go to Login
+            </button>
+            <button
+              onClick={() => router.push('/auth/signup')}
+              className="w-full bg-gray-200 text-gray-800 py-2 rounded-lg hover:bg-gray-300 transition"
+            >
+              Try Signing Up Again
             </button>
           </>
         )}
