@@ -68,23 +68,29 @@ export default function VerifyEmail() {
       console.log('✅ STEP 2: Token is valid');
       setDebugInfo('Step 3: Updating user verification status...');
 
-      // 3. Update user email verification status in users table
-      const { error: updateError } = await supabase
-        .from('users')
-        .update({ email_verified: true })
-        .eq('id', userId);
+      // 3. Update user email verification status via secure API
+setDebugInfo('Step 3: Updating Supabase Auth user metadata...');
 
-      console.log('🔍 STEP 3 Result:', { updateError });
+const response = await fetch('/api/verify-user', {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({ userId }),
+});
 
-      if (updateError) {
-        setDebugInfo(`User table update failed: ${updateError.message}`);
-        setStatus('error');
-        setMessage('Failed to verify email - database error');
-        return;
-      }
+const result = await response.json();
 
-      console.log('✅ STEP 3: User table updated successfully');
-      setDebugInfo('Step 4: Cleaning up verification record...');
+console.log('🔍 STEP 3 Result:', result);
+
+if (!response.ok) {
+  setDebugInfo(`Auth update failed: ${result.error}`);
+  setStatus('error');
+  setMessage('Failed to verify email - server error');
+  return;
+}
+
+console.log('✅ STEP 3: Auth user metadata updated successfully');
+setDebugInfo('Step 4: Cleaning up verification record...');
+
 
       // 4. Clean up verification record
       const { error: deleteError } = await supabase
