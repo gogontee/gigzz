@@ -1,5 +1,5 @@
 'use client';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { supabase } from '../../utils/supabaseClient';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { CheckCircle, XCircle, Loader } from 'lucide-react';
@@ -11,22 +11,24 @@ export default function VerifyEmail() {
   
   const [status, setStatus] = useState('verifying');
   const [message, setMessage] = useState('');
+  const hasVerified = useRef(false); // Prevents double execution
 
   useEffect(() => {
+    // If no token, show error immediately and stop
     if (!token) {
       setStatus('error');
       setMessage('Invalid verification link - no token found');
       return;
     }
 
+    // If already verifying or verified, don't run again
+    if (hasVerified.current) return;
+    
+    hasVerified.current = true; // Mark as started
     verifyEmailToken(token);
   }, [token]);
 
   const verifyEmailToken = async (verificationToken) => {
-    // DO NOT set any state until we know the final result
-    let finalStatus = 'error';
-    let finalMessage = 'An unexpected error occurred. Please try signing up again.';
-
     try {
       console.log('🔍 Starting verification with token:', verificationToken);
 
@@ -38,50 +40,52 @@ export default function VerifyEmail() {
         .single();
 
       if (fetchError || !verificationData) {
-        finalStatus = 'error';
-        finalMessage = 'Invalid or expired verification link';
+        // SET FINAL STATE - ERROR
+        setStatus('error');
+        setMessage('Invalid or expired verification link');
+        return;
       }
-      // 2. Check if token is expired (24 hours)
-      else if (new Date() > new Date(verificationData.expires_at)) {
-        finalStatus = 'error';
-        finalMessage = 'Verification link has expired. Please sign up again.';
+
+      // 2. Check if token is expired
+      if (new Date() > new Date(verificationData.expires_at)) {
+        // SET FINAL STATE - ERROR
+        setStatus('error');
+        setMessage('Verification link has expired. Please sign up again.');
+        return;
       }
-      else {
-        const userId = verificationData.user_id;
 
-        // 3. Update user email verification status
-        const { error: updateError } = await supabase
-          .from('users')
-          .update({ email_verified: true })
-          .eq('id', userId);
+      const userId = verificationData.user_id;
 
-        if (updateError) {
-          finalStatus = 'error';
-          finalMessage = 'Failed to verify email. Please try signing up again.';
-        } else {
-          // ✅ SUCCESS - Only set success if everything passes
-          finalStatus = 'success';
-          finalMessage = 'Email verified successfully! You can now log in.';
+      // 3. Update user email verification status
+      const { error: updateError } = await supabase
+        .from('users')
+        .update({ email_verified: true })
+        .eq('id', userId);
 
-          // Start background tasks (don't wait for them)
-          startBackgroundTasks(userId, verificationToken, verificationData.user_role);
-        }
+      if (updateError) {
+        // SET FINAL STATE - ERROR
+        setStatus('error');
+        setMessage('Failed to verify email. Please try signing up again.');
+        return;
       }
-    } catch (error) {
-      console.error('💥 UNEXPECTED ERROR:', error);
-      finalStatus = 'error';
-      finalMessage = 'An unexpected error occurred. Please try signing up again.';
-    }
 
-    // ✅ SET FINAL STATE ONLY ONCE - NO FLICKERING!
-    setStatus(finalStatus);
-    setMessage(finalMessage);
+      // ✅ SUCCESS - SET FINAL STATE ONLY ONCE
+      setStatus('success');
+      setMessage('Email verified successfully! You can now log in.');
 
-    // Only redirect if success
-    if (finalStatus === 'success') {
+      // Start background tasks
+      startBackgroundTasks(userId, verificationToken, verificationData.user_role);
+
+      // Redirect to login after success
       setTimeout(() => {
         router.push('/auth/login');
       }, 3000);
+
+    } catch (error) {
+      console.error('💥 UNEXPECTED ERROR:', error);
+      // SET FINAL STATE - ERROR
+      setStatus('error');
+      setMessage('An unexpected error occurred. Please try signing up again.');
     }
   };
 
