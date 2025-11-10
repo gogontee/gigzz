@@ -24,7 +24,9 @@ export default function VerifyEmail() {
 
   const verifyEmailToken = async (verificationToken) => {
     try {
-      // 1. Get verification data from database
+      console.log('🔍 Verifying token:', verificationToken);
+
+      // 1. Get verification data from database - CORRECTED COLUMN NAMES
       const { data: verificationData, error: fetchError } = await supabase
         .from('email_verifications')
         .select('*')
@@ -32,25 +34,31 @@ export default function VerifyEmail() {
         .single();
 
       if (fetchError || !verificationData) {
+        console.error('❌ Token fetch error:', fetchError);
         setStatus('error');
         setMessage('Invalid or expired verification link');
         return;
       }
 
-      // 2. Check if token is expired (24 hours)
-      if (new Date() > new Date(verificationData.expiresAt)) {
+      console.log('✅ Found verification data:', verificationData);
+
+      const userId = verificationData.user_id; // CORRECTED: user_id instead of userId
+
+      // 2. Check if token is expired (24 hours) - CORRECTED COLUMN NAME
+      if (new Date() > new Date(verificationData.expires_at)) { // CORRECTED: expires_at instead of expiresAt
         setStatus('error');
         setMessage('Verification link has expired. Please sign up again.');
         return;
       }
 
-      // 3. Update user email verification status in your users table
+      // 3. Update user email verification status in users table
       const { error: updateError } = await supabase
         .from('users')
         .update({ email_verified: true })
-        .eq('id', verificationData.userId);
+        .eq('id', userId); // CORRECTED: userId instead of verificationData.userId
 
       if (updateError) {
+        console.error('❌ User update error:', updateError);
         setStatus('error');
         setMessage('Failed to verify email');
         return;
@@ -58,22 +66,21 @@ export default function VerifyEmail() {
 
       // 4. Update auth user metadata
       const { error: authUpdateError } = await supabase.auth.admin.updateUserById(
-        verificationData.userId,
+        userId, // CORRECTED: userId instead of verificationData.userId
         { 
           user_metadata: { 
-            email_verified: true,
-            verification_token: null 
+            email_verified: true
           } 
         }
       );
 
       if (authUpdateError) {
-        console.error('Auth update error:', authUpdateError);
+        console.error('⚠️ Auth update error (continuing):', authUpdateError);
         // Continue anyway - the main verification is done
       }
 
       // 5. Handle pending photo upload if exists
-      const pendingPhotoKey = `pending_photo_${verificationData.userId}`;
+      const pendingPhotoKey = `pending_photo_${userId}`; // CORRECTED: userId instead of verificationData.userId
       const pendingPhoto = localStorage.getItem(pendingPhotoKey);
       
       if (pendingPhoto) {
@@ -85,7 +92,7 @@ export default function VerifyEmail() {
           
           const { error: uploadError } = await supabase.storage
             .from('avatars')
-            .upload(`${verificationData.userId}/${fileName}`, 
+            .upload(`${userId}/${fileName}`, // CORRECTED: userId instead of verificationData.userId
               dataURLtoBlob(photoData.fileData), 
               { upsert: true }
             );
@@ -94,19 +101,19 @@ export default function VerifyEmail() {
             // Get public URL and update profile
             const { data: urlData } = supabase.storage
               .from('avatars')
-              .getPublicUrl(`${verificationData.userId}/${fileName}`);
+              .getPublicUrl(`${userId}/${fileName}`); // CORRECTED: userId instead of verificationData.userId
 
-            const profileTable = verificationData.userRole === 'applicant' ? 'applicants' : 'employers';
+            const profileTable = verificationData.user_role === 'applicant' ? 'applicants' : 'employers'; // CORRECTED: user_role instead of userRole
             await supabase
               .from(profileTable)
               .update({ avatar_url: urlData.publicUrl })
-              .eq('id', verificationData.userId);
+              .eq('id', userId); // CORRECTED: userId instead of verificationData.userId
           }
 
           // Clean up localStorage
           localStorage.removeItem(pendingPhotoKey);
         } catch (photoError) {
-          console.error('Photo upload error:', photoError);
+          console.error('⚠️ Photo upload error (continuing):', photoError);
           // Don't fail verification because of photo upload
         }
       }
@@ -117,6 +124,7 @@ export default function VerifyEmail() {
         .delete()
         .eq('token', verificationToken);
 
+      console.log('✅ Email verification completed successfully!');
       setStatus('success');
       setMessage('Email verified successfully! You can now log in.');
       
@@ -125,7 +133,7 @@ export default function VerifyEmail() {
       }, 3000);
 
     } catch (error) {
-      console.error('Verification error:', error);
+      console.error('💥 Verification error:', error);
       setStatus('error');
       setMessage('An error occurred during verification');
     }
