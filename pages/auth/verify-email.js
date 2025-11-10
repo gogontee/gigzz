@@ -60,7 +60,7 @@ export default function VerifyEmail() {
         return;
       }
 
-      // ✅ SUCCESS - Show success immediately (don't wait for photo upload)
+      // ✅ SUCCESS - Show success immediately
       setStatus('success');
       setMessage('Email verified successfully! You can now log in.');
 
