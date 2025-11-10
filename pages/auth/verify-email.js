@@ -11,13 +11,11 @@ export default function VerifyEmail() {
   
   const [status, setStatus] = useState('verifying');
   const [message, setMessage] = useState('');
-  const [debugInfo, setDebugInfo] = useState('');
 
   useEffect(() => {
     if (!token) {
       setStatus('error');
       setMessage('Invalid verification link - no token found');
-      setDebugInfo('Token parameter is missing from URL');
       return;
     }
 
@@ -26,8 +24,7 @@ export default function VerifyEmail() {
 
   const verifyEmailToken = async (verificationToken) => {
     try {
-      console.log('🔍 STEP 1: Starting verification with token:', verificationToken);
-      setDebugInfo('Step 1: Looking up verification token in database...');
+      console.log('🔍 Starting verification with token:', verificationToken);
 
       // 1. Get verification data from database
       const { data: verificationData, error: fetchError } = await supabase
@@ -36,37 +33,27 @@ export default function VerifyEmail() {
         .eq('token', verificationToken)
         .single();
 
-      console.log('🔍 STEP 1 Result:', { verificationData, fetchError });
-
       if (fetchError) {
-        setDebugInfo(`Database error: ${fetchError.message}`);
+        console.error('Database error:', fetchError);
         setStatus('error');
         setMessage('Invalid verification link - database error');
         return;
       }
 
       if (!verificationData) {
-        setDebugInfo('No verification data found for this token');
         setStatus('error');
         setMessage('Invalid or expired verification link');
         return;
       }
 
-      console.log('✅ STEP 1: Found verification data:', verificationData);
-      setDebugInfo('Step 2: Checking token expiration...');
-
-      const userId = verificationData.user_id;
-
       // 2. Check if token is expired (24 hours)
       if (new Date() > new Date(verificationData.expires_at)) {
-        setDebugInfo('Token has expired');
         setStatus('error');
         setMessage('Verification link has expired. Please sign up again.');
         return;
       }
 
-      console.log('✅ STEP 2: Token is valid');
-      setDebugInfo('Step 3: Updating user verification status...');
+      const userId = verificationData.user_id;
 
       // 3. Update user email verification status in users table
       const { error: updateError } = await supabase
@@ -74,33 +61,22 @@ export default function VerifyEmail() {
         .update({ email_verified: true })
         .eq('id', userId);
 
-      console.log('🔍 STEP 3 Result:', { updateError });
-
       if (updateError) {
-        setDebugInfo(`User table update failed: ${updateError.message}`);
+        console.error('User table update failed:', updateError);
         setStatus('error');
         setMessage('Failed to verify email - database error');
         return;
       }
 
-      console.log('✅ STEP 3: User table updated successfully');
-      setDebugInfo('Step 4: Cleaning up verification record...');
-
-      // 4. Clean up verification record
-      const { error: deleteError } = await supabase
-        .from('email_verifications')
-        .delete()
-        .eq('token', verificationToken);
-
-      console.log('🔍 STEP 4 Result:', { deleteError });
-
-      if (deleteError) {
+      // 4. Clean up verification record (don't block on this)
+      try {
+        await supabase
+          .from('email_verifications')
+          .delete()
+          .eq('token', verificationToken);
+      } catch (deleteError) {
         console.log('⚠️ Failed to delete verification record (continuing):', deleteError);
-        // Continue anyway - the main verification is done
       }
-
-      console.log('✅ STEP 4: Verification record cleaned up');
-      setDebugInfo('Step 5: Handling photo upload if needed...');
 
       // 5. Handle pending photo upload if exists
       const pendingPhotoKey = `pending_photo_${userId}`;
@@ -130,8 +106,6 @@ export default function VerifyEmail() {
               .from(profileTable)
               .update({ avatar_url: urlData.publicUrl })
               .eq('id', userId);
-            
-            console.log('✅ Photo uploaded successfully');
           }
 
           localStorage.removeItem(pendingPhotoKey);
@@ -140,8 +114,8 @@ export default function VerifyEmail() {
         }
       }
 
+      // 6. SUCCESS - Only set success state once everything is done
       console.log('🎉 ALL STEPS COMPLETED SUCCESSFULLY!');
-      setDebugInfo('All steps completed successfully!');
       setStatus('success');
       setMessage('Email verified successfully! You can now log in.');
       
@@ -151,7 +125,6 @@ export default function VerifyEmail() {
 
     } catch (error) {
       console.error('💥 UNEXPECTED ERROR:', error);
-      setDebugInfo(`Unexpected error: ${error.message}`);
       setStatus('error');
       setMessage('An unexpected error occurred. Please try logging in directly.');
     }
@@ -181,7 +154,6 @@ export default function VerifyEmail() {
             <Loader className="w-16 h-16 text-orange-500 animate-spin mx-auto mb-4" />
             <h2 className="text-2xl font-bold text-gray-900 mb-2">Verifying Email</h2>
             <p className="text-gray-600 mb-2">Please wait while we verify your email address...</p>
-            <p className="text-xs text-gray-500 mt-4">{debugInfo}</p>
           </>
         )}
         
@@ -198,8 +170,7 @@ export default function VerifyEmail() {
           <>
             <XCircle className="w-16 h-16 text-red-500 mx-auto mb-4" />
             <h2 className="text-2xl font-bold text-gray-900 mb-2">Verification Failed</h2>
-            <p className="text-gray-600 mb-2">{message}</p>
-            <p className="text-xs text-red-500 mb-4">{debugInfo}</p>
+            <p className="text-gray-600 mb-4">{message}</p>
             <button
               onClick={() => router.push('/auth/login')}
               className="w-full bg-black text-white py-2 rounded-lg hover:bg-orange-600 transition mb-2"
