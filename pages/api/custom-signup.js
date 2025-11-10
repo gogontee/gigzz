@@ -121,7 +121,9 @@ export default async function handler(req, res) {
     let emailErrorDetails = null;
     
     try {
-      const verificationUrl = `http://localhost:3000/auth/verify-email?token=${verificationToken}`;
+      // Use environment variable for the base URL
+const baseUrl = process.env.NEXTAUTH_URL || 'https://mygigzz.com';
+const verificationUrl = `${baseUrl}/auth/verify-email?token=${verificationToken}`;
       
       console.log("📧 Attempting to send email to:", email);
       console.log("📧 Using from address: hello@mygigzz.com");
