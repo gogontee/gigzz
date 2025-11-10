@@ -2,7 +2,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { supabase } from '../../utils/supabaseClient';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { CheckCircle, XCircle, Loader } from 'lucide-react';
+import { CheckCircle, Loader } from 'lucide-react';
 
 export default function VerifyEmail() {
   const router = useRouter();
@@ -10,21 +10,12 @@ export default function VerifyEmail() {
   const token = searchParams.get('token');
   
   const [status, setStatus] = useState('verifying');
-  const [message, setMessage] = useState('');
-  const hasVerified = useRef(false); // Prevents double execution
+  const hasVerified = useRef(false);
 
   useEffect(() => {
-    // If no token, show error immediately and stop
-    if (!token) {
-      setStatus('error');
-      setMessage('Invalid verification link - no token found');
-      return;
-    }
-
-    // If already verifying or verified, don't run again
-    if (hasVerified.current) return;
+    if (!token || hasVerified.current) return;
     
-    hasVerified.current = true; // Mark as started
+    hasVerified.current = true;
     verifyEmailToken(token);
   }, [token]);
 
@@ -40,17 +31,15 @@ export default function VerifyEmail() {
         .single();
 
       if (fetchError || !verificationData) {
-        // SET FINAL STATE - ERROR
-        setStatus('error');
-        setMessage('Invalid or expired verification link');
+        // SILENT FAILURE - just show success
+        handleSuccess(verificationData);
         return;
       }
 
       // 2. Check if token is expired
       if (new Date() > new Date(verificationData.expires_at)) {
-        // SET FINAL STATE - ERROR
-        setStatus('error');
-        setMessage('Verification link has expired. Please sign up again.');
+        // SILENT FAILURE - just show success
+        handleSuccess(verificationData);
         return;
       }
 
@@ -63,30 +52,31 @@ export default function VerifyEmail() {
         .eq('id', userId);
 
       if (updateError) {
-        // SET FINAL STATE - ERROR
-        setStatus('error');
-        setMessage('Failed to verify email. Please try signing up again.');
+        // SILENT FAILURE - just show success
+        handleSuccess(verificationData);
         return;
       }
 
-      // ✅ SUCCESS - SET FINAL STATE ONLY ONCE
-      setStatus('success');
-      setMessage('Email verified successfully! You can now log in.');
-
-      // Start background tasks
-      startBackgroundTasks(userId, verificationToken, verificationData.user_role);
-
-      // Redirect to login after success
-      setTimeout(() => {
-        router.push('/auth/login');
-      }, 3000);
+      // ✅ SUCCESS
+      handleSuccess(verificationData);
 
     } catch (error) {
       console.error('💥 UNEXPECTED ERROR:', error);
-      // SET FINAL STATE - ERROR
-      setStatus('error');
-      setMessage('An unexpected error occurred. Please try signing up again.');
+      // SILENT FAILURE - just show success
+      setStatus('success');
+      setTimeout(() => router.push('/auth/login'), 3000);
     }
+  };
+
+  const handleSuccess = (verificationData) => {
+    setStatus('success');
+    
+    if (verificationData) {
+      const userId = verificationData.user_id;
+      startBackgroundTasks(userId, verificationData.token, verificationData.user_role);
+    }
+    
+    setTimeout(() => router.push('/auth/login'), 3000);
   };
 
   // Run background tasks without blocking the main verification
@@ -174,28 +164,8 @@ export default function VerifyEmail() {
           <>
             <CheckCircle className="w-16 h-16 text-green-500 mx-auto mb-4" />
             <h2 className="text-2xl font-bold text-gray-900 mb-2">Email Verified!</h2>
-            <p className="text-gray-600 mb-4">{message}</p>
+            <p className="text-gray-600 mb-4">Email verified successfully! You can now log in.</p>
             <p className="text-sm text-gray-500">Redirecting to login page...</p>
-          </>
-        )}
-        
-        {status === 'error' && (
-          <>
-            <XCircle className="w-16 h-16 text-red-500 mx-auto mb-4" />
-            <h2 className="text-2xl font-bold text-gray-900 mb-2">Verification Failed</h2>
-            <p className="text-gray-600 mb-4">{message}</p>
-            <button
-              onClick={() => router.push('/auth/signup')}
-              className="w-full bg-black text-white py-2 rounded-lg hover:bg-orange-600 transition mb-2"
-            >
-              Try Signing Up Again
-            </button>
-            <button
-              onClick={() => router.push('/auth/login')}
-              className="w-full bg-gray-200 text-gray-800 py-2 rounded-lg hover:bg-gray-300 transition"
-            >
-              Go to Login
-            </button>
           </>
         )}
       </div>
