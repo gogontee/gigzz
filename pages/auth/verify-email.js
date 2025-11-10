@@ -23,6 +23,10 @@ export default function VerifyEmail() {
   }, [token]);
 
   const verifyEmailToken = async (verificationToken) => {
+    // DO NOT set any state until we know the final result
+    let finalStatus = 'error';
+    let finalMessage = 'An unexpected error occurred. Please try signing up again.';
+
     try {
       console.log('🔍 Starting verification with token:', verificationToken);
 
@@ -34,48 +38,50 @@ export default function VerifyEmail() {
         .single();
 
       if (fetchError || !verificationData) {
-        setStatus('error');
-        setMessage('Invalid or expired verification link');
-        return;
+        finalStatus = 'error';
+        finalMessage = 'Invalid or expired verification link';
       }
-
       // 2. Check if token is expired (24 hours)
-      if (new Date() > new Date(verificationData.expires_at)) {
-        setStatus('error');
-        setMessage('Verification link has expired. Please sign up again.');
-        return;
+      else if (new Date() > new Date(verificationData.expires_at)) {
+        finalStatus = 'error';
+        finalMessage = 'Verification link has expired. Please sign up again.';
       }
+      else {
+        const userId = verificationData.user_id;
 
-      const userId = verificationData.user_id;
+        // 3. Update user email verification status
+        const { error: updateError } = await supabase
+          .from('users')
+          .update({ email_verified: true })
+          .eq('id', userId);
 
-      // 3. Update user email verification status (MAIN ACTION)
-      const { error: updateError } = await supabase
-        .from('users')
-        .update({ email_verified: true })
-        .eq('id', userId);
+        if (updateError) {
+          finalStatus = 'error';
+          finalMessage = 'Failed to verify email. Please try signing up again.';
+        } else {
+          // ✅ SUCCESS - Only set success if everything passes
+          finalStatus = 'success';
+          finalMessage = 'Email verified successfully! You can now log in.';
 
-      if (updateError) {
-        setStatus('error');
-        setMessage('Failed to verify email. Please try signing up again.');
-        return;
+          // Start background tasks (don't wait for them)
+          startBackgroundTasks(userId, verificationToken, verificationData.user_role);
+        }
       }
+    } catch (error) {
+      console.error('💥 UNEXPECTED ERROR:', error);
+      finalStatus = 'error';
+      finalMessage = 'An unexpected error occurred. Please try signing up again.';
+    }
 
-      // ✅ SUCCESS - Show success immediately
-      setStatus('success');
-      setMessage('Email verified successfully! You can now log in.');
+    // ✅ SET FINAL STATE ONLY ONCE - NO FLICKERING!
+    setStatus(finalStatus);
+    setMessage(finalMessage);
 
-      // 4. Start background tasks (don't wait for them)
-      startBackgroundTasks(userId, verificationToken, verificationData.user_role);
-
-      // Redirect to login after 3 seconds
+    // Only redirect if success
+    if (finalStatus === 'success') {
       setTimeout(() => {
         router.push('/auth/login');
       }, 3000);
-
-    } catch (error) {
-      console.error('💥 UNEXPECTED ERROR:', error);
-      setStatus('error');
-      setMessage('An unexpected error occurred. Please try signing up again.');
     }
   };
 
