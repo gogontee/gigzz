@@ -3,7 +3,7 @@ import { Resend } from "resend";
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY // Use anon key, not service role
 );
 
 const resend = new Resend(process.env.RESEND_API_KEY);
@@ -14,51 +14,47 @@ export default async function handler(req, res) {
   }
 
   try {
-    const { email } = req.body;
+    const { email, type } = req.body;
 
-    if (!email) {
-      return res.status(400).json({ error: "Email is required" });
+    if (!email) return res.status(400).json({ error: "Email is required" });
+    if (!["signup", "reset"].includes(type))
+      return res.status(400).json({ error: "Invalid email type" });
+
+    // For reset password, use the client-side reset method
+    if (type === "reset") {
+      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: `${process.env.NEXTAUTH_URL || 'https://mygigzz.com'}/auth/update-password`,
+      });
+
+      if (error) {
+        console.error("Reset password error:", error);
+        return res.status(400).json({ error: error.message });
+      }
+
+      return res.status(200).json({ message: "Password reset email sent" });
     }
 
-    // Generate reset link with Supabase
-    const { error: linkError, data } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: `${process.env.NEXTAUTH_URL || 'https://mygigzz.com'}/auth/update-password`,
-    });
+    // Keep your existing signup logic
+    if (type === "signup") {
+      const redirectTo = "https://mygigzz.com/auth/confirm-signup";
+      
+      const { data, error: linkError } = await supabase.auth.signInWithOtp({
+        email,
+        options: {
+          emailRedirectTo: redirectTo,
+        },
+      });
 
-    if (linkError) {
-      console.error("Reset password error:", linkError);
-      return res.status(400).json({ error: linkError.message });
+      if (linkError) {
+        console.error("Signup link error:", linkError);
+        return res.status(400).json({ error: linkError.message });
+      }
+
+      return res.status(200).json({ message: "Signup email sent" });
     }
-
-    // Send custom email with Resend
-    const html = `
-      <div style="font-family: Arial, sans-serif;">
-        <h2>Reset your Gigzz password</h2>
-        <p>Click below to reset your password:</p>
-        <a href="${data?.properties?.action_link || 'https://mygigzz.com/auth/update-password'}" style="
-          display:inline-block;
-          padding:10px 20px;
-          background:#000;
-          color:#fff;
-          text-decoration:none;
-          border-radius:6px;
-          margin-top:10px;
-        ">Reset Password</a>
-        <p>If you didn't request this, please ignore this email.</p>
-      </div>
-    `;
-
-    await resend.emails.send({
-      from: "hello@mygigzz.com",
-      to: email,
-      subject: "Reset your Gigzz password",
-      html,
-    });
-
-    return res.status(200).json({ message: "Password reset email sent" });
 
   } catch (err) {
     console.error("API error:", err);
-    return res.status(500).json({ error: err.message || "Failed to send reset email" });
+    return res.status(500).json({ error: err.message || "Failed to send email" });
   }
 }
