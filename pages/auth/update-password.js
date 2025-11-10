@@ -2,93 +2,89 @@
 
 import { useState, useEffect } from "react";
 import { supabase } from "../../utils/supabaseClient";
-import { useRouter } from "next/router";
-import { motion, AnimatePresence } from "framer-motion";
+import { useRouter, useSearchParams } from "next/navigation";
 
 export default function UpdatePasswordPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [status, setStatus] = useState("");
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [success, setSuccess] = useState(false);
 
   useEffect(() => {
-    if (!router.isReady) return;
+    // Check for custom token in query parameters (from your Resend email)
+    const token = searchParams.get('token');
+    const email = searchParams.get('email');
 
-    // Supabase password reset uses hash parameters, not query parameters
-    const hash = window.location.hash;
+    console.log("🔍 URL Parameters:", { token, email });
+
+    if (!token || !email) {
+      setStatus("❌ Reset link invalid or missing token.");
+      return;
+    }
+
+    // For custom tokens, we don't need to set a Supabase session
+    // Just validate that we have the required parameters
+    setStatus("✅ Please enter your new password.");
     
-    if (!hash || !hash.includes('access_token')) {
-      setStatus("❌ Reset link invalid or missing token.");
-      setLoading(false);
-      return;
-    }
-
-    // Parse the hash parameters
-    const params = new URLSearchParams(hash.substring(1)); // Remove the # character
-    const access_token = params.get('access_token');
-    const refresh_token = params.get('refresh_token');
-    const type = params.get('type');
-
-    if (!access_token) {
-      setStatus("❌ Reset link invalid or missing token.");
-      setLoading(false);
-      return;
-    }
-
-    // Set session with both tokens
-    supabase.auth.setSession({
-      access_token,
-      refresh_token
-    }).then(({ error }) => {
-      if (error) {
-        console.error("Session error:", error);
-        setStatus(`❌ ${error.message}`);
-      } else {
-        setStatus("✅ Session verified. You can now update your password.");
-      }
-      setLoading(false);
-    });
-  }, [router.isReady]);
+  }, [searchParams]);
 
   const handleUpdatePassword = async (e) => {
     e.preventDefault();
+    setLoading(true);
     setStatus("");
 
     if (password !== confirmPassword) {
       setStatus("❌ Passwords do not match.");
+      setLoading(false);
       return;
     }
 
     if (password.length < 6) {
       setStatus("❌ Password must be at least 6 characters long.");
+      setLoading(false);
       return;
     }
 
-    const { error } = await supabase.auth.updateUser({ password });
+    try {
+      // Since we're using custom tokens, we need to handle this differently
+      // Option 1: Try to get current session first
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      if (session) {
+        // User has an active session, update password directly
+        const { error } = await supabase.auth.updateUser({ 
+          password: password 
+        });
 
-    if (error) {
-      setStatus(`❌ ${error.message}`);
-    } else {
-      setSuccess(true);
-      setStatus("✅ Password updated successfully!");
-      
-      // Sign out after successful password update
-      await supabase.auth.signOut();
-      
-      setTimeout(() => router.push("/auth/login"), 2000);
+        if (error) throw error;
+
+        setSuccess(true);
+        setStatus("✅ Password updated successfully!");
+        
+        // Sign out and redirect
+        await supabase.auth.signOut();
+        setTimeout(() => router.push("/auth/login"), 2000);
+        
+      } else {
+        // Option 2: No session - user needs to sign in first
+        // For now, show a message to use Supabase's official reset
+        setStatus("❌ Please use the official password reset link sent by Supabase.");
+        
+        // Alternative: You could implement your own password reset logic here
+        // by verifying the custom token against your database
+      }
+
+    } catch (error) {
+      console.error("Update password error:", error);
+      setStatus(`❌ ${error.message || "Failed to update password"}`);
+    } finally {
+      setLoading(false);
     }
   };
-
-  if (loading) {
-    return (
-      <div className="flex min-h-screen items-center justify-center text-gray-700">
-        Checking reset link...
-      </div>
-    );
-  }
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
@@ -103,35 +99,25 @@ export default function UpdatePasswordPage() {
           <h1 className="text-2xl font-bold mt-3">Set a New Password</h1>
         </div>
 
-        {/* Success Animation */}
-        <AnimatePresence>
-          {success && (
-            <motion.div
-              initial={{ opacity: 0, scale: 0.8 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.8 }}
-              className="absolute top-0 left-0 w-full h-full bg-white rounded-xl flex flex-col items-center justify-center z-10"
-            >
-              <motion.div
-                initial={{ scale: 0 }}
-                animate={{ scale: 1 }}
-                transition={{ type: "spring", stiffness: 500, damping: 20 }}
+        {/* Success Message */}
+        {success && (
+          <div className="text-center py-8">
+            <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                className="h-8 w-8 text-green-600"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+                strokeWidth={2}
               >
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  className="h-16 w-16 text-green-600"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                  strokeWidth={2}
-                >
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                </svg>
-              </motion.div>
-              <p className="mt-4 text-lg font-semibold text-green-600">{status}</p>
-            </motion.div>
-          )}
-        </AnimatePresence>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+              </svg>
+            </div>
+            <p className="text-lg font-semibold text-green-600">{status}</p>
+            <p className="text-gray-600 mt-2">Redirecting to login...</p>
+          </div>
+        )}
 
         {/* Form */}
         {!success && (
@@ -140,7 +126,7 @@ export default function UpdatePasswordPage() {
             <div className="relative">
               <input
                 type={showPassword ? "text" : "password"}
-                className="w-full border px-4 py-2 rounded focus:outline-none focus:ring-2 focus:ring-orange-500"
+                className="w-full border border-gray-300 px-4 py-2 rounded focus:outline-none focus:ring-2 focus:ring-orange-500"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="Enter new password"
@@ -196,7 +182,7 @@ export default function UpdatePasswordPage() {
             <div className="relative">
               <input
                 type={showPassword ? "text" : "password"}
-                className="w-full border px-4 py-2 rounded focus:outline-none focus:ring-2 focus:ring-orange-500"
+                className="w-full border border-gray-300 px-4 py-2 rounded focus:outline-none focus:ring-2 focus:ring-orange-500"
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}
                 placeholder="Confirm new password"
@@ -210,7 +196,7 @@ export default function UpdatePasswordPage() {
               className="w-full bg-black text-white py-2 rounded hover:bg-orange-600 transition font-semibold disabled:opacity-50"
               disabled={loading}
             >
-              Update Password
+              {loading ? "Updating..." : "Update Password"}
             </button>
           </form>
         )}
