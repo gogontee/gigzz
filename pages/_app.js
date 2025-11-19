@@ -171,7 +171,7 @@ function MyApp({ Component, pageProps }) {
             {/* 🔸 Orange top progress bar */}
             <ProgressBar
               height="3px"
-              color="#f97316"
+              color="#000000ff"
               options={{ showSpinner: false }}
               shallowRouting
             />

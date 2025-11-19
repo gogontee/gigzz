@@ -72,13 +72,15 @@ export default function ProfilePage() {
   // Check if current user is the profile owner
   const isProfileOwner = currentUserId === applicantId;
 
-  // Load logged-in current user id
+  // Load logged-in current user id - NON-BLOCKING
   useEffect(() => {
     const getUser = async () => {
       try {
         const { data: { user }, error } = await supabase.auth.getUser();
-        if (error) console.error("Supabase auth error:", error.message);
-        if (user) setCurrentUserId(user.id);
+        // Don't throw error if not authenticated - this is normal
+        if (user) {
+          setCurrentUserId(user.id);
+        }
       } catch (err) {
         console.error("Error getting auth user:", err);
       }
@@ -86,9 +88,12 @@ export default function ProfilePage() {
     getUser();
   }, []);
 
-  // Load token balance for the profile owner
+  // Load token balance for the profile owner - ONLY if profile owner
   const loadTokenBalance = useCallback(async () => {
-    if (!applicantId) return;
+    if (!applicantId || !isProfileOwner) {
+      setTokenBalance(0);
+      return;
+    }
     
     try {
       const { data: wallet, error } = await supabase
@@ -108,13 +113,14 @@ export default function ProfilePage() {
       console.error('Unexpected error loading token balance:', err);
       setTokenBalance(0);
     }
-  }, [applicantId]);
+  }, [applicantId, isProfileOwner]);
 
-  // Load profile + projects
+  // Load profile + projects - AVAILABLE TO EVERYONE
   const loadProfileAndProjects = useCallback(async () => {
     if (!applicantId) return;
     setLoading(true);
     try {
+      // First try to get user role - this should work for public profiles
       const { data: userMeta, error: userMetaErr } = await supabase
         .from("users")
         .select("role")
@@ -123,42 +129,50 @@ export default function ProfilePage() {
 
       if (userMetaErr) {
         console.error("Error fetching user role:", userMetaErr);
-        setLoading(false);
-        return;
+        // Continue anyway - try to load from applicants table directly
       }
 
-      if (!userMeta) {
-        setLoading(false);
-        return;
-      }
-
-      const role = userMeta.role;
+      const role = userMeta?.role || "applicant"; // Default to applicant if no role found
       const table = role === "employer" ? "employers" : "applicants";
 
-      // Profile
+      // Profile - PUBLIC QUERY (no auth required)
       const { data: profileData, error: profileErr } = await supabase
         .from(table)
         .select("*")
         .eq("id", applicantId)
         .maybeSingle();
 
-      if (profileErr) console.error("Error fetching profile:", profileErr);
-      else if (profileData) setProfile({ ...profileData, role, table });
+      if (profileErr) {
+        console.error("Error fetching profile:", profileErr);
+        setProfile(null);
+      } else if (profileData) {
+        setProfile({ ...profileData, role, table });
+      } else {
+        setProfile(null);
+      }
 
-      // Projects
+      // Projects - PUBLIC QUERY (no auth required)
       const { data: projectsData, error: projectsErr } = await supabase
         .from("projects")
         .select("*")
         .eq("user_id", applicantId)
         .order("created_at", { ascending: false });
 
-      if (projectsErr) console.error("Error fetching projects:", projectsErr);
-      else if (projectsData) setProjects(projectsData);
+      if (projectsErr) {
+        console.error("Error fetching projects:", projectsErr);
+        setProjects([]);
+      } else if (projectsData) {
+        setProjects(projectsData);
+      } else {
+        setProjects([]);
+      }
 
-      // Load token balance after profile is loaded
+      // Load token balance only if user is profile owner
       await loadTokenBalance();
     } catch (err) {
       console.error("Unexpected error loading profile:", err);
+      setProfile(null);
+      setProjects([]);
     } finally {
       setLoading(false);
     }
@@ -168,7 +182,7 @@ export default function ProfilePage() {
     loadProfileAndProjects();
   }, [loadProfileAndProjects]);
 
-  // Get profile tag based on token balance
+  // Get profile tag based on token balance - ONLY for profile owner
   const getProfileTag = () => {
     if (!isProfileOwner) return null;
     
@@ -187,7 +201,7 @@ export default function ProfilePage() {
     }
   };
 
-  // Handle chat button click
+  // Handle chat button click - WITH PROPER AUTH HANDLING
   const handleChatClick = async () => {
     // If user is not logged in, redirect to login
     if (!currentUserId) {
@@ -250,11 +264,16 @@ export default function ProfilePage() {
 
   if (loading)
     return (
-      <div className="p-6 text-center text-gray-500">Loading profile...</div>
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="p-6 text-center text-gray-500">Loading profile...</div>
+      </div>
     );
+    
   if (!profile)
     return (
-      <div className="p-6 text-center text-red-500">Profile not found</div>
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="p-6 text-center text-red-500">Profile not found</div>
+      </div>
     );
 
   return (
@@ -262,7 +281,7 @@ export default function ProfilePage() {
       initial={{ opacity: 0, y: 16 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.4 }}
-      className="max-w-5xl mx-auto px-4 py-6 relative"
+      className="max-w-5xl mx-auto px-4 py-6 relative min-h-screen"
     >
       {/* Profile Header */}
       <div className="bg-gradient-to-r from-black to-orange-500 rounded-3xl p-6 text-white shadow-lg flex flex-col sm:flex-row gap-6 lg:mt-20 relative">
@@ -305,7 +324,7 @@ export default function ProfilePage() {
             }`}
           </p>
           
-          {/* Token balance display for profile owner */}
+          {/* Token balance display for profile owner ONLY */}
           {isProfileOwner && (
             <div className="mt-2 flex items-center gap-2">
               <span className="text-xs bg-black/30 px-2 py-1 rounded-full">
@@ -323,7 +342,7 @@ export default function ProfilePage() {
           )}
         </div>
 
-        {/* Chat button */}
+        {/* Chat button - VISIBLE TO EVERYONE */}
         <button
           onClick={handleChatClick}
           className="absolute bottom-4 right-4 bg-white text-black p-3 rounded-full shadow-lg hover:scale-110 transition flex items-center justify-center"
@@ -341,7 +360,7 @@ export default function ProfilePage() {
         </button>
       </div>
 
-      {/* Profile Details */}
+      {/* Profile Details - VISIBLE TO EVERYONE */}
       <div className="mt-6 bg-white rounded-2xl shadow-lg p-6 space-y-6">
         {profile.bio && (
           <div>
@@ -378,7 +397,7 @@ export default function ProfilePage() {
         )}
       </div>
 
-      {/* Portfolio */}
+      {/* Portfolio - VISIBLE TO EVERYONE */}
       <div className="mt-10">
         <h2 className="text-xl font-semibold mb-4">Portfolio</h2>
         {projects.length === 0 ? (
@@ -446,8 +465,8 @@ export default function ProfilePage() {
         )}
       </div>
 
-      {/* Chat Modal - Only show when viewing someone else's profile */}
-      {chatOpen && chatId && !isProfileOwner && (
+      {/* Chat Modal - Only show when viewing someone else's profile AND user is authenticated */}
+      {chatOpen && chatId && !isProfileOwner && currentUserId && (
         <ChatModal
           chatId={chatId}
           userId={currentUserId}
