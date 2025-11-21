@@ -40,7 +40,7 @@ export default function Signup() {
     country: '',
     state: '',
     city: '',
-    role: 'client',
+    role: '', // Changed from 'client' to empty string
   });
 
   const [avatarFile, setAvatarFile] = useState(null);
@@ -60,88 +60,94 @@ export default function Signup() {
   };
 
   const handleSignup = async (e) => {
-  e.preventDefault();
-  setErrorMsg('');
-  setSuccessMsg('');
-  setVerificationSent(false);
+    e.preventDefault();
+    setErrorMsg('');
+    setSuccessMsg('');
+    setVerificationSent(false);
 
-  if (!agreedToTerms) {
-    setErrorMsg('You must agree to the Terms of Service to continue.');
-    return;
-  }
+    // Add validation for role selection
+    if (!form.role) {
+      setErrorMsg('Please choose an account type.');
+      return;
+    }
 
-  if (form.password.length < 8) {
-    setErrorMsg('Password must be at least 8 characters long.');
-    return;
-  }
+    if (!agreedToTerms) {
+      setErrorMsg('You must agree to the Terms of Service to continue.');
+      return;
+    }
 
-  setLoading(true);
+    if (form.password.length < 8) {
+      setErrorMsg('Password must be at least 8 characters long.');
+      return;
+    }
 
-  try {
-    // Store photo data if exists
-    if (avatarFile) {
-      const reader = new FileReader();
-      reader.onload = () => {
-        const pendingPhotoData = {
-          fileData: reader.result,
-          fileName: avatarFile.name,
-          fileType: avatarFile.type,
+    setLoading(true);
+
+    try {
+      // Store photo data if exists
+      if (avatarFile) {
+        const reader = new FileReader();
+        reader.onload = () => {
+          const pendingPhotoData = {
+            fileData: reader.result,
+            fileName: avatarFile.name,
+            fileType: avatarFile.type,
+          };
+          sessionStorage.setItem('pending_photo', JSON.stringify(pendingPhotoData));
         };
-        sessionStorage.setItem('pending_photo', JSON.stringify(pendingPhotoData));
-      };
-      reader.readAsDataURL(avatarFile);
-    }
-
-    // Call our custom API
-    const response = await fetch('/api/custom-signup', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(form),
-    });
-
-    const result = await response.json();
-
-    if (!response.ok) {
-      // Show the actual error message from API
-      throw new Error(result.error || 'Signup failed. Please try again.');
-    }
-
-    // Store photo with user ID if we have one
-    if (avatarFile && result.userId) {
-      const pendingPhoto = sessionStorage.getItem('pending_photo');
-      if (pendingPhoto) {
-        localStorage.setItem(`pending_photo_${result.userId}`, pendingPhoto);
-        sessionStorage.removeItem('pending_photo');
+        reader.readAsDataURL(avatarFile);
       }
+
+      // Call our custom API
+      const response = await fetch('/api/custom-signup', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(form),
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        // Show the actual error message from API
+        throw new Error(result.error || 'Signup failed. Please try again.');
+      }
+
+      // Store photo with user ID if we have one
+      if (avatarFile && result.userId) {
+        const pendingPhoto = sessionStorage.getItem('pending_photo');
+        if (pendingPhoto) {
+          localStorage.setItem(`pending_photo_${result.userId}`, pendingPhoto);
+          sessionStorage.removeItem('pending_photo');
+        }
+      }
+
+      setVerificationSent(true);
+      setSuccessMsg(result.message);
+
+    } catch (err) {
+      console.error('Signup error:', err);
+      setErrorMsg(err.message);
+      sessionStorage.removeItem('pending_photo');
+    } finally {
+      setLoading(false);
     }
+  };
 
-    setVerificationSent(true);
-    setSuccessMsg(result.message);
-
-  } catch (err) {
-    console.error('Signup error:', err);
-    setErrorMsg(err.message);
-    sessionStorage.removeItem('pending_photo');
-  } finally {
-    setLoading(false);
-  }
-};
   // If verification was sent, show success message
   if (verificationSent) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-start bg-white px-4 pt-20 pb-10">
         <div className="mb-8">
-          // In your signup form, replace the image with:
-<Image
-  src="https://xatxjdsppcjgplmrtjcs.supabase.co/storage/v1/object/public/avatars/icon.png"
-  alt="Gigzz Logo"
-  width={50}
-  height={50}
-  style={{ width: "auto", height: "auto" }}
-  priority
-/>
+          <Image
+            src="https://xatxjdsppcjgplmrtjcs.supabase.co/storage/v1/object/public/avatars/icon.png"
+            alt="Gigzz Logo"
+            width={50}
+            height={50}
+            style={{ width: "auto", height: "auto" }}
+            priority
+          />
         </div>
 
         <div className="w-full max-w-md bg-white border rounded-xl shadow p-8 space-y-6 text-center">
@@ -191,7 +197,6 @@ export default function Signup() {
     );
   }
 
-  // Rest of your form UI remains exactly the same...
   return (
     <div className="min-h-screen flex flex-col items-center justify-start bg-white px-4 pt-20 pb-10">
       <div className="mb-8">
@@ -207,10 +212,9 @@ export default function Signup() {
 
       <form onSubmit={handleSignup} className="w-full max-w-md bg-white border rounded-xl shadow p-6 space-y-5">
         <h2 className="text-2xl font-bold text-black text-center">
-          Create your {form.role === 'client' ? 'Client' : 'Creative'} Account
+          Create your Account
         </h2>
 
-        {/* Your existing form fields remain exactly the same */}
         <div className="flex justify-between space-x-2">
           <input
             type="text"
@@ -290,6 +294,7 @@ export default function Signup() {
           required
           className="w-full p-3 border rounded-lg bg-white text-black focus:outline-none focus:border-orange-500"
         >
+          <option value="">Choose account type</option>
           <option value="client">I'm a Client</option>
           <option value="creative">I'm a Creative/Applicant</option>
         </select>
@@ -320,7 +325,7 @@ export default function Signup() {
         <motion.button
           whileTap={{ scale: 0.95 }}
           type="submit"
-          disabled={loading || !agreedToTerms}
+          disabled={loading || !agreedToTerms || !form.role}
           className="w-full p-3 rounded-lg bg-black text-white hover:bg-orange-600 transition disabled:opacity-50 font-medium"
         >
           {loading ? 'Creating Account...' : 'Create my account'}

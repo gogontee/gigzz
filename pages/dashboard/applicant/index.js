@@ -1,15 +1,15 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import { supabase } from '../../../utils/supabaseClient';
 import ApplicantLayout from '../../../components/dashboard/ApplicantLayout';
 import Portfolio from '../../../components/portfolio/Portfolio';
 import Profile from '../../../components/Profile';
 import Application from '../../../components/Application';
 import Settings from '../../../components/Settings';
-import Wallet from '../../../components/WalletComponent'; // ✅ Changed from Token to Wallet
-import { Briefcase, Coins, Layers, Bell, MessageSquare, Pencil } from 'lucide-react';
+import Wallet from '../../../components/WalletComponent';
+import { Briefcase, Coins, Layers, Bell, MessageSquare, Pencil, X, AlertTriangle, Wallet as WalletIcon } from 'lucide-react';
 import useUnreadMessages from '../../../hooks/useUnreadMessages';
 import ProfilePromotion from '../../../components/ProfilePromotion';
 
@@ -20,6 +20,8 @@ export default function ApplicantDashboard() {
   const [tokens, setTokens] = useState(0);
   const [projectsCount, setProjectsCount] = useState(0);
   const [unreadCountNotifications, setUnreadCountNotifications] = useState(0);
+  const [incompleteFields, setIncompleteFields] = useState([]);
+  const [showTokenWarning, setShowTokenWarning] = useState(false);
   const fileInputRef = useRef(null);
 
   const unreadMessagesCount = useUnreadMessages();
@@ -57,6 +59,21 @@ export default function ApplicantDashboard() {
     setTokens(tokenData?.balance || 0);
     setApplicationsCount(applicationsCount || 0);
     setProjectsCount(projectsCount || 0);
+
+    // Check for incomplete profile fields
+    if (profileData) {
+      const missingFields = [];
+      if (!profileData.avatar_url) missingFields.push('avatar_url');
+      if (!profileData.phone) missingFields.push('phone');
+      if (!profileData.full_address) missingFields.push('full_address');
+      if (!profileData.bio) missingFields.push('bio');
+      if (!profileData.specialties) missingFields.push('specialties');
+      
+      setIncompleteFields(missingFields);
+    }
+
+    // Show token warning if balance is 0
+    setShowTokenWarning((tokenData?.balance || 0) === 0);
   };
 
   useEffect(() => {
@@ -108,7 +125,20 @@ export default function ApplicantDashboard() {
 
     if (!updateError) {
       setProfile((prev) => ({ ...prev, avatar_url: data.publicUrl }));
+      // Remove avatar_url from incomplete fields if it was there
+      setIncompleteFields(prev => prev.filter(field => field !== 'avatar_url'));
     }
+  };
+
+  const getFieldMessage = (field) => {
+    const messages = {
+      avatar_url: 'Add your profile photo',
+      phone: 'Add your phone number',
+      full_address: 'Add your full address',
+      bio: 'Add your bio',
+      specialties: 'Add your specialties'
+    };
+    return messages[field] || 'Complete this field';
   };
 
   return (
@@ -129,9 +159,9 @@ export default function ApplicantDashboard() {
           <div className="flex items-center justify-between flex-wrap gap-4">
             <div>
               <h2 className="text-2xl font-semibold">
-                Welcome back, {profile?.full_name || 'Creative'}
+                Hello!, {profile?.full_name || 'Creative'}
               </h2>
-              <p className="text-sm text-gray-500">Let's start making money today!</p>
+              <p className="text-sm text-gray-500">wishing you goodluck today!</p>
             </div>
 
             <div className="flex items-center gap-4">
@@ -176,6 +206,66 @@ export default function ApplicantDashboard() {
             </div>
           </div>
 
+          {/* Incomplete Profile Warnings */}
+          <AnimatePresence>
+            {incompleteFields.length > 0 && (
+              <motion.div
+                initial={{ opacity: 0, y: -10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -10 }}
+                className="bg-yellow-50 border border-yellow-200 rounded-lg p-4"
+              >
+                <div className="flex items-start gap-3">
+                  <AlertTriangle className="w-5 h-5 text-yellow-600 mt-0.5 flex-shrink-0" />
+                  <div className="flex-1">
+                    <h3 className="text-yellow-800 font-medium text-sm mb-2">
+                      Scroll down, use the "Edit Profile" button and Complete your profile to get more gigs
+                    </h3>
+                    <div className="space-y-1">
+                      {incompleteFields.map(field => (
+                        <p key={field} className="text-yellow-700 text-sm">
+                          • {getFieldMessage(field)}
+                        </p>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+
+          {/* Token Warning */}
+          <AnimatePresence>
+            {showTokenWarning && (
+              <motion.div
+                initial={{ opacity: 0, y: -10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -10 }}
+                className="bg-blue-50 border border-blue-200 rounded-lg p-4"
+              >
+                <div className="flex items-start gap-3">
+                  <WalletIcon className="w-5 h-5 text-blue-600 mt-0.5 flex-shrink-0" />
+                  <div className="flex-1">
+                    <div className="flex justify-between items-start">
+                      <h3 className="text-blue-800 font-medium text-sm mb-1">
+                        Top up your token wallet!
+                      </h3>
+                      <button
+                        onClick={() => setShowTokenWarning(false)}
+                        className="text-blue-600 hover:text-blue-800"
+                      >
+                        <X size={16} />
+                      </button>
+                    </div>
+                    <p className="text-blue-700 text-sm">
+                      Don't miss out on juicy gigs! Click the Wallet button in the sidebar to add tokens.
+                    </p>
+                  </div>
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+
           {/* Stats */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             <StatCard icon={<Coins className="text-orange-500" />} label="Token Balance" value={tokens} />
@@ -190,13 +280,37 @@ export default function ApplicantDashboard() {
               <ProfilePromotion profile={profile} refreshProfile={fetchProfile} />
             )}
 
-            {/* Edit Profile */}
-            <a
+            {/* Edit Profile Button with Flicker Effect */}
+            <motion.a
               href="/dashboard/applicant/edit"
-              className="mt-6 px-6 py-3 bg-orange-500 text-white rounded-xl shadow hover:bg-orange-600 transition"
+              className="mt-6 px-6 py-3 bg-orange-500 text-white rounded-xl shadow hover:bg-orange-600 transition relative"
+              animate={
+                incompleteFields.length > 0 ? {
+                  scale: [1, 1.05, 1],
+                  boxShadow: [
+                    '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
+                    '0 10px 15px -3px rgba(249, 115, 22, 0.3), 0 4px 6px -2px rgba(0, 0, 0, 0.05)',
+                    '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)'
+                  ]
+                } : {}
+              }
+              transition={{
+                duration: 2,
+                repeat: incompleteFields.length > 0 ? Infinity : 0,
+                ease: "easeInOut"
+              }}
             >
               Edit Profile
-            </a>
+              {incompleteFields.length > 0 && (
+                <motion.span
+                  className="absolute -top-1 -right-1 bg-red-500 text-white text-xs w-5 h-5 flex items-center justify-center rounded-full"
+                  animate={{ scale: [1, 1.2, 1] }}
+                  transition={{ duration: 1, repeat: Infinity }}
+                >
+                  !
+                </motion.span>
+              )}
+            </motion.a>
           </div>
         </motion.div>
       )}
@@ -213,7 +327,7 @@ export default function ApplicantDashboard() {
       {/* Settings tab */}
       {activeTab === 'settings' && <Settings />}
 
-      {/* Wallet tab - ✅ Changed from Token to Wallet */}
+      {/* Wallet tab */}
       {activeTab === 'token' && (
         <div className="md:pt-20">
           <Wallet balance={tokens} refreshBalance={fetchProfile} />

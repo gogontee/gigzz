@@ -10,7 +10,9 @@ import {
   Coins,
   User,
   ChevronLeft,
-  ChevronRight
+  ChevronRight,
+  AlertTriangle,
+  AlertCircle
 } from 'lucide-react';
 import { supabase } from '../../utils/supabaseClient';
 
@@ -27,7 +29,26 @@ export default function ApplicantLayout({ children, applicant, activeTab, onTabC
   const router = useRouter();
   const [expanded, setExpanded] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
+  const [tokenBalance, setTokenBalance] = useState(null);
   const sidebarRef = useRef(null);
+
+  // Fetch token balance
+  useEffect(() => {
+    const fetchTokenBalance = async () => {
+      const { data: userData } = await supabase.auth.getUser();
+      if (!userData?.user) return;
+
+      const { data: tokenData } = await supabase
+        .from('token_wallets')
+        .select('balance')
+        .eq('user_id', userData.user.id)
+        .single();
+
+      setTokenBalance(tokenData?.balance || 0);
+    };
+
+    fetchTokenBalance();
+  }, []);
 
   // Detect mobile screen
   useEffect(() => {
@@ -81,6 +102,16 @@ export default function ApplicantLayout({ children, applicant, activeTab, onTabC
     if (isMobile) setExpanded(false);
   };
 
+  // Get token alert status
+  const getTokenAlertStatus = () => {
+    if (tokenBalance === null) return null; // Still loading
+    if (tokenBalance === 0) return 'red';
+    if (tokenBalance < 3) return 'yellow';
+    return null;
+  };
+
+  const tokenAlertStatus = getTokenAlertStatus();
+
   return (
     <div className="flex flex-col min-h-screen">
       <div className="flex flex-1">
@@ -115,19 +146,39 @@ export default function ApplicantLayout({ children, applicant, activeTab, onTabC
           <div className="flex flex-col px-1 py-4 space-y-1 sticky top-0">
             {navItems.map((item) => {
               const isActive = activeTab === item.key;
+              const showTokenAlert = item.key === 'token' && tokenAlertStatus;
+
               return (
                 <button
                   key={item.key}
                   onClick={() => handleNavClick(item)}
-                  className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-left transition ${
+                  className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-left transition relative ${
                     isActive ? 'bg-orange-500 text-white' : 'text-white'
                   } hover:bg-orange-600 focus:outline-none`}
                 >
-                  <div className="flex-shrink-0">{item.icon}</div>
+                  <div className="flex-shrink-0 relative">
+                    {item.icon}
+                    {showTokenAlert && (
+                      <div className={`absolute -top-1 -right-1 w-3 h-3 rounded-full border-2 border-black ${
+                        tokenAlertStatus === 'red' ? 'bg-red-500' : 'bg-yellow-500'
+                      }`} />
+                    )}
+                  </div>
                   <div className={`flex-1 text-sm font-medium truncate ${!expanded ? 'hidden' : ''}`}>
                     {item.label}
                   </div>
                   {isActive && expanded && <div className="w-2 h-2 bg-orange-300 rounded-full ml-1" />}
+                  
+                  {/* Expanded warning message */}
+                  {expanded && showTokenAlert && (
+                    <div className="absolute right-2 top-1/2 transform -translate-y-1/2">
+                      {tokenAlertStatus === 'red' ? (
+                        <AlertCircle className="w-4 h-4 text-red-400" />
+                      ) : (
+                        <AlertTriangle className="w-4 h-4 text-yellow-400" />
+                      )}
+                    </div>
+                  )}
                 </button>
               );
             })}
@@ -175,15 +226,24 @@ export default function ApplicantLayout({ children, applicant, activeTab, onTabC
             <div className="fixed bottom-0 w-full bg-white border-t border-gray-200 flex justify-around py-2 z-50">
               {navItems.map((item) => {
                 const isActive = activeTab === item.key;
+                const showTokenAlert = item.key === 'token' && tokenAlertStatus;
+
                 return (
                   <button
                     key={item.key}
                     onClick={() => handleNavClick(item)}
-                    className={`flex flex-col items-center text-xs ${
+                    className={`flex flex-col items-center text-xs relative ${
                       isActive ? 'text-orange-600 font-semibold' : 'text-gray-500'
                     }`}
                   >
-                    {item.icon}
+                    <div className="relative">
+                      {item.icon}
+                      {showTokenAlert && (
+                        <div className={`absolute -top-1 -right-1 w-2 h-2 rounded-full border border-white ${
+                          tokenAlertStatus === 'red' ? 'bg-red-500' : 'bg-yellow-500'
+                        }`} />
+                      )}
+                    </div>
                     <span>{item.label}</span>
                   </button>
                 );
