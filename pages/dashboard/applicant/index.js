@@ -246,7 +246,7 @@ export default function ApplicantDashboard() {
                         <motion.div
                           initial={{ opacity: 0, y: 10 }}
                           animate={{ opacity: 1, y: 0 }}
-                          className="bg-white/50 border border-orange-200 rounded-lg p-2 shadow-lg min-w-[150px]"
+                          className="bg-white border border-orange-200 rounded-lg p-2 shadow-lg min-w-[150px]"
                         >
                           <p className="text-xs text-gray-700 font-medium text-center">
                             Click here to upload your profile photo
