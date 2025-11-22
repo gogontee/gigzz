@@ -4,7 +4,7 @@ import Image from 'next/image';
 import { motion } from 'framer-motion';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { Eye, EyeOff, MailCheck, AlertCircle } from 'lucide-react';
+import { Eye, EyeOff, MailCheck, AlertCircle, Upload } from 'lucide-react';
 
 function PasswordInput({ value, onChange }) {
   const [showPassword, setShowPassword] = useState(false);
@@ -49,6 +49,7 @@ export default function Signup() {
   const [errorMsg, setErrorMsg] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
   const [verificationSent, setVerificationSent] = useState(false);
+  const [fileError, setFileError] = useState('');
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -56,7 +57,26 @@ export default function Signup() {
   };
 
   const handleFileChange = (e) => {
-    setAvatarFile(e.target.files[0]);
+    const file = e.target.files[0];
+    if (file) {
+      // Validate file type
+      const validTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp'];
+      if (!validTypes.includes(file.type)) {
+        setFileError('Please upload a valid image file (JPEG, PNG, GIF, WebP)');
+        setAvatarFile(null);
+        return;
+      }
+
+      // Validate file size (max 5MB)
+      if (file.size > 5 * 1024 * 1024) {
+        setFileError('File size must be less than 5MB');
+        setAvatarFile(null);
+        return;
+      }
+
+      setAvatarFile(file);
+      setFileError('');
+    }
   };
 
   const handleSignup = async (e) => {
@@ -68,6 +88,12 @@ export default function Signup() {
     // Add validation for role selection
     if (!form.role) {
       setErrorMsg('Please choose an account type.');
+      return;
+    }
+
+    // Add validation for profile picture
+    if (!avatarFile) {
+      setErrorMsg('Profile picture is required.');
       return;
     }
 
@@ -84,19 +110,17 @@ export default function Signup() {
     setLoading(true);
 
     try {
-      // Store photo data if exists
-      if (avatarFile) {
-        const reader = new FileReader();
-        reader.onload = () => {
-          const pendingPhotoData = {
-            fileData: reader.result,
-            fileName: avatarFile.name,
-            fileType: avatarFile.type,
-          };
-          sessionStorage.setItem('pending_photo', JSON.stringify(pendingPhotoData));
+      // Store photo data (mandatory now)
+      const reader = new FileReader();
+      reader.onload = () => {
+        const pendingPhotoData = {
+          fileData: reader.result,
+          fileName: avatarFile.name,
+          fileType: avatarFile.type,
         };
-        reader.readAsDataURL(avatarFile);
-      }
+        sessionStorage.setItem('pending_photo', JSON.stringify(pendingPhotoData));
+      };
+      reader.readAsDataURL(avatarFile);
 
       // Call our custom API
       const response = await fetch('/api/custom-signup', {
@@ -115,7 +139,7 @@ export default function Signup() {
       }
 
       // Store photo with user ID if we have one
-      if (avatarFile && result.userId) {
+      if (result.userId) {
         const pendingPhoto = sessionStorage.getItem('pending_photo');
         if (pendingPhoto) {
           localStorage.setItem(`pending_photo_${result.userId}`, pendingPhoto);
@@ -163,19 +187,17 @@ export default function Signup() {
               Please check your inbox and click the verification link to activate your account.
             </p>
             
-            {avatarFile && (
-              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                <div className="flex items-start gap-3">
-                  <AlertCircle className="w-5 h-5 text-blue-500 mt-0.5 flex-shrink-0" />
-                  <div className="text-left">
-                    <p className="text-blue-800 text-sm font-medium mb-1">Profile Photo:</p>
-                    <p className="text-blue-700 text-sm">
-                      Your profile photo will be uploaded after email verification.
-                    </p>
-                  </div>
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+              <div className="flex items-start gap-3">
+                <AlertCircle className="w-5 h-5 text-blue-500 mt-0.5 flex-shrink-0" />
+                <div className="text-left">
+                  <p className="text-blue-800 text-sm font-medium mb-1">Profile Photo:</p>
+                  <p className="text-blue-700 text-sm">
+                    Your profile photo will be uploaded after email verification.
+                  </p>
                 </div>
               </div>
-            )}
+            </div>
 
             <div className="bg-orange-50 border border-orange-200 rounded-lg p-4">
               <p className="text-orange-800 text-sm">
@@ -249,13 +271,28 @@ export default function Signup() {
         <PasswordInput value={form.password} onChange={handleChange} />
 
         <div>
-          <label className="block text-sm text-gray-700 mb-2">Profile Picture (Optional)</label>
-          <input
-            type="file"
-            accept="image/*"
-            onChange={handleFileChange}
-            className="w-full p-2 border rounded-lg bg-white text-black focus:outline-none focus:border-orange-500"
-          />
+          <label className="block text-sm text-gray-700 mb-2">
+            Profile Picture <span className="text-red-500">*</span>
+          </label>
+          <div className="relative">
+            <input
+              type="file"
+              accept="image/*"
+              onChange={handleFileChange}
+              required
+              className="w-full p-3 border rounded-lg bg-white text-black focus:outline-none focus:border-orange-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-orange-50 file:text-orange-700 hover:file:bg-orange-100"
+            />
+            <Upload className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+          </div>
+          {fileError && (
+            <p className="text-red-500 text-sm mt-1 flex items-center gap-1">
+              <AlertCircle className="w-4 h-4" />
+              {fileError}
+            </p>
+          )}
+          <p className="text-xs text-gray-500 mt-1">
+            Supported formats: JPEG, PNG, GIF, WebP. Max size: 5MB
+          </p>
         </div>
 
         <input
@@ -325,7 +362,7 @@ export default function Signup() {
         <motion.button
           whileTap={{ scale: 0.95 }}
           type="submit"
-          disabled={loading || !agreedToTerms || !form.role}
+          disabled={loading || !agreedToTerms || !form.role || !avatarFile}
           className="w-full p-3 rounded-lg bg-black text-white hover:bg-orange-600 transition disabled:opacity-50 font-medium"
         >
           {loading ? 'Creating Account...' : 'Create my account'}

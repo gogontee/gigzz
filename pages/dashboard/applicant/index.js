@@ -9,7 +9,7 @@ import Profile from '../../../components/Profile';
 import Application from '../../../components/Application';
 import Settings from '../../../components/Settings';
 import Wallet from '../../../components/WalletComponent';
-import { Briefcase, Coins, Layers, Bell, MessageSquare, Pencil, X, AlertTriangle, Wallet as WalletIcon } from 'lucide-react';
+import { Briefcase, Coins, Layers, Bell, MessageSquare, Pencil, X, AlertTriangle, Wallet as WalletIcon, Pointer } from 'lucide-react';
 import useUnreadMessages from '../../../hooks/useUnreadMessages';
 import ProfilePromotion from '../../../components/ProfilePromotion';
 
@@ -22,6 +22,7 @@ export default function ApplicantDashboard() {
   const [unreadCountNotifications, setUnreadCountNotifications] = useState(0);
   const [incompleteFields, setIncompleteFields] = useState([]);
   const [showTokenWarning, setShowTokenWarning] = useState(false);
+  const [showAvatarPrompt, setShowAvatarPrompt] = useState(false);
   const fileInputRef = useRef(null);
 
   const unreadMessagesCount = useUnreadMessages();
@@ -70,6 +71,9 @@ export default function ApplicantDashboard() {
       if (!profileData.specialties) missingFields.push('specialties');
       
       setIncompleteFields(missingFields);
+      
+      // Show avatar prompt if avatar_url is null
+      setShowAvatarPrompt(!profileData.avatar_url);
     }
 
     // Show token warning if balance is 0
@@ -127,6 +131,8 @@ export default function ApplicantDashboard() {
       setProfile((prev) => ({ ...prev, avatar_url: data.publicUrl }));
       // Remove avatar_url from incomplete fields if it was there
       setIncompleteFields(prev => prev.filter(field => field !== 'avatar_url'));
+      // Hide the avatar prompt after successful upload
+      setShowAvatarPrompt(false);
     }
   };
 
@@ -184,17 +190,73 @@ export default function ApplicantDashboard() {
               </a>
 
               <div className="relative group">
-                <img
-                  src={profile?.avatar_url || '/default-avatar.png'}
-                  alt="Avatar"
-                  className="w-10 h-10 min-w-[40px] min-h-[40px] rounded-full border-2 border-orange-500 object-cover"
-                />
-                <button
-                  onClick={() => fileInputRef.current.click()}
-                  className="absolute bottom-0 right-0 bg-white p-1 rounded-full shadow group-hover:flex hidden md:group-hover:flex md:flex hover:bg-orange-100"
-                >
-                  <Pencil size={14} className="text-gray-700" />
-                </button>
+                {/* Avatar Upload Area */}
+                <div className="relative">
+                  {profile?.avatar_url ? (
+                    <img
+                      src={profile.avatar_url}
+                      alt="Avatar"
+                      className="w-10 h-10 min-w-[40px] min-h-[40px] rounded-full border-2 border-orange-500 object-cover"
+                      onError={(e) => {
+                        e.target.src = 'https://xatxjdsppcjgplmrtjcs.supabase.co/storage/v1/object/public/avatars/default.jpg';
+                      }}
+                    />
+                  ) : (
+                    <img
+                      src="https://xatxjdsppcjgplmrtjcs.supabase.co/storage/v1/object/public/avatars/default.jpg"
+                      alt="Default Avatar"
+                      className="w-10 h-10 min-w-[40px] min-h-[40px] rounded-full border-2 border-orange-500 object-cover"
+                    />
+                  )}
+                  
+                  {/* Edit Button */}
+                  <button
+                    onClick={() => fileInputRef.current.click()}
+                    className="absolute bottom-0 right-0 bg-white p-1 rounded-full shadow group-hover:flex hidden md:group-hover:flex md:flex hover:bg-orange-100"
+                  >
+                    <Pencil size={14} className="text-gray-700" />
+                  </button>
+
+                  {/* Bouncing Finger Icon with Popup */}
+                  <AnimatePresence>
+                    {showAvatarPrompt && (
+                      <motion.div
+                        initial={{ opacity: 0, scale: 0 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        exit={{ opacity: 0, scale: 0 }}
+                        className="absolute top-12 -right-14 z-10"
+                      >
+                        {/* Bouncing Finger Icon */}
+                        <motion.div
+                          animate={{
+                            y: [0, -10, 0],
+                            rotate: [0, -5, 0],
+                          }}
+                          transition={{
+                            duration: 1,
+                            repeat: Infinity,
+                            ease: "easeInOut"
+                          }}
+                          className="flex justify-center mb-2"
+                        >
+                          <Pointer className="w-5 h-5 text-orange-500 transform rotate-45" />
+                        </motion.div>
+
+                        {/* Popup Message - Now positioned below the finger */}
+                        <motion.div
+                          initial={{ opacity: 0, y: 10 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          className="bg-white/50 border border-orange-200 rounded-lg p-2 shadow-lg min-w-[150px]"
+                        >
+                          <p className="text-xs text-gray-700 font-medium text-center">
+                            Click here to upload your profile photo
+                          </p>
+                        </motion.div>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+                </div>
+
                 <input
                   type="file"
                   accept="image/*"
@@ -219,7 +281,7 @@ export default function ApplicantDashboard() {
                   <AlertTriangle className="w-5 h-5 text-yellow-600 mt-0.5 flex-shrink-0" />
                   <div className="flex-1">
                     <h3 className="text-yellow-800 font-medium text-sm mb-2">
-                      Scroll down, use the "Edit Profile" button and Complete your profile to get more gigs
+                      Scroll down, use the "Edit Profile" button to Complete your profile and get more gigs
                     </h3>
                     <div className="space-y-1">
                       {incompleteFields.map(field => (
