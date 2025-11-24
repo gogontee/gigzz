@@ -2,6 +2,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/router';
 import { createPagesBrowserClient } from '@supabase/auth-helpers-nextjs';
+import { track } from '@vercel/analytics';
 import Header from '../../components/Header';
 import MobileHeader from '../../components/MobileHeader';
 import Footer from '../../components/Footer';
@@ -603,7 +604,13 @@ export default function JobDetailPage() {
           )}
 
           <motion.button
-            onClick={handleApply}
+            onClick={() => {
+              track('apply_button_clicked', {
+                jobId: job?.id,
+                jobTitle: job?.title,
+              });
+              handleApply();
+            }}
             disabled={submitting || (job.condition && !acceptedTerms)}
             className="w-full bg-black text-white px-6 py-3 rounded-xl hover:bg-orange-400 transition-all duration-200 font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
             whileHover={{ scale: submitting ? 1 : 1.03 }}
