@@ -6,6 +6,20 @@ import { Eye } from "lucide-react";
 
 const supabase = createPagesBrowserClient();
 
+// Function to strip HTML tags and decode HTML entities
+const stripHtml = (html) => {
+  if (!html) return '';
+  
+  // Create a temporary div element
+  const tempDiv = document.createElement('div');
+  tempDiv.innerHTML = html;
+  
+  // Get text content and decode HTML entities
+  const text = tempDiv.textContent || tempDiv.innerText || '';
+  
+  return text;
+};
+
 export default function Portfolio() {
   const [projects, setProjects] = useState([]);
   const [search, setSearch] = useState('');
@@ -27,8 +41,15 @@ export default function Portfolio() {
       if (error) {
         console.error('Error fetching premium projects:', error);
       } else if (data) {
+        // Process projects to strip HTML from details
+        const processedData = data.map(project => ({
+          ...project,
+          // Strip HTML from details and create a clean version
+          cleanDetails: stripHtml(project.details)
+        }));
+
         // Randomize order
-        const randomized = data.sort(() => Math.random() - 0.5);
+        const randomized = processedData.sort(() => Math.random() - 0.5);
 
         if (pageNum === 1) {
           setProjects(randomized); // replace on first page
@@ -122,11 +143,11 @@ export default function Portfolio() {
                   {proj.location && (
                     <p className="text-sm text-gray-500 mt-1">{proj.location}</p>
                   )}
-                  {proj.details && (
+                  {proj.cleanDetails && (
                     <p className="text-sm text-gray-700 mt-2 hidden lg:block">
-                      {proj.details.length > 50
-                        ? proj.details.substring(0, 50) + '...'
-                        : proj.details}
+                      {proj.cleanDetails.length > 50
+                        ? proj.cleanDetails.substring(0, 50) + '...'
+                        : proj.cleanDetails}
                     </p>
                   )}
                 </div>

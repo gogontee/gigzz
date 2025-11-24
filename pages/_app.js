@@ -8,14 +8,16 @@ import { useEffect, useState } from "react";
 import { createPagesBrowserClient } from "@supabase/auth-helpers-nextjs";
 import { SessionContextProvider } from "@supabase/auth-helpers-react";
 import { AppProgressBar as ProgressBar } from "next-nprogress-bar";
-import { UserProvider } from "../context/UserContext"; // ✅ Added
+import { UserProvider } from "../context/UserContext";
+
+// ✅ Added Vercel Analytics
+import { Analytics } from "@vercel/analytics/react";
 
 function MyApp({ Component, pageProps }) {
   const router = useRouter();
   const [isMounted, setIsMounted] = useState(false);
   const [supabaseClient] = useState(() => createPagesBrowserClient());
 
-  // Prevent hydration mismatches
   useEffect(() => {
     setIsMounted(true);
   }, []);
@@ -23,7 +25,6 @@ function MyApp({ Component, pageProps }) {
   return (
     <>
       <Head>
-        {/* ✅ Basic SEO */}
         <title>Gigzz — Find Remote, Hybrid & Onsite Jobs</title>
         <meta
           name="description"
@@ -37,7 +38,6 @@ function MyApp({ Component, pageProps }) {
         <meta name="viewport" content="width=device-width, initial-scale=1.0" />
         <link rel="canonical" href="https://mygigzz.com" />
 
-        {/* ✅ Favicon and App Icons */}
         <link
           rel="icon"
           href="https://mygigzz.com/favicon.ico"
@@ -65,9 +65,8 @@ function MyApp({ Component, pageProps }) {
           href="https://mygigzz.com/apple-touch-icon.png"
         />
         <link rel="manifest" href="https://mygigzz.com/site.webmanifest" />
-        <meta name="theme-color" content="#f97316" />
+        <meta name="theme-color" content="hsla(29, 51%, 90%, 1.00)" />
 
-        {/* ✅ Open Graph (for social sharing) */}
         <meta
           property="og:title"
           content="Gigzz — Remote, Hybrid & Onsite Jobs"
@@ -84,7 +83,6 @@ function MyApp({ Component, pageProps }) {
         <meta property="og:type" content="website" />
         <meta property="og:site_name" content="Gigzz" />
 
-        {/* ✅ Twitter Cards */}
         <meta name="twitter:card" content="summary_large_image" />
         <meta
           name="twitter:title"
@@ -100,7 +98,6 @@ function MyApp({ Component, pageProps }) {
         />
         <meta name="twitter:site" content="@GigzzOfficial" />
 
-        {/* ✅ Facebook, Instagram, TikTok Cards */}
         <meta property="og:locale" content="en_US" />
         <meta property="fb:app_id" content="1234567890" />
         <meta
@@ -120,7 +117,6 @@ function MyApp({ Component, pageProps }) {
           content="Discover freelance, remote, and onsite opportunities on Gigzz. Work with verified clients and showcase your talent."
         />
 
-        {/* ✅ Structured Data for Google Rich Results */}
         <script
           type="application/ld+json"
           dangerouslySetInnerHTML={{
@@ -168,13 +164,15 @@ function MyApp({ Component, pageProps }) {
               </AnimatePresence>
             </Layout>
 
-            {/* 🔸 Orange top progress bar */}
             <ProgressBar
               height="3px"
-              color="#ffffffff"
+              color="#e16c12ff"
               options={{ showSpinner: false }}
               shallowRouting
             />
+
+            {/* ✅ Vercel Analytics placed correctly */}
+            <Analytics />
           </UserProvider>
         </SessionContextProvider>
       )}
