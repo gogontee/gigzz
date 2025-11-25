@@ -12,8 +12,11 @@ import {
   MapPin,
   GraduationCap,
   Calendar,
+  Edit3,
+  X,
 } from "lucide-react";
 import ChatModal from "../../../components/ChatModal";
+import WalletComponent from "../../../components/WalletComponent";
 
 const supabase = createPagesBrowserClient();
 
@@ -63,6 +66,7 @@ export default function ProfilePage() {
   const [projects, setProjects] = useState([]);
   const [loading, setLoading] = useState(true);
   const [tokenBalance, setTokenBalance] = useState(0);
+  const [showWallet, setShowWallet] = useState(false);
 
   const [chatOpen, setChatOpen] = useState(false);
   const [chatId, setChatId] = useState(null);
@@ -331,33 +335,46 @@ export default function ProfilePage() {
                 🪙 Tokens: {tokenBalance}
               </span>
               {tokenBalance <= 1 && (
-                <Link
-                  href="/dashboard/wallet"
+                <button
+                  onClick={() => setShowWallet(true)}
                   className="text-xs bg-yellow-500 text-black px-2 py-1 rounded-full hover:bg-yellow-600 transition"
                 >
                   Get More Tokens
-                </Link>
+                </button>
               )}
             </div>
           )}
         </div>
 
-        {/* Chat button - VISIBLE TO EVERYONE */}
-        <button
-          onClick={handleChatClick}
-          className="absolute bottom-4 right-4 bg-white text-black p-3 rounded-full shadow-lg hover:scale-110 transition flex items-center justify-center"
-          aria-label="Chat"
-          title={getChatButtonTooltip()}
-          disabled={chatLoading}
-        >
-          {chatLoading ? (
-            <svg className="w-5 h-5 animate-spin text-black" viewBox="3 3 18 18">
-              <path className="fill-black" d="M12 3v3" />
-            </svg>
-          ) : (
-            <MessageCircle className="w-6 h-6" />
+        {/* Actions (Edit + Chat) - Smaller on mobile */}
+        <div className="absolute bottom-4 right-4 flex gap-2 sm:gap-3">
+          {isProfileOwner && (
+            <Link
+              href="/dashboard/applicant/edit"
+              className="bg-white text-black p-2 sm:p-3 rounded-full shadow-lg hover:scale-110 transition transform duration-200 focus:outline-none group"
+              aria-label="Edit Profile"
+            >
+              <Edit3 className="w-4 h-4 sm:w-6 sm:h-6 group-hover:rotate-12 transition-transform" />
+            </Link>
           )}
-        </button>
+          
+          {/* Chat button - VISIBLE TO EVERYONE */}
+          <button
+            onClick={handleChatClick}
+            className="bg-white text-black p-2 sm:p-3 rounded-full shadow-lg hover:scale-110 transition flex items-center justify-center"
+            aria-label="Chat"
+            title={getChatButtonTooltip()}
+            disabled={chatLoading}
+          >
+            {chatLoading ? (
+              <svg className="w-4 h-4 sm:w-6 sm:h-6 animate-spin text-black" viewBox="3 3 18 18">
+                <path className="fill-black" d="M12 3v3" />
+              </svg>
+            ) : (
+              <MessageCircle className="w-4 h-4 sm:w-6 sm:h-6" />
+            )}
+          </button>
+        </div>
       </div>
 
       {/* Profile Details - VISIBLE TO EVERYONE */}
@@ -464,6 +481,35 @@ export default function ProfilePage() {
           </div>
         )}
       </div>
+
+      {/* Wallet Modal */}
+      {showWallet && (
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4"
+        >
+          <motion.div
+            initial={{ opacity: 0, scale: 0.9 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.9 }}
+            className="bg-white rounded-2xl w-full max-w-md mx-4 max-h-[90vh] overflow-y-auto relative"
+          >
+            {/* Close Button */}
+            <button
+              onClick={() => setShowWallet(false)}
+              className="absolute top-4 right-4 z-10 bg-gray-100 hover:bg-gray-200 rounded-full p-2 transition-colors duration-200"
+              aria-label="Close wallet"
+            >
+              <X className="w-5 h-5 text-gray-600" />
+            </button>
+            
+            {/* Wallet Component */}
+            <WalletComponent onClose={() => setShowWallet(false)} />
+          </motion.div>
+        </motion.div>
+      )}
 
       {/* Chat Modal - Only show when viewing someone else's profile AND user is authenticated */}
       {chatOpen && chatId && !isProfileOwner && currentUserId && (
