@@ -1,6 +1,6 @@
 'use client';
 import React, { useState, useEffect } from 'react';
-import { Pencil, Trash2, X } from 'lucide-react';
+import { Pencil, Trash2, X, Calendar, MapPin, DollarSign, Users, Briefcase, GraduationCap, ListChecks } from 'lucide-react';
 import { createPagesBrowserClient } from "@supabase/auth-helpers-nextjs";
 import { useRouter } from 'next/navigation';
 import Link from "next/link";
@@ -151,6 +151,22 @@ export default function JobListCard({ job, onDelete, onUpdate }) {
     setIsDeleteConfirmOpen(false);
   };
 
+  // Format date for display
+  const formatDate = (dateString) => {
+    if (!dateString) return 'N/A';
+    return new Date(dateString).toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric'
+    });
+  };
+
+  // Check if deadline is passed
+  const isDeadlinePassed = (dateString) => {
+    if (!dateString) return false;
+    return new Date(dateString) < new Date();
+  };
+
   return (
     <div className="rounded-xl bg-white shadow-md border p-4 flex flex-col gap-2 hover:shadow-lg transition h-full">
       {isEditing ? (
@@ -231,22 +247,168 @@ export default function JobListCard({ job, onDelete, onUpdate }) {
         </>
       )}
 
-      {/* ✅ Job Details Modal */}
+      {/* ✅ Enhanced Job Details Modal */}
       {isDetailsOpen && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center z-40 overflow-y-auto">
-          <div className="bg-white p-6 rounded-xl max-w-lg w-full relative max-h-[85vh] overflow-y-auto mt-20">
-            <button onClick={() => setIsDetailsOpen(false)} className="absolute top-2 right-2 text-gray-600 hover:text-black">
-              <X size={18} />
-            </button>
-            <h2 className="text-xl font-bold mb-4 text-orange-400">{job.title}</h2>
-            <p className="text-gray-700 mb-2">{job.description}</p>
-            <p><strong>Location:</strong> {job.location || 'N/A'}</p>
-            <p><strong>Deadline:</strong> {job.application_deadline || 'N/A'}</p>
-            <p><strong>Responsibilities:</strong> {job.responsibilities || 'N/A'}</p>
-            <p><strong>Requirements:</strong> {job.requirements || 'N/A'}</p>
-            <p><strong>Qualification:</strong> {job.educational_qualification || 'N/A'}</p>
-            <p><strong>Salary:</strong> ₦{job.min_price?.toLocaleString()} - ₦{job.max_price?.toLocaleString()} ({job.price_frequency || 'one-time'})</p>
-            <p className="mt-2"><strong>Applicants:</strong> {applicantsCount}</p>
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl max-w-4xl w-full max-h-[90vh] overflow-hidden flex flex-col shadow-2xl">
+            {/* Header */}
+            <div className="bg-gradient-to-r from-orange-500 to-orange-600 p-4 sm:p-6 text-white">
+              <div className="flex justify-between items-start">
+                <div className="flex-1">
+                  <h2 className="text-xl sm:text-2xl font-bold mb-2">{job.title}</h2>
+                  <div className="flex flex-wrap gap-2 text-xs sm:text-sm">
+                    <div className="flex items-center gap-1 bg-white/20 px-2 sm:px-3 py-1 rounded-full">
+                      <Briefcase size={14} />
+                      <span>{job.category || 'Uncategorized'}</span>
+                    </div>
+                    <div className="flex items-center gap-1 bg-white/20 px-2 sm:px-3 py-1 rounded-full">
+                      <MapPin size={14} />
+                      <span>{job.location || 'Remote'}</span>
+                    </div>
+                    <div className="flex items-center gap-1 bg-white/20 px-2 sm:px-3 py-1 rounded-full">
+                      <Users size={14} />
+                      <span>{applicantsCount} Applicants</span>
+                    </div>
+                  </div>
+                </div>
+                <button 
+                  onClick={() => setIsDetailsOpen(false)} 
+                  className="text-white hover:bg-white/20 p-1 sm:p-2 rounded-full transition flex-shrink-0"
+                >
+                  <X size={18} className="sm:w-6 sm:h-6" />
+                </button>
+              </div>
+            </div>
+
+            {/* Content */}
+            <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-4 sm:space-y-6">
+              {/* Job Overview */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
+                {/* Salary */}
+                <div className="bg-gray-50 rounded-xl p-3 sm:p-4">
+                  <div className="flex items-center gap-2 mb-2">
+                    <DollarSign className="text-green-600" size={18} />
+                    <h3 className="font-semibold text-gray-900 text-sm sm:text-base">Salary Range</h3>
+                  </div>
+                  <p className="text-base sm:text-lg font-bold text-gray-900">
+                    ₦{job.min_price?.toLocaleString()} - ₦{job.max_price?.toLocaleString()}
+                  </p>
+                  <p className="text-xs sm:text-sm text-gray-600 capitalize">{job.price_frequency || 'one-time'}</p>
+                </div>
+
+                {/* Deadline */}
+                <div className="bg-gray-50 rounded-xl p-3 sm:p-4">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Calendar className={isDeadlinePassed(job.application_deadline) ? "text-red-600" : "text-blue-600"} size={18} />
+                    <h3 className="font-semibold text-gray-900 text-sm sm:text-base">Application Deadline</h3>
+                  </div>
+                  <p className={`text-base sm:text-lg font-bold ${isDeadlinePassed(job.application_deadline) ? 'text-red-600' : 'text-gray-900'}`}>
+                    {formatDate(job.application_deadline)}
+                  </p>
+                  {isDeadlinePassed(job.application_deadline) && (
+                    <p className="text-xs sm:text-sm text-red-600 font-medium">Deadline Passed</p>
+                  )}
+                </div>
+              </div>
+
+              {/* Job Description */}
+              <div>
+                <h3 className="text-base sm:text-lg font-semibold text-gray-900 mb-2 sm:mb-3">Job Description</h3>
+                <div className="bg-gray-50 rounded-xl p-3 sm:p-4">
+                  <p className="text-gray-700 leading-relaxed text-sm sm:text-base whitespace-pre-line">
+                    {job.description || 'No description provided.'}
+                  </p>
+                </div>
+              </div>
+
+              {/* Requirements & Qualifications */}
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
+                {/* Requirements */}
+                <div>
+                  <h3 className="text-base sm:text-lg font-semibold text-gray-900 mb-2 sm:mb-3 flex items-center gap-2">
+                    <ListChecks size={18} className="text-orange-500" />
+                    Requirements
+                  </h3>
+                  <div className="bg-gray-50 rounded-xl p-3 sm:p-4">
+                    {job.requirements ? (
+                      <ul className="space-y-1 sm:space-y-2">
+                        {job.requirements.split('\n').filter(item => item.trim()).map((requirement, index) => (
+                          <li key={index} className="flex items-start gap-2 text-gray-700 text-sm sm:text-base">
+                            <span className="text-orange-500 mt-1 flex-shrink-0">•</span>
+                            <span>{requirement.trim()}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    ) : (
+                      <p className="text-gray-500 italic text-sm sm:text-base">No specific requirements listed.</p>
+                    )}
+                  </div>
+                </div>
+
+                {/* Qualifications */}
+                <div>
+                  <h3 className="text-base sm:text-lg font-semibold text-gray-900 mb-2 sm:mb-3 flex items-center gap-2">
+                    <GraduationCap size={18} className="text-orange-500" />
+                    Educational Qualification
+                  </h3>
+                  <div className="bg-gray-50 rounded-xl p-3 sm:p-4">
+                    {job.educational_qualification ? (
+                      <ul className="space-y-1 sm:space-y-2">
+                        {job.educational_qualification.split('\n').filter(item => item.trim()).map((qualification, index) => (
+                          <li key={index} className="flex items-start gap-2 text-gray-700 text-sm sm:text-base">
+                            <span className="text-orange-500 mt-1 flex-shrink-0">•</span>
+                            <span>{qualification.trim()}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    ) : (
+                      <p className="text-gray-500 italic text-sm sm:text-base">No specific qualifications listed.</p>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* Responsibilities */}
+              <div>
+                <h3 className="text-base sm:text-lg font-semibold text-gray-900 mb-2 sm:mb-3">Responsibilities</h3>
+                <div className="bg-gray-50 rounded-xl p-3 sm:p-4">
+                  {job.responsibilities ? (
+                    <ul className="space-y-1 sm:space-y-2">
+                      {job.responsibilities.split('\n').filter(item => item.trim()).map((responsibility, index) => (
+                        <li key={index} className="flex items-start gap-2 text-gray-700 text-sm sm:text-base">
+                          <span className="text-orange-500 mt-1 flex-shrink-0">•</span>
+                          <span>{responsibility.trim()}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <p className="text-gray-500 italic text-sm sm:text-base">No specific responsibilities listed.</p>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div className="border-t bg-gray-50 px-4 sm:px-6 py-3 sm:py-4">
+              <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3">
+                <div className="text-xs sm:text-sm text-gray-600 text-center sm:text-left">
+                  Job ID: {job.id} • Posted on {formatDate(job.created_at)}
+                </div>
+                <div className="flex flex-col xs:flex-row gap-2 justify-center">
+                  <Link href={`/job/${job.id}/applicants`} className="flex-1">
+                    <button className="w-full bg-black text-white px-3 py-2 text-sm rounded-lg hover:bg-orange-500 transition font-medium">
+                      View Applicants ({applicantsCount})
+                    </button>
+                  </Link>
+                  <button 
+                    onClick={() => setIsDetailsOpen(false)}
+                    className="w-full border border-gray-300 text-gray-700 px-3 py-2 text-sm rounded-lg hover:bg-gray-50 transition font-medium"
+                  >
+                    Close
+                  </button>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       )}
