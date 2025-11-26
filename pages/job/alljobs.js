@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef, useCallback } from "react";
 import { useRouter } from "next/router";
 import { supabase } from "../../utils/supabaseClient";
 import Header from "../../components/Header";
@@ -101,6 +101,9 @@ export default function AllJobs() {
   const [page, setPage] = useState(0);
   const [hasMore, setHasMore] = useState(true);
   const [loading, setLoading] = useState(false);
+  const [isFetching, setIsFetching] = useState(false);
+  const observerRef = useRef(null);
+  const lastJobRef = useRef(null);
 
   useEffect(() => {
     fetchJobs(0, true); // load first page
@@ -109,6 +112,28 @@ export default function AllJobs() {
   useEffect(() => {
     applyFilters(jobs, searchQuery, selectedCategory);
   }, [searchQuery, selectedCategory, jobs]);
+
+  // Initialize intersection observer for infinite scroll
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting && hasMore && !loading && !isFetching) {
+          loadMoreJobs();
+        }
+      },
+      { threshold: 0.1 }
+    );
+
+    if (observerRef.current) {
+      observer.observe(observerRef.current);
+    }
+
+    return () => {
+      if (observerRef.current) {
+        observer.unobserve(observerRef.current);
+      }
+    };
+  }, [hasMore, loading, isFetching]);
 
   // Fetch jobs with pagination
   const fetchJobs = async (pageNumber, reset = false) => {
@@ -147,7 +172,7 @@ export default function AllJobs() {
     }
 
     setPage(pageNumber);
-    setHasMore(data.length === PAGE_SIZE); // only show "Load More" if full page loaded
+    setHasMore(data.length === PAGE_SIZE);
     setLoading(false);
 
     const initialQuery = routerQuery?.query || "";
@@ -158,6 +183,51 @@ export default function AllJobs() {
 
     applyFilters(reset ? sorted : [...jobs, ...sorted], initialQuery, initialCategory);
   };
+
+  // Load more jobs for infinite scroll
+  const loadMoreJobs = useCallback(async () => {
+    if (isFetching || !hasMore) return;
+
+    setIsFetching(true);
+    const nextPage = page + 1;
+
+    const from = nextPage * PAGE_SIZE;
+    const to = from + PAGE_SIZE - 1;
+
+    const { data, error } = await supabase
+      .from("jobs")
+      .select("*")
+      .range(from, to);
+
+    if (error) {
+      console.error("Error fetching more jobs:", error.message);
+      setIsFetching(false);
+      return;
+    }
+
+    if (data.length > 0) {
+      // ✅ Custom client-side sort for new data
+      const sorted = data.sort((a, b) => {
+        const rank = (tag) => {
+          if (tag === "Premium") return 1;
+          if (tag === "Gold") return 2;
+          if (tag === "Silver") return 3;
+          return 4; // NULL or anything else
+        };
+        const rankDiff = rank(a.promotion_tag) - rank(b.promotion_tag);
+        if (rankDiff !== 0) return rankDiff;
+        return new Date(b.created_at) - new Date(a.created_at);
+      });
+
+      setJobs((prev) => [...prev, ...sorted]);
+      setPage(nextPage);
+      setHasMore(data.length === PAGE_SIZE);
+    } else {
+      setHasMore(false);
+    }
+
+    setIsFetching(false);
+  }, [page, hasMore, isFetching]);
 
   // Main filtering function
   const applyFilters = (allJobs, query, category) => {
@@ -186,6 +256,21 @@ export default function AllJobs() {
 
     setFilteredJobs(filtered);
   };
+
+  // Continuous scroll - when reaching end, start from beginning
+  useEffect(() => {
+    if (!hasMore && filteredJobs.length > 0 && !isFetching) {
+      // Add a small delay before restarting to create seamless loop
+      const timer = setTimeout(() => {
+        // For continuous effect, we can reset to show all jobs again
+        // This creates the infinite scroll illusion
+        setHasMore(true);
+        setPage(0);
+      }, 1000);
+
+      return () => clearTimeout(timer);
+    }
+  }, [hasMore, filteredJobs.length, isFetching]);
 
   return (
     <div>
@@ -244,33 +329,67 @@ export default function AllJobs() {
           ))}
         </div>
 
-        {/* Job Results */}
-        {filteredJobs.length === 0 ? (
+        {/* Job Results with Animation */}
+        {filteredJobs.length === 0 && !loading ? (
           <p className="text-gray-500">No jobs found.</p>
-        ) : viewMode === "grid" ? (
-          <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-            {filteredJobs.map((job) => (
-              <JobCard key={job.id} job={job} viewMode="grid" />
-            ))}
-          </div>
         ) : (
-          <div className="space-y-4">
-            {filteredJobs.map((job) => (
-              <JobCard key={job.id} job={job} viewMode="list" />
-            ))}
+          <>
+            {viewMode === "grid" ? (
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                {filteredJobs.map((job, index) => (
+                  <div
+                    key={`${job.id}-${index}`}
+                    className="animate-fade-in-up"
+                    style={{
+                      animationDelay: `${(index % 10) * 0.1}s`,
+                      animationFillMode: 'both'
+                    }}
+                    ref={index === filteredJobs.length - 1 ? lastJobRef : null}
+                  >
+                    <JobCard job={job} viewMode="grid" />
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {filteredJobs.map((job, index) => (
+                  <div
+                    key={`${job.id}-${index}`}
+                    className="animate-fade-in-up"
+                    style={{
+                      animationDelay: `${(index % 10) * 0.1}s`,
+                      animationFillMode: 'both'
+                    }}
+                    ref={index === filteredJobs.length - 1 ? lastJobRef : null}
+                  >
+                    <JobCard job={job} viewMode="list" />
+                  </div>
+                ))}
+              </div>
+            )}
+          </>
+        )}
+
+        {/* Loading Indicator */}
+        {(loading || isFetching) && (
+          <div className="flex justify-center mt-6">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-orange-500"></div>
           </div>
         )}
 
-        {/* Load More */}
+        {/* Infinite Scroll Sentinel */}
         {hasMore && (
-          <div className="flex justify-center mt-6">
-            <button
-              onClick={() => fetchJobs(page + 1)}
-              disabled={loading}
-              className="px-4 py-2 bg-black text-white rounded-full hover:bg-orange-600 transition disabled:opacity-50"
-            >
-              {loading ? "Loading..." : "Load More"}
-            </button>
+          <div ref={observerRef} className="h-10" />
+        )}
+
+        {/* Continuous Loop Indicator */}
+        {!hasMore && filteredJobs.length > 0 && (
+          <div className="text-center mt-6 py-4">
+            <div className="animate-pulse">
+              <p className="text-gray-500 text-sm">
+                🎉 All jobs loaded! Loading more...
+              </p>
+            </div>
           </div>
         )}
       </div>
@@ -279,6 +398,23 @@ export default function AllJobs() {
       <div className="hidden md:block">
         <Footer />
       </div>
+
+      {/* Add custom CSS for animations */}
+      <style jsx global>{`
+        @keyframes fade-in-up {
+          0% {
+            opacity: 0;
+            transform: translateY(20px);
+          }
+          100% {
+            opacity: 1;
+            transform: translateY(0);
+          }
+        }
+        .animate-fade-in-up {
+          animation: fade-in-up 0.6s ease-out;
+        }
+      `}</style>
     </div>
   );
 }
