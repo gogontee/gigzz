@@ -185,10 +185,13 @@ export default function AllJobs() {
     router.push(`/job/${job.id}`);
   };
 
-  const handleLoadMore = () => {
-    const nextPage = page + 1;
-    setPage(nextPage);
-    fetchJobs(false, nextPage);
+  const handleViewAllJobs = () => {
+    // Navigate to the all jobs page with current filters as query params
+    const queryParams = new URLSearchParams();
+    if (searchQuery) queryParams.append('query', searchQuery);
+    if (selectedCategory && selectedCategory !== 'All Jobs') queryParams.append('category', selectedCategory);
+    
+    router.push(`/job/alljobs?${queryParams.toString()}`);
   };
 
   return (
@@ -237,15 +240,14 @@ export default function AllJobs() {
         </div>
       )}
 
-      {/* Load More Button */}
+      {/* View All Jobs Button */}
       {hasMore && (
         <div className="flex justify-center mt-6">
           <button
-            onClick={handleLoadMore}
-            disabled={loading}
-            className="px-6 py-2 border border-black rounded-lg hover:bg-black hover:text-white transition disabled:opacity-50"
+            onClick={handleViewAllJobs}
+            className="px-6 py-2 border border-black rounded-lg hover:bg-black hover:text-white transition"
           >
-            {loading ? "Loading..." : "Load More"}
+            View All Jobs
           </button>
         </div>
       )}

@@ -16,8 +16,8 @@ import { supabase } from "../utils/supabaseClient";
 export default function Home() {
   const [media, setMedia] = useState([
     // ✅ Fallback media
-    "https://xatxjdsppcjgplmrtjcs.supabase.co/storage/v1/object/public/header/header3.jpg",
-    "https://xatxjdsppcjgplmrtjcs.supabase.co/storage/v1/object/public/header/header4.jpg",
+    "https://xatxjdsppcjgplmrtjcs.supabase.co/storage/v1/object/public/header/hero5.jpg",
+    "https://xatxjdsppcjgplmrtjcs.supabase.co/storage/v1/object/public/header/gigzz.jpg",
   ]);
   const [currentIndex, setCurrentIndex] = useState(0);
   const videoRef = useRef(null);
