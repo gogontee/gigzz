@@ -27,6 +27,11 @@ export default function TestimonialCard() {
 
   if (testimonials.length === 0) return null;
 
+  // Function to extract first name only
+  const getFirstName = (fullName) => {
+    return fullName ? fullName.split(' ')[0] : 'User';
+  };
+
   const fallbackAvatar =
     "https://ui-avatars.com/api/?name=User&background=0D8ABC&color=fff&size=128";
 
@@ -41,10 +46,10 @@ export default function TestimonialCard() {
           >
             <img
               src={t.avatar_url || fallbackAvatar}
-              alt={t.full_name}
+              alt={getFirstName(t.full_name)}
               className="w-16 h-16 rounded-full mx-auto mb-3 object-cover"
             />
-            <h3 className="font-semibold text-gray-800">{t.full_name}</h3>
+            <h3 className="font-semibold text-gray-800">{getFirstName(t.full_name)}</h3>
             <p className="text-gray-600 text-sm mt-2">{t.testimony}</p>
           </div>
         ))}
@@ -59,10 +64,10 @@ export default function TestimonialCard() {
           >
             <img
               src={t.avatar_url || fallbackAvatar}
-              alt={t.full_name}
+              alt={getFirstName(t.full_name)}
               className="w-16 h-16 rounded-full mx-auto mb-3 object-cover"
             />
-            <h3 className="font-semibold text-gray-800">{t.full_name}</h3>
+            <h3 className="font-semibold text-gray-800">{getFirstName(t.full_name)}</h3>
             <p className="text-gray-600 text-sm mt-2">{t.testimony}</p>
           </div>
         ))}

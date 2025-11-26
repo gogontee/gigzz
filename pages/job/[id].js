@@ -8,7 +8,8 @@ import MobileHeader from '../../components/MobileHeader';
 import Footer from '../../components/Footer';
 import { motion, AnimatePresence } from 'framer-motion';
 import JobCard from '../../components/JobCard';
-import { MapPin, Clock, DollarSign, FileText } from "lucide-react";
+import WalletComponent from '../../components/WalletComponent'; // Import WalletComponent
+import { MapPin, Clock, DollarSign, FileText, X } from "lucide-react";
 
 
 export const supabase = createPagesBrowserClient(
@@ -61,6 +62,10 @@ export default function JobDetailPage() {
   // agent terms state
   const [showAgentTerms, setShowAgentTerms] = useState(false);
   const [acceptedTerms, setAcceptedTerms] = useState(false);
+
+  // wallet top-up state
+  const [showTopUpPrompt, setShowTopUpPrompt] = useState(false);
+  const [showWalletComponent, setShowWalletComponent] = useState(false);
 
   useEffect(() => {
     const checkMobile = () => setIsMobile(window.innerWidth <= 768);
@@ -187,10 +192,7 @@ export default function JobDetailPage() {
 
     if (walletErr || !wallet || wallet.balance < 3) {
       setSubmitting(false);
-      setModalMessage(
-        '⚠️ Insufficient token balance. Kindly fund your token and try again.'
-      );
-      setShowModal(true);
+      setShowTopUpPrompt(true);
       return;
     }
 
@@ -267,6 +269,16 @@ export default function JobDetailPage() {
     setAttachments([]);
     setLinks(['']);
     setAcceptedTerms(false);
+  };
+
+  const handleTopUpResponse = (wantsToTopUp) => {
+    setShowTopUpPrompt(false);
+    if (wantsToTopUp) {
+      setShowWalletComponent(true);
+    } else {
+      setModalMessage('⚠️ Insufficient token balance. Kindly fund your token and try again.');
+      setShowModal(true);
+    }
   };
 
   const handleFileChange = (e, idx) => {
@@ -477,8 +489,8 @@ export default function JobDetailPage() {
 
           <div className="mb-4">
             <div className="flex items-center justify-between mb-2">
-              <label className="text-sm font-semibold text-gray-900">Attachments</label>
-              <span className="text-xs text-gray-500">Max 5 • JPG, JPEG, PNG, SVG, PDF</span>
+              <label className="text-sm font-semibold text-gray-900">Attachments (Optional)</label>
+              <span className="text-[9px] text-gray-500">Max 5 • JPG, JPEG, PNG, SVG, PDF</span>
             </div>
 
             {attachments.length === 0 && (
@@ -535,7 +547,7 @@ export default function JobDetailPage() {
                   }
                   setLinks(newLinks);
                 }}
-                placeholder="Enter link URL"
+                placeholder="Enter link URL (Optional)"
                 className="w-full border border-gray-300 rounded-xl p-3 text-sm mb-2 focus:outline-none focus:ring-2 focus:ring-orange-400 focus:border-transparent transition-all duration-200"
               />
             ))}
@@ -831,6 +843,84 @@ export default function JobDetailPage() {
               >
                 OK
               </motion.button>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Top-up Prompt Modal */}
+      <AnimatePresence>
+        {showTopUpPrompt && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4"
+          >
+            <motion.div
+              initial={{ opacity: 0, scale: 0.9 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.9 }}
+              className="bg-white rounded-2xl p-6 max-w-md w-full shadow-xl"
+            >
+              <h3 className="text-lg font-semibold text-gray-900 mb-4 text-center">
+                Insufficient Token Balance
+              </h3>
+              <p className="text-gray-700 mb-6 text-center">
+                You need at least 3 tokens to apply for this job. Do you wish to top up your tokens now?
+              </p>
+              <div className="flex gap-3">
+                <motion.button
+                  onClick={() => handleTopUpResponse(false)}
+                  className="flex-1 px-4 py-3 text-sm border-2 border-gray-300 text-gray-700 rounded-xl hover:bg-gray-50 transition-all duration-200 font-semibold"
+                  whileHover={{ scale: 1.03 }}
+                  whileTap={{ scale: 0.98 }}
+                >
+                  Cancel
+                </motion.button>
+                <motion.button
+                  onClick={() => handleTopUpResponse(true)}
+                  className="flex-1 px-4 py-3 text-sm bg-black text-white rounded-xl hover:bg-orange-400 transition-all duration-200 font-semibold"
+                  whileHover={{ scale: 1.03 }}
+                  whileTap={{ scale: 0.98 }}
+                >
+                  Top Up Now
+                </motion.button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Wallet Component Modal */}
+      <AnimatePresence>
+        {showWalletComponent && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4"
+          >
+            <motion.div
+              initial={{ opacity: 0, scale: 0.9 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.9 }}
+              className="bg-white rounded-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto relative"
+            >
+              {/* Close Button */}
+              <motion.button
+                onClick={() => setShowWalletComponent(false)}
+                className="absolute top-4 right-4 z-10 p-2 bg-gray-100 hover:bg-gray-200 rounded-full transition-colors duration-200"
+                whileHover={{ scale: 1.1 }}
+                whileTap={{ scale: 0.9 }}
+              >
+                <X className="w-5 h-5 text-gray-600" />
+              </motion.button>
+              
+              <WalletComponent 
+                onClose={() => setShowWalletComponent(false)}
+                showCloseButton={false}
+              />
             </motion.div>
           </motion.div>
         )}
