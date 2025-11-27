@@ -9,6 +9,7 @@ export default function BottomTabs() {
   const user = useUser();
 
   const [dashboardPath, setDashboardPath] = useState(null);
+  const [role, setRole] = useState(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -17,6 +18,7 @@ export default function BottomTabs() {
         if (!user) {
           // Not logged in → login page
           setDashboardPath('/auth/login');
+          setRole(null);
           return;
         }
 
@@ -31,6 +33,7 @@ export default function BottomTabs() {
 
         if (employer) {
           setDashboardPath('/dashboard/employer');
+          setRole('employer');
           return;
         }
 
@@ -43,14 +46,17 @@ export default function BottomTabs() {
 
         if (applicant) {
           setDashboardPath('/dashboard/applicant');
+          setRole('applicant');
           return;
         }
 
         // Authenticated but no role found → fallback to login
         setDashboardPath('/auth/login');
+        setRole(null);
       } catch (err) {
         console.error('Error fetching role:', err);
         setDashboardPath('/auth/login');
+        setRole(null);
       } finally {
         setLoading(false);
       }
@@ -65,7 +71,8 @@ export default function BottomTabs() {
     { href: '/', label: 'Home', icon: <Home size={22} /> },
     { href: '/profile', label: 'Profile', icon: <User size={22} /> },
     { href: '/more', label: 'More', icon: <MapPin size={22} /> },
-    { href: '/employerlanding', label: 'Post', icon: <Plus size={22} /> },
+    // Post tab - only visible to employers
+    ...(role === 'employer' ? [{ href: '/employerlanding', label: 'Post', icon: <Plus size={22} /> }] : []),
     { href: dashboardPath, label: 'Dashboard', icon: <Briefcase size={22} /> },
   ];
 

@@ -2,8 +2,56 @@
 import Link from "next/link";
 import MobileHeader from "../components/MobileHeader";
 import { Briefcase, Globe, Users, Building2 } from "lucide-react";
+import { useEffect, useState } from "react";
+import { useUser } from "@supabase/auth-helpers-react";
+import { supabase } from "../utils/supabaseClient";
 
 export default function MorePage() {
+  const user = useUser();
+  const [role, setRole] = useState(null);
+
+  // Fetch user's role
+  const fetchProfile = async (userId) => {
+    try {
+      if (!userId) return setRole(null);
+
+      const { data: employerProfile } = await supabase
+        .from("employers")
+        .select("id")
+        .eq("id", userId)
+        .maybeSingle();
+
+      if (employerProfile) {
+        setRole("employer");
+        return;
+      }
+
+      const { data: applicantProfile } = await supabase
+        .from("applicants")
+        .select("id")
+        .eq("id", userId)
+        .maybeSingle();
+
+      if (applicantProfile) {
+        setRole("applicant");
+        return;
+      }
+
+      setRole(user?.user_metadata?.role || null);
+    } catch (err) {
+      console.error("Profile fetch error:", err);
+      setRole(null);
+    }
+  };
+
+  useEffect(() => {
+    if (user?.id) {
+      fetchProfile(user.id);
+    } else {
+      setRole(null);
+    }
+  }, [user]);
+
   return (
     <div className="min-h-screen bg-white text-black">
       {/* ✅ Always show MobileHeader */}
@@ -12,12 +60,22 @@ export default function MorePage() {
       </div>
 
       <div className="px-6 py-8 space-y-4 pt-4 md:pt-20">
-        {/* ✅ Gigzzstars now direct link */}
+        {/* ✅ Gigzzstars - Only visible to employers */}
+        {role === "employer" && (
+          <Link
+            href="/gigzzstar"
+            className="block py-3 px-4 rounded-lg bg-zinc-50 shadow text-black hover:bg-orange-400 hover:text-white transition"
+          >
+            Gigzzstars
+          </Link>
+        )}
+
+        {/* ✅ How To - Visible to everyone */}
         <Link
-          href="/gigzzstar"
+          href="/learnmore"
           className="block py-3 px-4 rounded-lg bg-zinc-50 shadow text-black hover:bg-orange-400 hover:text-white transition"
         >
-          Gigzzstars
+          How To
         </Link>
 
         {/* Other Tabs */}

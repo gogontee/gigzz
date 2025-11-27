@@ -15,7 +15,6 @@ export default function DesktopHeader() {
   const [navDropdownOpen, setNavDropdownOpen] = useState(null);
   const [userDropdownOpen, setUserDropdownOpen] = useState(false);
 
-
   // Fetch user's avatar and role
   const fetchProfile = async (userId) => {
     try {
@@ -146,22 +145,39 @@ export default function DesktopHeader() {
             </AnimatePresence>
           </div>
 
-          <Link
-            href="/employerlanding"
-            className="transition hover:text-orange-500"
-          >
-            Post Your Job
-          </Link>
+          {/* ✅ Post Your Job - Only visible to employers */}
+          {role === "employer" && (
+            <Link
+              href="/employerlanding"
+              className={`transition hover:text-orange-500 ${
+                isActive("/employerlanding") ? "text-orange-500" : ""
+              }`}
+            >
+              Post Your Job
+            </Link>
+          )}
 
-          {/* ✅ Gigzzstars direct link */}
+          {/* ✅ How To - Visible to everyone */}
           <Link
-            href="/gigzzstar"
+            href="/learnmore"
             className={`transition hover:text-orange-500 ${
-              isActive("/gigzzstar") ? "text-orange-500" : ""
+              isActive("/learnmore") ? "text-orange-500" : ""
             }`}
           >
-            Sportlight
+            How To
           </Link>
+
+          {/* ✅ Gigzzstars - Only visible to employers */}
+          {role === "employer" && (
+            <Link
+              href="/gigzzstar"
+              className={`transition hover:text-orange-500 ${
+                isActive("/gigzzstar") ? "text-orange-500" : ""
+              }`}
+            >
+              Sportlight
+            </Link>
+          )}
 
           <Link
             href="/news"
