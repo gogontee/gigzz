@@ -4,6 +4,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { createClient } from "@supabase/supabase-js";
 import JobCard from "../components/JobCard";
 import MobileHeader from "../components/MobileHeader";
+import Footer from "../components/Footer";
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL,
@@ -325,6 +326,11 @@ export default function Remote() {
             </div>
           </motion.div>
         )}
+      </div>
+
+      {/* Desktop-only Footer */}
+      <div className="hidden md:block mt-20">
+        <Footer />
       </div>
     </>
   );

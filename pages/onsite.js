@@ -1,8 +1,6 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { List, Grid3x3, Search } from "lucide-react";
-import Link from "next/link";
-import Image from "next/image";
 import { createClient } from "@supabase/supabase-js";
 import Footer from "../components/Footer";
 import MobileHeader from "../components/MobileHeader";
@@ -28,74 +26,167 @@ const categories = [
   "Finance",
 ];
 
+const INITIAL_LOAD_SIZE = 10;
+const CONTINUOUS_LOAD_SIZE = 8;
+
 export default function OnsiteJobsPage() {
-  const [jobs, setJobs] = useState([]);
+  const [allOnsiteJobs, setAllOnsiteJobs] = useState([]);
+  const [displayedJobs, setDisplayedJobs] = useState([]);
   const [viewMode, setViewMode] = useState("grid");
   const [search, setSearch] = useState("");
   const [activeCategory, setActiveCategory] = useState("All");
+  const [loading, setLoading] = useState(false);
+  const [isFetching, setIsFetching] = useState(false);
+  const [hasMore, setHasMore] = useState(true);
+  const [allJobsLoaded, setAllJobsLoaded] = useState(false);
+  const [currentIndex, setCurrentIndex] = useState(0);
+  const observerRef = useRef(null);
+  const containerRef = useRef(null);
 
+  // Load all onsite jobs once on component mount
   useEffect(() => {
-    const fetchOnsiteJobs = async () => {
-      const { data, error } = await supabase
-        .from("jobs")
-        .select("*")
-        .eq("category", "Onsite");
-
-      if (error) {
-        console.error("Error fetching onsite jobs:", error);
-      } else {
-        // Custom sort: promotion_tag priority, then created_at desc
-        const priority = { Premium: 1, Gold: 2, Silver: 3, null: 4 };
-        const sortedJobs = data.sort((a, b) => {
-          const rankA = priority[a.promotion_tag] ?? 4;
-          const rankB = priority[b.promotion_tag] ?? 4;
-          if (rankA !== rankB) return rankA - rankB;
-          return new Date(b.created_at) - new Date(a.created_at);
-        });
-        setJobs(sortedJobs);
-      }
-    };
-
-    fetchOnsiteJobs();
+    fetchAllOnsiteJobs();
   }, []);
 
-  const filteredJobs = jobs.filter((job) => {
-    const title = job.title?.toLowerCase() || "";
-    const company = job.company?.toLowerCase() || "";
-    const tags = job.tags || [];
+  // Filter jobs based on search and category
+  useEffect(() => {
+    applyFilters(allOnsiteJobs, search, activeCategory);
+  }, [search, activeCategory, allOnsiteJobs]);
 
-    const matchesSearch =
-      title.includes(search.toLowerCase()) ||
-      company.includes(search.toLowerCase());
+  // Initialize intersection observer for infinite scroll
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting && hasMore && !loading && !isFetching) {
+          loadMoreJobs();
+        }
+      },
+      { threshold: 0.1 }
+    );
 
-    const matchesCategory =
-      activeCategory === "All"
-        ? true
-        : tags.some((tag) =>
-            tag.toLowerCase().includes(activeCategory.toLowerCase())
-          );
+    if (observerRef.current) {
+      observer.observe(observerRef.current);
+    }
 
-    return matchesSearch && matchesCategory;
-  });
+    return () => {
+      if (observerRef.current) {
+        observer.unobserve(observerRef.current);
+      }
+    };
+  }, [hasMore, loading, isFetching]);
 
-  // Shuffle promo images
-  const promoImages = [
-    {
-      src: "https://xatxjdsppcjgplmrtjcs.supabase.co/storage/v1/object/public/generalphoto//1.jpg",
-      href: "/remote",
-      label: "Find Remote Jobs",
-    },
-    {
-      src: "https://xatxjdsppcjgplmrtjcs.supabase.co/storage/v1/object/public/generalphoto//2.jpg",
-      href: "/hybrid",
-      label: "View Hybrid Jobs",
-    },
-    {
-      src: "https://xatxjdsppcjgplmrtjcs.supabase.co/storage/v1/object/public/generalphoto//4.jpg",
-      href: "/contract",
-      label: "Contract / Part-time",
-    },
-  ].sort(() => Math.random() - 0.5);
+  // Fetch ALL onsite jobs from database
+  const fetchAllOnsiteJobs = async () => {
+    setLoading(true);
+    
+    const { data, error } = await supabase
+      .from("jobs")
+      .select("*")
+      .eq("category", "Onsite")
+      .order("created_at", { ascending: false });
+
+    if (error) {
+      console.error("Error fetching onsite jobs:", error);
+      setLoading(false);
+      return;
+    }
+
+    // Custom sort: promotion_tag priority, then created_at desc
+    const priority = { Premium: 1, Gold: 2, Silver: 3, null: 4 };
+    const sortedJobs = data.sort((a, b) => {
+      const rankA = priority[a.promotion_tag] ?? 4;
+      const rankB = priority[b.promotion_tag] ?? 4;
+      if (rankA !== rankB) return rankA - rankB;
+      return new Date(b.created_at) - new Date(a.created_at);
+    });
+
+    setAllOnsiteJobs(sortedJobs);
+    
+    // Load initial batch for display
+    if (sortedJobs.length > 0) {
+      const initialBatch = sortedJobs.slice(0, INITIAL_LOAD_SIZE);
+      setDisplayedJobs(initialBatch);
+      setCurrentIndex(INITIAL_LOAD_SIZE);
+      setHasMore(sortedJobs.length > INITIAL_LOAD_SIZE);
+    } else {
+      setHasMore(false);
+    }
+    
+    setLoading(false);
+  };
+
+  // Load more jobs for infinite scroll
+  const loadMoreJobs = useCallback(async () => {
+    if (isFetching || !hasMore) return;
+
+    setIsFetching(true);
+
+    // Get filtered jobs based on current search and category
+    const filtered = applyFiltersLogic(allOnsiteJobs, search, activeCategory);
+    
+    if (currentIndex >= filtered.length) {
+      // Reached end of current filtered list, start continuous loop
+      if (filtered.length > 0) {
+        // Reset to beginning for continuous effect
+        setTimeout(() => {
+          const newBatch = filtered.slice(0, CONTINUOUS_LOAD_SIZE);
+          setDisplayedJobs(newBatch);
+          setCurrentIndex(CONTINUOUS_LOAD_SIZE);
+          setHasMore(true);
+          setAllJobsLoaded(true);
+        }, 500);
+      }
+    } else {
+      // Load next batch from current filtered list
+      const nextBatch = filtered.slice(currentIndex, currentIndex + CONTINUOUS_LOAD_SIZE);
+      setDisplayedJobs(prev => [...prev, ...nextBatch]);
+      setCurrentIndex(prev => prev + CONTINUOUS_LOAD_SIZE);
+      setHasMore(currentIndex + CONTINUOUS_LOAD_SIZE < filtered.length);
+    }
+
+    setIsFetching(false);
+  }, [currentIndex, hasMore, isFetching, allOnsiteJobs, search, activeCategory]);
+
+  // Main filtering logic
+  const applyFiltersLogic = (allJobs, query, category) => {
+    let filtered = allJobs;
+
+    // General search
+    if (query.trim()) {
+      const q = query.toLowerCase();
+      filtered = filtered.filter((job) => {
+        const title = job.title?.toLowerCase() || "";
+        const company = job.company?.toLowerCase() || "";
+        const description = job.description?.toLowerCase() || "";
+        
+        return title.includes(q) || company.includes(q) || description.includes(q);
+      });
+    }
+
+    // Category filter
+    if (category !== "All") {
+      filtered = filtered.filter((job) => {
+        const tags = job.tags || [];
+        return tags.some((tag) =>
+          tag.toLowerCase().includes(category.toLowerCase())
+        );
+      });
+    }
+
+    return filtered;
+  };
+
+  // Apply filters and reset display
+  const applyFilters = (allJobs, query, category) => {
+    const filtered = applyFiltersLogic(allJobs, query, category);
+    
+    // Reset displayed jobs with new filtered results
+    const initialBatch = filtered.slice(0, INITIAL_LOAD_SIZE);
+    setDisplayedJobs(initialBatch);
+    setCurrentIndex(INITIAL_LOAD_SIZE);
+    setHasMore(filtered.length > INITIAL_LOAD_SIZE);
+    setAllJobsLoaded(false);
+  };
 
   return (
     <>
@@ -149,82 +240,94 @@ export default function OnsiteJobsPage() {
           })}
         </div>
 
-        {/* Job Grid/List with shuffled images */}
-        <div
-          className={
-            viewMode === "grid"
-              ? "grid grid-cols-2 md:grid-cols-3 gap-4"
-              : "space-y-4"
-          }
-        >
-          <AnimatePresence>
-            {filteredJobs.map((job, index) => (
-              <motion.div
-                key={job.id}
-                layout
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -10 }}
-                transition={{ duration: 0.3 }}
-              >
-                <JobCard
-                  job={{
-                    id: job.id,
-                    title: job.title,
-                    location: job.location,
-                    type: job.type,
-                    min_price: job.min_price,
-                    max_price: job.max_price,
-                    price_frequency: job.price_frequency,
-                    tags: job.tags || [],
-                    description: job.description || "",
-                    avatar_url: job.avatar_url,
-                  }}
-                  viewMode={viewMode}
-                />
-              </motion.div>
-            ))}
-
-            {/* Insert promo images */}
-            {filteredJobs.length > 0 &&
-              promoImages.map((img, i) => (
-                <motion.div
-                  key={i}
-                  layout
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  exit={{ opacity: 0 }}
-                  className="relative rounded-xl overflow-hidden shadow-md group"
-                >
-                  <Image
-                    src={img.src}
-                    alt={img.label}
-                    layout="responsive"
-                    width={500}
-                    height={300}
-                    className="group-hover:scale-105 transition duration-300"
-                  />
-                  <div className="absolute inset-0 bg-black/30 flex items-end justify-end p-4">
-                    <Link href={img.href}>
-                      <button className="bg-white text-black px-3 py-1.5 text-sm rounded-lg font-semibold hover:bg-orange-600 hover:text-white transition">
-                        {img.label}
-                      </button>
-                    </Link>
-                  </div>
-                </motion.div>
-              ))}
-          </AnimatePresence>
+        {/* Job Grid/List with Staggered Animation */}
+        <div ref={containerRef}>
+          {displayedJobs.length === 0 && !loading ? (
+            <motion.p
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              className="mt-10 text-sm text-center text-gray-500"
+            >
+              No onsite jobs found.
+            </motion.p>
+          ) : (
+            <div className={
+              viewMode === "grid"
+                ? "grid grid-cols-2 md:grid-cols-3 gap-4"
+                : "space-y-4"
+            }>
+              <AnimatePresence>
+                {displayedJobs.map((job, index) => (
+                  <motion.div
+                    key={`${job.id}-${index}`}
+                    layout
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -10 }}
+                    transition={{ 
+                      duration: 0.5,
+                      delay: Math.min(index * 0.05, 0.5),
+                      ease: "easeOut"
+                    }}
+                  >
+                    <JobCard
+                      job={{
+                        id: job.id,
+                        title: job.title,
+                        location: job.location,
+                        type: job.type,
+                        min_price: job.min_price,
+                        max_price: job.max_price,
+                        price_frequency: job.price_frequency,
+                        tags: job.tags || [],
+                        description: job.description || "",
+                        avatar_url: job.avatar_url,
+                      }}
+                      viewMode={viewMode}
+                    />
+                  </motion.div>
+                ))}
+              </AnimatePresence>
+            </div>
+          )}
         </div>
 
-        {/* No Jobs */}
-        {filteredJobs.length === 0 && (
-          <motion.p
+        {/* Loading Indicator */}
+        {(loading || isFetching) && (
+          <motion.div 
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
-            className="mt-10 text-sm text-center text-gray-500"
+            className="flex justify-center mt-6"
           >
-            No onsite jobs found.
-          </motion.p>
+            <div className="flex flex-col items-center gap-2">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-orange-500"></div>
+              <p className="text-sm text-gray-500">
+                {isFetching ? "Loading more onsite jobs..." : "Loading onsite jobs..."}
+              </p>
+            </div>
+          </motion.div>
+        )}
+
+        {/* Infinite Scroll Sentinel */}
+        {hasMore && (
+          <div ref={observerRef} className="h-10" />
+        )}
+
+        {/* Continuous Loop Indicator */}
+        {allJobsLoaded && (
+          <motion.div 
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="text-center mt-6 py-4"
+          >
+            <div className="animate-pulse inline-flex items-center gap-2 bg-orange-50 px-4 py-2 rounded-full">
+              <span className="w-2 h-2 bg-orange-500 rounded-full animate-bounce"></span>
+              <p className="text-sm text-orange-700 font-medium">
+                Continuous scroll enabled • Showing {displayedJobs.length} onsite jobs
+              </p>
+              <span className="w-2 h-2 bg-orange-500 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></span>
+            </div>
+          </motion.div>
         )}
 
         {/* Desktop Only Footer */}

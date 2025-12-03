@@ -318,9 +318,9 @@ export default function ProfilePage() {
           </div>
 
           <p className="mt-1 text-sm opacity-90">{profile.email}</p>
-          {profile.phone && (
-            <p className="mt-1 text-sm opacity-90">📞 {profile.phone}</p>
-          )}
+          
+          {/* REMOVED PHONE NUMBER DISPLAY */}
+          
           <p className="mt-3 text-sm opacity-90 flex items-center gap-1">
             <MapPin className="w-4 h-4" />
             {`${profile.city || ""}, ${profile.state || ""}, ${

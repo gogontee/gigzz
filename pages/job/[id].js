@@ -11,7 +11,6 @@ import JobCard from '../../components/JobCard';
 import WalletComponent from '../../components/WalletComponent'; // Import WalletComponent
 import { MapPin, Clock, DollarSign, FileText, X } from "lucide-react";
 
-
 export const supabase = createPagesBrowserClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL,
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
@@ -61,7 +60,10 @@ export default function JobDetailPage() {
 
   // agent terms state
   const [showAgentTerms, setShowAgentTerms] = useState(false);
-  const [acceptedTerms, setAcceptedTerms] = useState(false);
+  const [acceptedAgentTerms, setAcceptedAgentTerms] = useState(false);
+
+  // gigzz terms state
+  const [acceptedGigzzTerms, setAcceptedGigzzTerms] = useState(false);
 
   // wallet top-up state
   const [showTopUpPrompt, setShowTopUpPrompt] = useState(false);
@@ -136,6 +138,24 @@ export default function JobDetailPage() {
     fetchJob();
   }, [id]);
 
+  // Only show location tab if category is not "remote"
+  const showLocationTab = job?.category?.toLowerCase() !== 'remote';
+  
+  // Filter tabs based on conditions
+  const tabs = [
+    { id: 'description', label: 'Description' },
+    { id: 'responsibilities', label: 'Responsibilities' },
+    { id: 'requirements', label: 'Requirements' },
+    { id: 'qualification', label: 'Qualification' },
+    ...(showLocationTab ? [{ id: 'location', label: 'Location' }] : [])
+  ].filter(tab => {
+    if (tab.id === 'responsibilities' && !job?.responsibilities) return false;
+    if (tab.id === 'requirements' && !job?.requirements) return false;
+    if (tab.id === 'qualification' && !job?.educational_qualification) return false;
+    if (tab.id === 'location' && !job?.location) return false;
+    return true;
+  });
+
   const handleApply = async () => {
     if (!user) {
       setModalMessage('❌ You must login to apply for this job.');
@@ -176,8 +196,15 @@ export default function JobDetailPage() {
     }
 
     // Check if agent terms need to be accepted
-    if (job?.condition && !acceptedTerms) {
+    if (job?.condition && !acceptedAgentTerms) {
       setModalMessage('⚠️ Please read and accept the agent terms and conditions.');
+      setShowModal(true);
+      return;
+    }
+
+    // Check if Gigzz terms are accepted
+    if (!acceptedGigzzTerms) {
+      setModalMessage('⚠️ Please accept the Gigzz Terms of Use.');
       setShowModal(true);
       return;
     }
@@ -268,7 +295,8 @@ export default function JobDetailPage() {
     setBidAmount('');
     setAttachments([]);
     setLinks(['']);
-    setAcceptedTerms(false);
+    setAcceptedAgentTerms(false);
+    setAcceptedGigzzTerms(false);
   };
 
   const handleTopUpResponse = (wantsToTopUp) => {
@@ -313,14 +341,6 @@ export default function JobDetailPage() {
       alert('Job link copied to clipboard!');
     }
   };
-
-  const tabs = [
-    { id: 'description', label: 'Description' },
-    { id: 'responsibilities', label: 'Responsibilities' },
-    { id: 'requirements', label: 'Requirements' },
-    { id: 'qualification', label: 'Qualification' },
-    { id: 'location', label: 'Location' }
-  ];
 
   const renderTabContent = () => {
     switch (activeTab) {
@@ -553,7 +573,28 @@ export default function JobDetailPage() {
             ))}
           </div>
 
-          {/* Agent Terms Section */}
+          {/* Gigzz Terms & Conditions (Always Required) */}
+          <div className="mb-4 p-4 bg-gray-50 rounded-xl border border-gray-200">
+            <label className="flex items-start gap-3">
+              <input
+                type="checkbox"
+                checked={acceptedGigzzTerms}
+                onChange={(e) => setAcceptedGigzzTerms(e.target.checked)}
+                className="mt-1 text-orange-600 focus:ring-orange-500"
+                required
+              />
+              <div className="flex-1">
+                <span className="text-sm font-medium text-gray-900">
+                  I accept the <a href="/terms" target="_blank" className="text-orange-600 hover:text-orange-800 font-semibold underline">Gigzz Terms of Use</a>
+                </span>
+                <p className="text-xs text-gray-600 mt-1">
+                  By applying, you agree to our terms and conditions governing job applications and service usage.
+                </p>
+              </div>
+            </label>
+          </div>
+
+          {/* Agent Terms Section (Only for Agent Posted Jobs) */}
           {job.condition && (
             <div className="mb-6">
               <motion.button
@@ -596,8 +637,8 @@ export default function JobDetailPage() {
                     <label className="flex items-start gap-3 mt-4 p-3 bg-orange-50 rounded-lg border border-orange-200">
                       <input
                         type="checkbox"
-                        checked={acceptedTerms}
-                        onChange={(e) => setAcceptedTerms(e.target.checked)}
+                        checked={acceptedAgentTerms}
+                        onChange={(e) => setAcceptedAgentTerms(e.target.checked)}
                         className="mt-1 text-orange-600 focus:ring-orange-500"
                       />
                       <div className="flex-1">
@@ -623,7 +664,7 @@ export default function JobDetailPage() {
               });
               handleApply();
             }}
-            disabled={submitting || (job.condition && !acceptedTerms)}
+            disabled={submitting || (job.condition && !acceptedAgentTerms) || !acceptedGigzzTerms}
             className="w-full bg-black text-white px-6 py-3 rounded-xl hover:bg-orange-400 transition-all duration-200 font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
             whileHover={{ scale: submitting ? 1 : 1.03 }}
             whileTap={{ scale: 0.98 }}
@@ -682,16 +723,16 @@ export default function JobDetailPage() {
                       )}
                     </div>
                     <div>
-                      
-<h1 className="text-2xl md:text-4xl font-bold mb-2">{job.title}</h1>
-<div className="flex flex-wrap items-center gap-1">
-  {isVerified && (
-    <span className={`inline-flex items-center gap-0.5 bg-green-600 px-1 py-0.5 rounded-full font-medium ${
-      isMobile ? 'text-[7px]' : 'text-[7px]'
-    }`}>
-      ✔ Verified Client
-    </span>
-  )}                  {job.condition && (
+                      <h1 className="text-2xl md:text-4xl font-bold mb-2">{job.title}</h1>
+                      <div className="flex flex-wrap items-center gap-1">
+                        {isVerified && (
+                          <span className={`inline-flex items-center gap-0.5 bg-green-600 px-1 py-0.5 rounded-full font-medium ${
+                            isMobile ? 'text-[7px]' : 'text-[7px]'
+                          }`}>
+                            ✔ Verified Client
+                          </span>
+                        )}
+                        {job.condition && (
                           <span className={`inline-flex items-center gap-1 bg-orange-400 px-2 py-0.5 rounded-full font-medium ${
                             isMobile ? 'text-xs' : 'text-xs'
                           }`}>
@@ -723,10 +764,13 @@ export default function JobDetailPage() {
                         <p className="text-gray-300 text-sm">{job.price_frequency}</p>
                       )}
                     </div>
-                    <div className="flex items-center gap-2">
-                      <span className="text-gray-300">Deadline:</span>
-                      <span className="font-semibold">{job.application_deadline}</span>
-                    </div>
+                    {/* Only show deadline if it exists */}
+                    {job.application_deadline && (
+                      <div className="flex items-center gap-2">
+                        <span className="text-gray-300">Deadline:</span>
+                        <span className="font-semibold">{job.application_deadline}</span>
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>

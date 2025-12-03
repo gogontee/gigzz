@@ -7,6 +7,22 @@ import dayjs from 'dayjs';
 const JOB_CATEGORIES = ['Remote', 'Hybrid', 'Onsite'];
 const JOB_TYPES = ['Freelance', 'Contract', 'Full-time', 'Part-time'];
 const PRICE_FREQUENCIES = ['Per Job', 'One-Time', 'Daily', 'Weekly', 'Monthly'];
+const JOB_INDUSTRIES = [
+  'Design & Creative',
+  'Tech',
+  'Marketing & Sales',
+  'Writing & Translation',
+  'Customer Support',
+  'Finance & Accounting',
+  'Fashion',
+  'Entertainment',
+  'Legal Services',
+  'Construction',
+  'Advertising',
+  'Hospitality',
+  'Transportation',
+  'Others'
+];
 
 export default function JobPostForm({ employerId, onPosted }) {
   const [form, setForm] = useState({
@@ -22,6 +38,7 @@ export default function JobPostForm({ employerId, onPosted }) {
     requirements: '',
     location: '',
     tags: '',
+    job_industry: JOB_INDUSTRIES[0], // ✅ new field for industry
     educational_qualification: '',
     is_agent: '', // ✅ new field - will be 'true' or 'false'
     agent_terms: '', // ✅ new field for agent terms and conditions
@@ -167,6 +184,7 @@ export default function JobPostForm({ employerId, onPosted }) {
         tags: form.tags
           ? form.tags.split(',').map((t) => t.trim()).filter((t) => t.length > 0)
           : [],
+        job_industry: form.job_industry, // ✅ Store selected industry
         avatar_url: employer.avatar_url,
         educational_qualification: form.educational_qualification || null,
         agent: form.is_agent === 'true', // ✅ Convert to boolean for database
@@ -196,6 +214,7 @@ export default function JobPostForm({ employerId, onPosted }) {
           requirements: '',
           location: '',
           tags: '',
+          job_industry: JOB_INDUSTRIES[0], // ✅ Reset industry field
           educational_qualification: '',
           is_agent: '', // ✅ Reset agent field
           agent_terms: '', // ✅ Reset agent terms field
@@ -564,6 +583,26 @@ Do not ask for upfront payment from applicants.`}
             placeholder="marketing, writing, frontend, react, figma"
             className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-orange-500 focus:border-transparent transition"
           />
+        </div>
+
+        {/* ✅ Select Industry Field - Added after Tags */}
+        <div>
+          <label className="text-sm font-medium mb-1">Select Industry</label>
+          <select
+            name="job_industry"
+            value={form.job_industry}
+            onChange={handleChange}
+            className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-orange-500 focus:border-transparent transition"
+          >
+            {JOB_INDUSTRIES.map((industry) => (
+              <option key={industry} value={industry}>
+                {industry}
+              </option>
+            ))}
+          </select>
+          <p className="text-xs text-gray-500 mt-1">
+            Choose the industry that best describes this job. This helps applicants find jobs in their preferred field.
+          </p>
         </div>
 
         {/* ✅ Policy Confirmations */}
