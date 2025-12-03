@@ -15,13 +15,14 @@ const industryMapping = {
   "Writing & Translation": ["writing & translation", "Writing & Translation"],
   "Customer Support": ["customer support", "Customer Support"],
   "Finance & Accounting": ["finance & accounting", "Finance & Accounting"],
-  "Fashion": ["fashion", "Fashion"],
+  "Beauty & Fashion": ["fashion", "Fashion"],
   "Entertainment": ["entertainment", "Entertainment"],
   "Legal Services": ["legal services", "Legal Services"],
   "Construction": ["construction", "Construction"],
   "Advertising": ["advertising", "Advertising"],
   "Hospitality": ["hospitality", "Hospitality"],
   "Transportation": ["transportation", "Transportation"],
+  "Management": ["management", "Management"],
   "Others": ["others", "Others", "other", "Other", "miscellaneous", "Miscellaneous"]
 };
 

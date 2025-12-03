@@ -416,8 +416,9 @@ export default function Home() {
             { label: "Marketing & Sales" },
             { label: "Writing & Translation" },
             { label: "Customer Support" },
+            { label: "Management" },
             { label: "Finance & Accounting" },
-            { label: "Fashion" },
+            { label: "Beauty & Fashion" },
             { label: "Entertainment" },
             { label: "Legal Services" },
             { label: "Construction" }, // Changed from "Engineering"
