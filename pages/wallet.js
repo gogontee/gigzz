@@ -1,6 +1,10 @@
 // pages/wallet.js
-import Token from '../components/Token';
+import WalletComponent from '../components/WalletComponent';
 
 export default function Wallet() {
-  return <Token />;
+  return (
+    <div className="md:pt-20">
+      <WalletComponent />
+    </div>
+  );
 }
