@@ -7,22 +7,22 @@ import Footer from "../../components/Footer";
 import JobCard from "../../components/JobCard";
 import { List, Grid3x3, Search } from "lucide-react";
 
-// Industry to job_industry field mapping with variations
-const industryToJobIndustry = {
-  "Design & Creatives": ["design & creatives", "design & creative", "design and creatives", "design and creative"],
-  "Tech": ["tech", "technology", "tech industry"],
-  "Marketing & Sales": ["marketing & sales", "marketing and sales"],
-  "Writing & Translation": ["writing & translation", "writing and translation"],
-  "Customer Support": ["customer support"],
-  "Finance & Accounting": ["finance & accounting", "finance and accounting"],
-  "Fashion": ["fashion"],
-  "Entertainment": ["entertainment"],
-  "Legal Services": ["legal services"],
-  "Construction": ["construction"],
-  "Advertising": ["advertising"],
-  "Hospitality": ["hospitality"],
-  "Transportation": ["transportation"],
-  "Others": ["others", "other", "miscellaneous"]
+// Industry to job_industry field mapping with exact values
+const industryMapping = {
+  "Design & Creatives": ["design & creatives", "Design & Creatives"],
+  "Tech": ["tech", "Tech", "technology", "Technology"],
+  "Marketing & Sales": ["marketing & sales", "Marketing & Sales"],
+  "Writing & Translation": ["writing & translation", "Writing & Translation"],
+  "Customer Support": ["customer support", "Customer Support"],
+  "Finance & Accounting": ["finance & accounting", "Finance & Accounting"],
+  "Fashion": ["fashion", "Fashion"],
+  "Entertainment": ["entertainment", "Entertainment"],
+  "Legal Services": ["legal services", "Legal Services"],
+  "Construction": ["construction", "Construction"],
+  "Advertising": ["advertising", "Advertising"],
+  "Hospitality": ["hospitality", "Hospitality"],
+  "Transportation": ["transportation", "Transportation"],
+  "Others": ["others", "Others", "other", "Other", "miscellaneous", "Miscellaneous"]
 };
 
 const PAGE_SIZE = 30;
@@ -44,17 +44,29 @@ export default function AllJobs() {
   const observerRef = useRef(null);
   const lastJobRef = useRef(null);
 
+  // Fetch initial jobs based on category
   useEffect(() => {
-    fetchJobs(0, true); // load first page
+    const initialCategory = routerQuery?.category || "All Jobs";
+    const initialQuery = routerQuery?.query || "";
+    
+    setSelectedCategory(initialCategory);
+    setSearchQuery(initialQuery);
+    
+    fetchJobs(0, true, initialCategory, initialQuery);
   }, [routerQuery]);
 
+  // Apply client-side search filtering
   useEffect(() => {
-    applyFilters(jobs, searchQuery, selectedCategory);
-  }, [searchQuery, selectedCategory, jobs]);
+    if (searchQuery.trim()) {
+      const filtered = jobs.filter(job => matchesSearchQuery(job, searchQuery));
+      setFilteredJobs(filtered);
+    } else {
+      setFilteredJobs(jobs);
+    }
+  }, [searchQuery, jobs]);
 
   // Initialize intersection observer for infinite scroll
   useEffect(() => {
-    // Only enable infinite scroll if we have filtered jobs >= MIN_JOBS_FOR_INFINITE_SCROLL
     if (filteredJobs.length < MIN_JOBS_FOR_INFINITE_SCROLL) {
       return;
     }
@@ -79,8 +91,8 @@ export default function AllJobs() {
     };
   }, [hasMore, loading, isFetching, filteredJobs.length]);
 
-  // Fetch jobs with pagination
-  const fetchJobs = async (pageNumber, reset = false) => {
+  // Fetch jobs with pagination and category filtering
+  const fetchJobs = async (pageNumber, reset = false, category = selectedCategory, search = searchQuery) => {
     setLoading(true);
     const from = pageNumber * PAGE_SIZE;
     const to = from + PAGE_SIZE - 1;
@@ -88,8 +100,16 @@ export default function AllJobs() {
     // Build base query
     let query = supabase
       .from("jobs")
-      .select("*")
-      .range(from, to);
+      .select("*");
+
+    // Apply category filter if not "All Jobs"
+    if (category !== "All Jobs" && industryMapping[category]) {
+      const industryValues = industryMapping[category];
+      query = query.in("job_industry", industryValues);
+    }
+
+    // Apply range for pagination
+    query = query.range(from, to);
 
     const { data, error } = await query;
 
@@ -98,9 +118,6 @@ export default function AllJobs() {
       setLoading(false);
       return;
     }
-
-    // Log some sample job_industry values to debug
-    console.log("Sample job_industry values:", data.slice(0, 5).map(job => job.job_industry));
 
     // ✅ Custom client-side sort to enforce Premium → Gold → Silver → NULL
     const sorted = data.sort((a, b) => {
@@ -117,26 +134,32 @@ export default function AllJobs() {
 
     if (reset) {
       setJobs(sorted);
+      // Apply search filter if exists
+      if (search.trim()) {
+        const filtered = sorted.filter(job => matchesSearchQuery(job, search));
+        setFilteredJobs(filtered);
+      } else {
+        setFilteredJobs(sorted);
+      }
     } else {
-      setJobs((prev) => [...prev, ...sorted]);
+      const newJobs = [...jobs, ...sorted];
+      setJobs(newJobs);
+      // Apply search filter if exists
+      if (search.trim()) {
+        const filtered = newJobs.filter(job => matchesSearchQuery(job, search));
+        setFilteredJobs(filtered);
+      } else {
+        setFilteredJobs(newJobs);
+      }
     }
 
     setPage(pageNumber);
     setHasMore(data.length === PAGE_SIZE);
     setLoading(false);
-
-    const initialQuery = routerQuery?.query || "";
-    const initialCategory = routerQuery?.category || "All Jobs";
-
-    setSearchQuery(initialQuery);
-    setSelectedCategory(initialCategory);
-
-    applyFilters(reset ? sorted : [...jobs, ...sorted], initialQuery, initialCategory);
   };
 
   // Load more jobs for infinite scroll
   const loadMoreJobs = useCallback(async () => {
-    // Don't load more if filtered jobs are less than minimum required
     if (isFetching || !hasMore || filteredJobs.length < MIN_JOBS_FOR_INFINITE_SCROLL) return;
 
     setIsFetching(true);
@@ -145,10 +168,19 @@ export default function AllJobs() {
     const from = nextPage * PAGE_SIZE;
     const to = from + PAGE_SIZE - 1;
 
-    const { data, error } = await supabase
+    let query = supabase
       .from("jobs")
-      .select("*")
-      .range(from, to);
+      .select("*");
+
+    // Apply category filter if not "All Jobs"
+    if (selectedCategory !== "All Jobs" && industryMapping[selectedCategory]) {
+      const industryValues = industryMapping[selectedCategory];
+      query = query.in("job_industry", industryValues);
+    }
+
+    query = query.range(from, to);
+
+    const { data, error } = await query;
 
     if (error) {
       console.error("Error fetching more jobs:", error.message);
@@ -170,15 +202,24 @@ export default function AllJobs() {
         return new Date(b.created_at) - new Date(a.created_at);
       });
 
-      setJobs((prev) => [...prev, ...sorted]);
+      const newJobs = [...jobs, ...sorted];
+      setJobs(newJobs);
       setPage(nextPage);
       setHasMore(data.length === PAGE_SIZE);
+      
+      // Apply search filter if exists
+      if (searchQuery.trim()) {
+        const filtered = newJobs.filter(job => matchesSearchQuery(job, searchQuery));
+        setFilteredJobs(filtered);
+      } else {
+        setFilteredJobs(newJobs);
+      }
     } else {
       setHasMore(false);
     }
 
     setIsFetching(false);
-  }, [page, hasMore, isFetching, filteredJobs.length]);
+  }, [page, hasMore, isFetching, filteredJobs.length, selectedCategory, jobs, searchQuery]);
 
   // Helper function to extract tags from job
   const getJobTags = (job) => {
@@ -229,67 +270,17 @@ export default function AllJobs() {
     return false;
   };
 
-  // Check if job matches category (case-insensitive job_industry match)
-  const matchesCategory = (job, category) => {
-    if (category === "All Jobs") return true;
-    
-    const expectedIndustries = industryToJobIndustry[category];
-    if (!expectedIndustries || !Array.isArray(expectedIndustries)) return false;
-    
-    // Check if job_industry matches any of the expected values (case-insensitive)
-    if (job.job_industry) {
-      const jobIndustryLower = job.job_industry.toLowerCase().trim();
-      
-      for (const expectedIndustry of expectedIndustries) {
-        if (jobIndustryLower === expectedIndustry.toLowerCase()) {
-          return true;
-        }
-      }
-      
-      // Also check for partial matches for common variations
-      if (category === "Design & Creatives") {
-        if (jobIndustryLower.includes("design") && jobIndustryLower.includes("creative")) {
-          return true;
-        }
-      } else if (category === "Marketing & Sales") {
-        if (jobIndustryLower.includes("marketing") && jobIndustryLower.includes("sales")) {
-          return true;
-        }
-      } else if (category === "Writing & Translation") {
-        if (jobIndustryLower.includes("writing") && jobIndustryLower.includes("translation")) {
-          return true;
-        }
-      } else if (category === "Finance & Accounting") {
-        if (jobIndustryLower.includes("finance") && jobIndustryLower.includes("accounting")) {
-          return true;
-        }
-      }
-    }
-    
-    return false;
-  };
-
-  // Main filtering function
-  const applyFilters = (allJobs, query, category) => {
-    let filtered = allJobs;
-
-    // Filter by category (exact job_industry match)
-    if (category !== "All Jobs") {
-      filtered = filtered.filter(job => matchesCategory(job, category));
-    }
-
-    // Filter by search query (checks tags and title)
-    if (query.trim()) {
-      filtered = filtered.filter(job => matchesSearchQuery(job, query));
-    }
-
-    setFilteredJobs(filtered);
-  };
-
-  // Handle category click
-  const handleCategoryClick = (category) => {
+  // Handle category click - fetch from database
+  const handleCategoryClick = async (category) => {
     setSelectedCategory(category);
-    applyFilters(jobs, searchQuery, category);
+    setSearchQuery("");
+    await fetchJobs(0, true, category, "");
+  };
+
+  // Handle search input change
+  const handleSearchChange = (e) => {
+    const value = e.target.value;
+    setSearchQuery(value);
   };
 
   // Check if we should show footer (only if filtered jobs are less than 10)
@@ -338,7 +329,7 @@ export default function AllJobs() {
             placeholder="Search jobs by tags or job title..."
             className="w-full py-2 pl-10 pr-3 rounded-lg text-sm border border-gray-300 shadow-sm focus:outline-none focus:ring-2 focus:ring-orange-500"
             value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
+            onChange={handleSearchChange}
           />
           <p className="text-xs text-gray-500 mt-1">
             Search by job tags or job title only
@@ -347,7 +338,7 @@ export default function AllJobs() {
 
         {/* Category Filter */}
         <div className="flex flex-wrap justify-center gap-1 mb-6">
-          {["All Jobs", ...Object.keys(industryToJobIndustry)].map((cat) => (
+          {["All Jobs", ...Object.keys(industryMapping)].map((cat) => (
             <button
               key={cat}
               onClick={() => handleCategoryClick(cat)}
@@ -366,9 +357,8 @@ export default function AllJobs() {
         {process.env.NODE_ENV === 'development' && (
           <div className="mb-4 p-3 bg-yellow-50 rounded-lg border border-yellow-200">
             <p className="text-sm text-yellow-700 text-center">
-              Debug: {jobs.length} total jobs loaded | Sample industries: {
-                Array.from(new Set(jobs.slice(0, 10).map(j => j.job_industry).filter(Boolean))).join(', ')
-              }
+              Debug: {jobs.length} total jobs loaded | {filteredJobs.length} filtered | 
+              Current category: {selectedCategory}
             </p>
           </div>
         )}
@@ -405,10 +395,7 @@ export default function AllJobs() {
               }
             </p>
             <button
-              onClick={() => {
-                setSelectedCategory("All Jobs");
-                setSearchQuery("");
-              }}
+              onClick={() => handleCategoryClick("All Jobs")}
               className="px-4 py-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600 transition"
             >
               View All Jobs
