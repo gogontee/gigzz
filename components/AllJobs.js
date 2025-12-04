@@ -62,6 +62,7 @@ export default function AllJobs() {
   const [loading, setLoading] = useState(false);
 
   const searchTimerRef = useRef(null);
+  const floatTimerRef = useRef(null);
 
   // ---------- Activity recorder ----------
   const recordActivity = useCallback(
@@ -240,17 +241,61 @@ export default function AllJobs() {
         </div>
       )}
 
-      {/* View All Jobs Button */}
+      {/* View All Jobs Button with Floating Effect */}
       {hasMore && (
         <div className="flex justify-center mt-6">
           <button
             onClick={handleViewAllJobs}
-            className="px-6 py-2 border border-black rounded-lg hover:bg-black hover:text-white transition"
+            className="px-6 py-3 bg-black text-white rounded-lg shadow-lg hover:shadow-xl transform transition-all duration-300 hover:-translate-y-1 active:translate-y-0 active:scale-95 animate-float"
           >
             View All Jobs
+            <svg 
+              className="inline-block ml-2 w-4 h-4 animate-bounce" 
+              fill="none" 
+              stroke="currentColor" 
+              viewBox="0 0 24 24" 
+              xmlns="http://www.w3.org/2000/svg"
+            >
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M14 5l7 7m0 0l-7 7m7-7H3"></path>
+            </svg>
           </button>
         </div>
       )}
+
+      {/* Add floating animation styles */}
+      <style jsx>{`
+        @keyframes float {
+          0% {
+            transform: translateY(0px);
+            box-shadow: 0 10px 20px rgba(0, 0, 0, 0.1);
+          }
+          50% {
+            transform: translateY(-5px);
+            box-shadow: 0 15px 30px rgba(0, 0, 0, 0.15);
+          }
+          100% {
+            transform: translateY(0px);
+            box-shadow: 0 10px 20px rgba(0, 0, 0, 0.1);
+          }
+        }
+        
+        .animate-float {
+          animation: float 3s ease-in-out infinite;
+        }
+        
+        @keyframes pulse-glow {
+          0%, 100% {
+            box-shadow: 0 0 20px rgba(0, 0, 0, 0.1), 0 0 0 rgba(255, 107, 0, 0);
+          }
+          50% {
+            box-shadow: 0 0 20px rgba(0, 0, 0, 0.1), 0 0 20px rgba(255, 107, 0, 0.3);
+          }
+        }
+        
+        .animate-pulse-glow {
+          animation: pulse-glow 2s ease-in-out infinite;
+        }
+      `}</style>
     </div>
   );
 }

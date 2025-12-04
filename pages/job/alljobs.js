@@ -5,7 +5,7 @@ import Header from "../../components/Header";
 import MobileHeader from "../../components/MobileHeader";
 import Footer from "../../components/Footer";
 import JobCard from "../../components/JobCard";
-import { List, Grid3x3, Search } from "lucide-react";
+import { List, Grid3x3, Search, RefreshCw } from "lucide-react";
 
 // Industry to job_industry field mapping with exact values
 const industryMapping = {
@@ -27,7 +27,8 @@ const industryMapping = {
 };
 
 const PAGE_SIZE = 30;
-const MIN_JOBS_FOR_INFINITE_SCROLL = 10;
+const MIN_JOBS_FOR_RECYCLING = 10;
+const MAX_RECYCLES = 20; // Maximum number of times to recycle before resetting
 
 export default function AllJobs() {
   const router = useRouter();
@@ -42,8 +43,11 @@ export default function AllJobs() {
   const [hasMore, setHasMore] = useState(true);
   const [loading, setLoading] = useState(false);
   const [isFetching, setIsFetching] = useState(false);
+  const [recycleCount, setRecycleCount] = useState(0);
+  const [allLoadedJobIds, setAllLoadedJobIds] = useState(new Set());
   const observerRef = useRef(null);
   const lastJobRef = useRef(null);
+  const containerRef = useRef(null);
 
   // Fetch initial jobs based on category
   useEffect(() => {
@@ -68,17 +72,20 @@ export default function AllJobs() {
 
   // Initialize intersection observer for infinite scroll
   useEffect(() => {
-    if (filteredJobs.length < MIN_JOBS_FOR_INFINITE_SCROLL) {
+    if (filteredJobs.length < MIN_JOBS_FOR_RECYCLING) {
       return;
     }
 
     const observer = new IntersectionObserver(
       (entries) => {
-        if (entries[0].isIntersecting && hasMore && !loading && !isFetching) {
-          loadMoreJobs();
+        if (entries[0].isIntersecting && !loading && !isFetching) {
+          handleLoadMore();
         }
       },
-      { threshold: 0.1 }
+      { 
+        threshold: 0.1,
+        rootMargin: "50px"
+      }
     );
 
     if (observerRef.current) {
@@ -120,22 +127,15 @@ export default function AllJobs() {
       return;
     }
 
-    // ✅ Custom client-side sort to enforce Premium → Gold → Silver → NULL
-    const sorted = data.sort((a, b) => {
-      const rank = (tag) => {
-        if (tag === "Premium") return 1;
-        if (tag === "Gold") return 2;
-        if (tag === "Silver") return 3;
-        return 4; // NULL or anything else
-      };
-      const rankDiff = rank(a.promotion_tag) - rank(b.promotion_tag);
-      if (rankDiff !== 0) return rankDiff;
-      return new Date(b.created_at) - new Date(a.created_at);
-    });
+    // Custom client-side sort to enforce Premium → Gold → Silver → NULL
+    const sorted = sortJobsByPromotion(data);
 
     if (reset) {
+      const newJobIds = new Set(sorted.map(job => job.id));
+      setAllLoadedJobIds(newJobIds);
+      setRecycleCount(0);
       setJobs(sorted);
-      // Apply search filter if exists
+      
       if (search.trim()) {
         const filtered = sorted.filter(job => matchesSearchQuery(job, search));
         setFilteredJobs(filtered);
@@ -144,8 +144,10 @@ export default function AllJobs() {
       }
     } else {
       const newJobs = [...jobs, ...sorted];
+      const updatedJobIds = new Set([...allLoadedJobIds, ...sorted.map(job => job.id)]);
+      setAllLoadedJobIds(updatedJobIds);
       setJobs(newJobs);
-      // Apply search filter if exists
+      
       if (search.trim()) {
         const filtered = newJobs.filter(job => matchesSearchQuery(job, search));
         setFilteredJobs(filtered);
@@ -159,13 +161,49 @@ export default function AllJobs() {
     setLoading(false);
   };
 
-  // Load more jobs for infinite scroll
-  const loadMoreJobs = useCallback(async () => {
-    if (isFetching || !hasMore || filteredJobs.length < MIN_JOBS_FOR_INFINITE_SCROLL) return;
+  // Sort jobs by promotion tag and date
+  const sortJobsByPromotion = (jobsArray) => {
+    return jobsArray.sort((a, b) => {
+      const rank = (tag) => {
+        if (tag === "Premium") return 1;
+        if (tag === "Gold") return 2;
+        if (tag === "Silver") return 3;
+        return 4; // NULL or anything else
+      };
+      const rankDiff = rank(a.promotion_tag) - rank(b.promotion_tag);
+      if (rankDiff !== 0) return rankDiff;
+      return new Date(b.created_at) - new Date(a.created_at);
+    });
+  };
+
+  // Load more jobs - either new ones or recycle existing ones
+  const handleLoadMore = useCallback(async () => {
+    if (isFetching || loading) return;
 
     setIsFetching(true);
-    const nextPage = page + 1;
 
+    // If we have more than 10 jobs and have already loaded a page, recycle jobs
+    if (filteredJobs.length >= MIN_JOBS_FOR_RECYCLING && recycleCount < MAX_RECYCLES) {
+      // Shuffle and add more from already loaded jobs
+      await recycleJobs();
+    } else if (hasMore) {
+      // Load new jobs from database
+      await loadNewJobs();
+    } else if (recycleCount >= MAX_RECYCLES) {
+      // Reset and start fresh from beginning
+      await resetAndLoadFresh();
+    } else {
+      // No more jobs to load
+      setIsFetching(false);
+      return;
+    }
+
+    setIsFetching(false);
+  }, [page, hasMore, isFetching, filteredJobs.length, recycleCount, selectedCategory, jobs, searchQuery]);
+
+  // Load new jobs from database
+  const loadNewJobs = async () => {
+    const nextPage = page + 1;
     const from = nextPage * PAGE_SIZE;
     const to = from + PAGE_SIZE - 1;
 
@@ -185,25 +223,15 @@ export default function AllJobs() {
 
     if (error) {
       console.error("Error fetching more jobs:", error.message);
-      setIsFetching(false);
       return;
     }
 
     if (data.length > 0) {
-      // ✅ Custom client-side sort for new data
-      const sorted = data.sort((a, b) => {
-        const rank = (tag) => {
-          if (tag === "Premium") return 1;
-          if (tag === "Gold") return 2;
-          if (tag === "Silver") return 3;
-          return 4; // NULL or anything else
-        };
-        const rankDiff = rank(a.promotion_tag) - rank(b.promotion_tag);
-        if (rankDiff !== 0) return rankDiff;
-        return new Date(b.created_at) - new Date(a.created_at);
-      });
-
+      const sorted = sortJobsByPromotion(data);
       const newJobs = [...jobs, ...sorted];
+      const updatedJobIds = new Set([...allLoadedJobIds, ...sorted.map(job => job.id)]);
+      
+      setAllLoadedJobIds(updatedJobIds);
       setJobs(newJobs);
       setPage(nextPage);
       setHasMore(data.length === PAGE_SIZE);
@@ -218,9 +246,50 @@ export default function AllJobs() {
     } else {
       setHasMore(false);
     }
+  };
 
-    setIsFetching(false);
-  }, [page, hasMore, isFetching, filteredJobs.length, selectedCategory, jobs, searchQuery]);
+  // Recycle existing jobs by shuffling and adding them again
+  const recycleJobs = async () => {
+    // Get current filtered jobs
+    const currentFilteredJobs = searchQuery.trim() 
+      ? jobs.filter(job => matchesSearchQuery(job, searchQuery))
+      : jobs;
+
+    if (currentFilteredJobs.length === 0) return;
+
+    // Shuffle the jobs array randomly
+    const shuffled = [...currentFilteredJobs].sort(() => Math.random() - 0.5);
+    
+    // Take first 10-20 jobs from shuffled array
+    const takeCount = Math.min(15, shuffled.length);
+    const recycledJobs = shuffled.slice(0, takeCount);
+    
+    // Add recycled jobs to current jobs
+    const newJobs = [...jobs, ...recycledJobs];
+    setJobs(newJobs);
+    
+    // Apply search filter if exists
+    if (searchQuery.trim()) {
+      const filtered = newJobs.filter(job => matchesSearchQuery(job, searchQuery));
+      setFilteredJobs(filtered);
+    } else {
+      setFilteredJobs(newJobs);
+    }
+    
+    // Increase recycle count
+    setRecycleCount(prev => prev + 1);
+    
+    // If we've recycled a lot, set hasMore to false to trigger reset
+    if (recycleCount + 1 >= MAX_RECYCLES) {
+      setHasMore(false);
+    }
+  };
+
+  // Reset and load fresh jobs
+  const resetAndLoadFresh = async () => {
+    setRecycleCount(0);
+    await fetchJobs(0, true, selectedCategory, searchQuery);
+  };
 
   // Helper function to extract tags from job
   const getJobTags = (job) => {
@@ -275,6 +344,7 @@ export default function AllJobs() {
   const handleCategoryClick = async (category) => {
     setSelectedCategory(category);
     setSearchQuery("");
+    setRecycleCount(0);
     await fetchJobs(0, true, category, "");
   };
 
@@ -285,10 +355,10 @@ export default function AllJobs() {
   };
 
   // Check if we should show footer (only if filtered jobs are less than 10)
-  const shouldShowFooter = filteredJobs.length < MIN_JOBS_FOR_INFINITE_SCROLL;
+  const shouldShowFooter = filteredJobs.length < MIN_JOBS_FOR_RECYCLING;
 
   return (
-    <div>
+    <div ref={containerRef}>
       {/* Headers */}
       <div className="hidden md:block">
         <Header />
@@ -309,14 +379,20 @@ export default function AllJobs() {
               </span>
             )}
           </h1>
-          <button
-            onClick={() =>
-              setViewMode(viewMode === "grid" ? "list" : "grid")
-            }
-            className="p-2 rounded-full bg-gray-100 hover:bg-orange-100 transition"
-          >
-            {viewMode === "grid" ? <List size={18} /> : <Grid3x3 size={18} />}
-          </button>
+          <div className="flex items-center gap-2">
+            {/* Recycle Counter (for debugging) */}
+            {recycleCount > 0 && process.env.NODE_ENV === 'development' && (
+              <span className="text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded">
+                Recycled: {recycleCount}
+              </span>
+            )}
+            <button
+              onClick={() => setViewMode(viewMode === "grid" ? "list" : "grid")}
+              className="p-2 rounded-full bg-gray-100 hover:bg-orange-100 transition"
+            >
+              {viewMode === "grid" ? <List size={18} /> : <Grid3x3 size={18} />}
+            </button>
+          </div>
         </div>
 
         {/* Search */}
@@ -353,16 +429,6 @@ export default function AllJobs() {
             </button>
           ))}
         </div>
-
-        {/* Debug info - remove in production */}
-        {process.env.NODE_ENV === 'development' && (
-          <div className="mb-4 p-3 bg-yellow-50 rounded-lg border border-yellow-200">
-            <p className="text-sm text-yellow-700 text-center">
-              Debug: {jobs.length} total jobs loaded | {filteredJobs.length} filtered | 
-              Current category: {selectedCategory}
-            </p>
-          </div>
-        )}
 
         {/* Filter Info */}
         {(selectedCategory !== "All Jobs" || searchQuery) && (
@@ -408,7 +474,7 @@ export default function AllJobs() {
               <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
                 {filteredJobs.map((job, index) => (
                   <div
-                    key={`${job.id}-${index}`}
+                    key={`${job.id}-${index}-${recycleCount}`}
                     className="animate-fade-in-up"
                     style={{
                       animationDelay: `${(index % 10) * 0.1}s`,
@@ -423,7 +489,7 @@ export default function AllJobs() {
               <div className="space-y-4">
                 {filteredJobs.map((job, index) => (
                   <div
-                    key={`${job.id}-${index}`}
+                    key={`${job.id}-${index}-${recycleCount}`}
                     className="animate-fade-in-up"
                     style={{
                       animationDelay: `${(index % 10) * 0.1}s`,
@@ -441,28 +507,59 @@ export default function AllJobs() {
         {/* Loading Indicator */}
         {(loading || isFetching) && (
           <div className="flex justify-center mt-6">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-orange-500"></div>
+            <div className="flex flex-col items-center gap-2">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-orange-500"></div>
+              {recycleCount > 0 && (
+                <p className="text-xs text-gray-500">
+                  Loading more jobs... ({recycleCount} recycled)
+                </p>
+              )}
+            </div>
           </div>
         )}
 
-        {/* Infinite Scroll Sentinel - Only show if filtered jobs >= MIN_JOBS_FOR_INFINITE_SCROLL */}
-        {hasMore && filteredJobs.length >= MIN_JOBS_FOR_INFINITE_SCROLL && (
-          <div ref={observerRef} className="h-10" />
+        {/* Infinite Scroll Sentinel */}
+        {filteredJobs.length >= MIN_JOBS_FOR_RECYCLING && (
+          <div ref={observerRef} className="h-20 relative">
+            <div className="absolute bottom-0 left-0 right-0 text-center">
+              <div className="inline-flex items-center gap-2 text-sm text-gray-500">
+                <RefreshCw className="w-4 h-4 animate-spin" />
+                <span>Scroll for more jobs...</span>
+              </div>
+            </div>
+          </div>
         )}
 
-        {/* Continuous Loop Indicator - Only show if filtered jobs >= MIN_JOBS_FOR_INFINITE_SCROLL */}
-        {!hasMore && filteredJobs.length > 0 && filteredJobs.length >= MIN_JOBS_FOR_INFINITE_SCROLL && (
+        {/* Continuous Loop Indicator */}
+        {!hasMore && filteredJobs.length >= MIN_JOBS_FOR_RECYCLING && recycleCount < MAX_RECYCLES && (
           <div className="text-center mt-6 py-4">
             <div className="animate-pulse">
-              <p className="text-gray-500 text-sm">
-                🎉 All jobs loaded! Loading more...
+              <p className="text-gray-500 text-sm flex items-center justify-center gap-2">
+                <RefreshCw className="w-4 h-4" />
+                Showing more jobs from what you've already seen...
               </p>
             </div>
           </div>
         )}
+
+        {/* Reset Indicator */}
+        {recycleCount >= MAX_RECYCLES && (
+          <div className="text-center mt-6 py-4">
+            <button
+              onClick={resetAndLoadFresh}
+              className="px-4 py-2 bg-black text-white rounded-lg hover:bg-gray-800 transition flex items-center gap-2 mx-auto"
+            >
+              <RefreshCw className="w-4 h-4" />
+              Refresh for new jobs
+            </button>
+            <p className="text-xs text-gray-500 mt-2">
+              You've seen all available jobs. Click to refresh and start over.
+            </p>
+          </div>
+        )}
       </div>
 
-      {/* Footer - Only show if filtered jobs are less than MIN_JOBS_FOR_INFINITE_SCROLL */}
+      {/* Footer - Only show if filtered jobs are less than MIN_JOBS_FOR_RECYCLING */}
       {shouldShowFooter && (
         <div className="hidden md:block">
           <Footer />

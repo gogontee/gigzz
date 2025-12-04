@@ -175,7 +175,7 @@ export default function DesktopHeader() {
                 isActive("/gigzzstar") ? "text-orange-500" : ""
               }`}
             >
-              Sportlight
+              
             </Link>
           )}
 

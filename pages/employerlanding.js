@@ -41,10 +41,10 @@ Post your job on MyGigzz today — and turn your ideas into reality.`
     title: "Browse Portfolio",
     description: "View portfolios of top creatives.",
     icon: <ClipboardList className="w-5 h-5 text-black" />,
-    href: "/portfolio",
+    href: "/comingsoon",
     modalContent: {
       title: "Why Browse Portfolios?",
-      content: "Browsing through applicant portfolios helps you make informed hiring decisions. You can assess the quality of previous work, see if their style matches your vision, and evaluate their experience with similar projects. This ensures you hire the right creative professional for your specific needs."
+      content: "Browsing through applicant portfolios helps you make informed hiring decisions. You can assess the quality of previous work, see if their style matches your vision, and evaluate their experience with similar projects. This ensures you hire the right creative professional for your specific needs. This feature is coming soon! At the moment, you can access applicants portfolio when they apply to your job. you will also find a few recommended portfolios in your dashboard"
     }
   },
   {
