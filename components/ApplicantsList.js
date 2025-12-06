@@ -599,7 +599,7 @@ export default function ApplicantsList() {
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="flex items-center gap-2">
                           <Link
-                            href={`/gigzzstar/${applicant.id}`}
+                            href={`/dashboard/profile/[id]`.replace('[id]', applicant.id)}
                             className="flex items-center gap-1 bg-blue-600 text-white px-3 py-1 rounded text-sm hover:bg-blue-700 transition"
                           >
                             <Eye size={14} />
