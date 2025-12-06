@@ -1,6 +1,6 @@
 'use client';
 import React, { useState, useEffect } from 'react';
-import { Camera, CheckCircle, X } from 'lucide-react';
+import { Camera, CheckCircle, X, User, RefreshCw } from 'lucide-react';
 import { supabase } from '../../utils/supabaseClient';
 
 export default function EmployerProfileEditor({ employer, onUpdated }) {
@@ -15,6 +15,14 @@ export default function EmployerProfileEditor({ employer, onUpdated }) {
   const [previewAvatar, setPreviewAvatar] = useState('');
   const [loading, setLoading] = useState(false);
   const [statusMsg, setStatusMsg] = useState({ type: '', text: '' });
+  
+  // New states for account switching
+  const [showSwitchConfirm, setShowSwitchConfirm] = useState(false);
+  const [showPasswordConfirm, setShowPasswordConfirm] = useState(false);
+  const [password, setPassword] = useState('');
+  const [switchLoading, setSwitchLoading] = useState(false);
+  const [switchError, setSwitchError] = useState('');
+  const [currentUserId, setCurrentUserId] = useState(null);
 
   useEffect(() => {
     if (!employer) return;
@@ -26,6 +34,15 @@ export default function EmployerProfileEditor({ employer, onUpdated }) {
       bio: employer.bio || '',
     });
     setPreviewAvatar(employer.avatar_url || '');
+    
+    // Get current user ID
+    const getCurrentUser = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        setCurrentUserId(user.id);
+      }
+    };
+    getCurrentUser();
   }, [employer]);
 
   const handleChange = (e) => {
@@ -39,7 +56,6 @@ export default function EmployerProfileEditor({ employer, onUpdated }) {
     setPreviewAvatar(URL.createObjectURL(file));
   };
 
-  // Upload file to Supabase storage under clients_asset/
   const uploadToStorage = async (file, employerId) => {
     const ext = file.name.split('.').pop();
     const fileName = `${employerId}-${Date.now()}.${ext}`;
@@ -71,7 +87,6 @@ export default function EmployerProfileEditor({ employer, onUpdated }) {
     try {
       let avatar_url = employer.avatar_url || null;
 
-      // If user selected new avatar
       if (avatarFile) {
         try {
           avatar_url = await uploadToStorage(avatarFile, employer.id);
@@ -82,7 +97,6 @@ export default function EmployerProfileEditor({ employer, onUpdated }) {
         }
       }
 
-      // Build only fields that were filled (skip empty strings)
       const updateData = {};
       if (form.name.trim()) updateData.name = form.name;
       if (form.company.trim()) updateData.company = form.company;
@@ -117,10 +131,233 @@ export default function EmployerProfileEditor({ employer, onUpdated }) {
     setLoading(false);
   };
 
+  // Handle switch to applicant account
+  const handleSwitchToApplicant = () => {
+    setShowSwitchConfirm(true);
+  };
+
+  const confirmSwitch = () => {
+    setShowSwitchConfirm(false);
+    setShowPasswordConfirm(true);
+  };
+
+  const cancelSwitch = () => {
+    setShowSwitchConfirm(false);
+    setShowPasswordConfirm(false);
+    setPassword('');
+    setSwitchError('');
+  };
+
+  const verifyPasswordAndSwitch = async () => {
+    if (!password.trim()) {
+      setSwitchError('Please enter your password');
+      return;
+    }
+
+    setSwitchLoading(true);
+    setSwitchError('');
+
+    try {
+      // First, get the current user's email
+      const { data: { user }, error: userError } = await supabase.auth.getUser();
+      
+      if (userError || !user) {
+        setSwitchError('Unable to get user information. Please try again.');
+        setSwitchLoading(false);
+        return;
+      }
+
+      const userEmail = user.email;
+
+      // Verify the password by signing in
+      const { error: signInError } = await supabase.auth.signInWithPassword({
+        email: userEmail,
+        password: password,
+      });
+
+      if (signInError) {
+        setSwitchError('Invalid password. Please try again.');
+        setSwitchLoading(false);
+        return;
+      }
+
+      // Update user role to applicant in the users table
+      // Option 1: If you have a 'users' table
+      const { error: updateError } = await supabase
+        .from('users')
+        .update({ role: 'applicant' })
+        .eq('id', user.id);
+
+      if (updateError) {
+        console.error('Role update error:', updateError);
+        
+        // Option 2: If you have a 'profiles' table instead
+        // Try updating profiles table if users table doesn't exist
+        const { error: profileError } = await supabase
+          .from('profiles')
+          .update({ role: 'applicant' })
+          .eq('id', user.id);
+
+        if (profileError) {
+          console.error('Profile update error:', profileError);
+          
+          // Option 3: If you store role in a different table
+          // Check if employer has user_id field
+          if (employer?.user_id) {
+            const { error: employerUserError } = await supabase
+              .from('users')
+              .update({ role: 'applicant' })
+              .eq('id', employer.user_id);
+            
+            if (employerUserError) {
+              console.error('Employer user update error:', employerUserError);
+              setSwitchError('Failed to update account type. Please contact support.');
+              setSwitchLoading(false);
+              return;
+            }
+          } else {
+            setSwitchError('Failed to switch account type. Please contact support.');
+            setSwitchLoading(false);
+            return;
+          }
+        }
+      }
+
+      // Also update the employers table to mark this account as switched
+      if (employer?.id) {
+        await supabase
+          .from('employers')
+          .update({ 
+            account_switched: true,
+            switched_at: new Date().toISOString()
+          })
+          .eq('id', employer.id);
+      }
+
+      // Success - show message and redirect
+      setSwitchLoading(false);
+      setShowPasswordConfirm(false);
+      setPassword('');
+      
+      // Show success message
+      setStatusMsg({ 
+        type: 'success', 
+        text: 'Account switched to applicant successfully! Redirecting...' 
+      });
+      
+      // Sign out and redirect to login or applicant dashboard
+      setTimeout(async () => {
+        await supabase.auth.signOut();
+        window.location.href = '/auth/login?role=applicant'; // Redirect to login with role param
+      }, 2000);
+
+    } catch (err) {
+      console.error('Switch error:', err);
+      setSwitchError('An unexpected error occurred. Please try again.');
+      setSwitchLoading(false);
+    }
+  };
+
   return (
     <div className="max-w-3xl mx-auto bg-white rounded-2xl shadow-lg p-6 space-y-6">
+      {/* Switch Account Section */}
+      <div className="border-b pb-4 mb-6">
+        <div className="flex items-center justify-between">
+          <div>
+            <h3 className="text-lg font-semibold">Account Type</h3>
+            <p className="text-sm text-gray-600">You're currently using an Employer account</p>
+          </div>
+          <button
+            type="button"
+            onClick={handleSwitchToApplicant}
+            className="flex items-center gap-2 bg-blue-50 text-blue-600 hover:bg-blue-100 px-4 py-2 rounded-lg transition"
+          >
+            <User size={18} />
+            Switch to Applicant Account
+          </button>
+        </div>
+      </div>
+
+      {/* Switch Confirmation Modal */}
+      {showSwitchConfirm && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl p-6 max-w-md w-full">
+            <h3 className="text-xl font-bold mb-2">Switch to Applicant Account?</h3>
+            <p className="text-gray-600 mb-6">
+              This will change your account type to Applicant. You'll lose employer-specific features 
+              and gain applicant features. You'll need to verify your password to confirm.
+            </p>
+            <div className="flex gap-3 justify-end">
+              <button
+                onClick={cancelSwitch}
+                className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={confirmSwitch}
+                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+              >
+                Continue
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Password Confirmation Modal */}
+      {showPasswordConfirm && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl p-6 max-w-md w-full">
+            <h3 className="text-xl font-bold mb-2">Confirm Password</h3>
+            <p className="text-gray-600 mb-4">
+              Please enter your password to confirm account switch.
+            </p>
+            
+            <div className="mb-6">
+              <label className="block text-sm font-medium mb-2">Password</label>
+              <input
+                type="password"
+                value={password}
+                onChange={(e) => {
+                  setPassword(e.target.value);
+                  setSwitchError('');
+                }}
+                className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                placeholder="Enter your password"
+                autoComplete="current-password"
+              />
+              {switchError && (
+                <p className="text-red-600 text-sm mt-2 flex items-center gap-1">
+                  <X size={14} />
+                  {switchError}
+                </p>
+              )}
+            </div>
+            
+            <div className="flex gap-3 justify-end">
+              <button
+                onClick={cancelSwitch}
+                disabled={switchLoading}
+                className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={verifyPasswordAndSwitch}
+                disabled={switchLoading}
+                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 flex items-center gap-2"
+              >
+                {switchLoading ? 'Processing...' : 'Switch Account'}
+                {!switchLoading && <RefreshCw size={16} />}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Profile Editor Content */}
       <div className="flex flex-col sm:flex-row gap-6 items-start">
-        {/* Avatar */}
         <div className="relative flex flex-col items-center">
           <div className="w-24 h-24 rounded-full overflow-hidden bg-gray-100 border-2 border-gray-200">
             {previewAvatar ? (

@@ -370,6 +370,13 @@ export default function LoginPage() {
           </button>
         </form>
 
+        {/* Add this tagline section */}
+        <div className="text-center py-3">
+          <p className="text-xs text-gray-600 leading-tight">
+            Log in to explore premium opportunities or list your openings
+          </p>
+        </div>
+
         {/* Pending Photo Notice */}
         {hasPendingPhoto && !uploadingPhoto && (
           <div className="bg-orange-50 border border-orange-200 rounded-lg p-4">

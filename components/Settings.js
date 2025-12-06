@@ -4,6 +4,7 @@
 import { useEffect, useState } from 'react';
 import { createPagesBrowserClient } from "@supabase/auth-helpers-nextjs";
 import { useRouter } from 'next/router';
+import { CheckCircle, X, Briefcase, RefreshCw } from 'lucide-react';
 
 const supabase = createPagesBrowserClient();
 
@@ -16,6 +17,14 @@ export default function Settings() {
   const [bio, setBio] = useState('');
   const [showBioPreview, setShowBioPreview] = useState(false);
   const router = useRouter();
+
+  // New states for account switching
+  const [showSwitchConfirm, setShowSwitchConfirm] = useState(false);
+  const [showPasswordConfirm, setShowPasswordConfirm] = useState(false);
+  const [password, setPassword] = useState('');
+  const [switchLoading, setSwitchLoading] = useState(false);
+  const [switchError, setSwitchError] = useState('');
+  const [switchSuccess, setSwitchSuccess] = useState('');
 
   // Function to convert HTML to plain text
   const htmlToPlainText = (html) => {
@@ -111,6 +120,138 @@ export default function Settings() {
     router.push('/auth/reset');
   };
 
+  // Handle switch to employer account
+  const handleSwitchToEmployer = () => {
+    setShowSwitchConfirm(true);
+  };
+
+  const confirmSwitch = () => {
+    setShowSwitchConfirm(false);
+    setShowPasswordConfirm(true);
+  };
+
+  const cancelSwitch = () => {
+    setShowSwitchConfirm(false);
+    setShowPasswordConfirm(false);
+    setPassword('');
+    setSwitchError('');
+    setSwitchSuccess('');
+  };
+
+  const verifyPasswordAndSwitch = async () => {
+    if (!password.trim()) {
+      setSwitchError('Please enter your password');
+      return;
+    }
+
+    setSwitchLoading(true);
+    setSwitchError('');
+    setSwitchSuccess('');
+
+    try {
+      // First, get the current user's email
+      const { data: { user }, error: userError } = await supabase.auth.getUser();
+      
+      if (userError || !user) {
+        setSwitchError('Unable to get user information. Please try again.');
+        setSwitchLoading(false);
+        return;
+      }
+
+      const userEmail = user.email;
+
+      // Verify the password by signing in
+      const { error: signInError } = await supabase.auth.signInWithPassword({
+        email: userEmail,
+        password: password,
+      });
+
+      if (signInError) {
+        setSwitchError('Invalid password. Please try again.');
+        setSwitchLoading(false);
+        return;
+      }
+
+      // Update user role to employer in the users table
+      let roleUpdateSuccessful = false;
+      
+      // Try updating users table first
+      const { error: usersUpdateError } = await supabase
+        .from('users')
+        .update({ role: 'employer' })
+        .eq('id', user.id);
+
+      if (!usersUpdateError) {
+        roleUpdateSuccessful = true;
+      } else {
+        console.error('Users table update error:', usersUpdateError);
+        
+        // Try updating profiles table as fallback
+        const { error: profilesUpdateError } = await supabase
+          .from('profiles')
+          .update({ role: 'employer' })
+          .eq('id', user.id);
+          
+        if (!profilesUpdateError) {
+          roleUpdateSuccessful = true;
+        } else {
+          console.error('Profiles table update error:', profilesUpdateError);
+          
+          // Try creating an employer record in the employers table
+          const { error: createEmployerError } = await supabase
+            .from('employers')
+            .upsert({
+              id: user.id,
+              user_id: user.id,
+              name: fullName || user.email?.split('@')[0] || 'Employer',
+              email: userEmail,
+              phone: phone || '',
+              created_at: new Date().toISOString(),
+              updated_at: new Date().toISOString()
+            }, { onConflict: 'id' });
+            
+          if (!createEmployerError) {
+            roleUpdateSuccessful = true;
+          }
+        }
+      }
+
+      if (!roleUpdateSuccessful) {
+        setSwitchError('Failed to update account type. Please contact support.');
+        setSwitchLoading(false);
+        return;
+      }
+
+      // Also update the applicants table to mark this account as switched
+      if (profile?.id) {
+        await supabase
+          .from('applicants')
+          .update({ 
+            account_switched: true,
+            switched_at: new Date().toISOString()
+          })
+          .eq('id', profile.id);
+      }
+
+      // Success - show message and prepare for logout
+      setSwitchLoading(false);
+      setShowPasswordConfirm(false);
+      setPassword('');
+      setSwitchSuccess('Account switched to employer successfully! Signing out...');
+      
+      // Sign out after 2 seconds and redirect to login
+      setTimeout(async () => {
+        await supabase.auth.signOut();
+        router.push('/auth/login?role=employer');
+      }, 2000);
+
+    } catch (err) {
+      console.error('Switch error:', err);
+      setSwitchError('An unexpected error occurred. Please try again.');
+      setSwitchLoading(false);
+    }
+  };
+
   if (loading) {
     return <div className="p-10">Loading settings...</div>;
   }
@@ -118,6 +259,140 @@ export default function Settings() {
   return (
     <div className="max-w-5xl mx-auto px-4 py-10 md:pt-20 md:pb-10">
       <h1 className="text-2xl font-bold mb-6">⚙️ Settings</h1>
+
+      {/* Switch Account Section */}
+      <div className="bg-white rounded-lg shadow p-6 mb-8">
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="text-xl font-semibold mb-2">🔄 Account Type</h2>
+            <p className="text-sm text-gray-600 mb-4">You're currently using an Applicant account</p>
+          </div>
+          <button
+            type="button"
+            onClick={handleSwitchToEmployer}
+            className="flex items-center gap-2 bg-blue-50 text-blue-600 hover:bg-blue-100 px-4 py-2 rounded-lg transition"
+          >
+            <Briefcase size={18} />
+            Switch to Employer Account
+          </button>
+        </div>
+        <p className="text-sm text-gray-500 mt-3">
+          Switch to an employer account to list jobs and hire candidates.
+        </p>
+        
+        {/* Success Message */}
+        {switchSuccess && (
+          <div className="mt-4 p-3 bg-green-50 border border-green-200 rounded-lg flex items-center gap-2 text-green-700">
+            <CheckCircle size={16} />
+            <span>{switchSuccess}</span>
+          </div>
+        )}
+      </div>
+
+      {/* Switch Confirmation Modal */}
+      {showSwitchConfirm && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl p-6 max-w-md w-full">
+            <h3 className="text-xl font-bold mb-2 flex items-center gap-2">
+              <Briefcase size={20} />
+              Switch to Employer Account?
+            </h3>
+            <p className="text-gray-600 mb-6">
+              This will change your account type to Employer. You'll be able to:
+            </p>
+            <ul className="text-gray-600 mb-6 space-y-2">
+              <li className="flex items-start gap-2">
+                <div className="w-1.5 h-1.5 bg-blue-500 rounded-full mt-2"></div>
+                <span>List job openings and post vacancies</span>
+              </li>
+              <li className="flex items-start gap-2">
+                <div className="w-1.5 h-1.5 bg-blue-500 rounded-full mt-2"></div>
+                <span>Browse and hire job seekers</span>
+              </li>
+              <li className="flex items-start gap-2">
+                <div className="w-1.5 h-1.5 bg-blue-500 rounded-full mt-2"></div>
+                <span>Manage your company profile</span>
+              </li>
+              <li className="flex items-start gap-2">
+                <div className="w-1.5 h-1.5 bg-red-500 rounded-full mt-2"></div>
+                <span>You'll lose applicant-specific features</span>
+              </li>
+            </ul>
+            <p className="text-gray-600 mb-6">
+              You'll need to verify your password to confirm. After switching, you'll be signed out and redirected to login.
+            </p>
+            <div className="flex gap-3 justify-end">
+              <button
+                onClick={cancelSwitch}
+                className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={confirmSwitch}
+                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center gap-2"
+              >
+                Continue
+                <Briefcase size={16} />
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Password Confirmation Modal */}
+      {showPasswordConfirm && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl p-6 max-w-md w-full">
+            <h3 className="text-xl font-bold mb-2">Confirm Password</h3>
+            <p className="text-gray-600 mb-4">
+              Please enter your password to confirm account switch to Employer.
+            </p>
+            <p className="text-sm text-gray-500 mb-4 bg-yellow-50 p-2 rounded">
+              Note: You'll be signed out after switching and redirected to login.
+            </p>
+            
+            <div className="mb-6">
+              <label className="block text-sm font-medium mb-2">Password</label>
+              <input
+                type="password"
+                value={password}
+                onChange={(e) => {
+                  setPassword(e.target.value);
+                  setSwitchError('');
+                }}
+                className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                placeholder="Enter your password"
+                autoComplete="current-password"
+              />
+              {switchError && (
+                <p className="text-red-600 text-sm mt-2 flex items-center gap-1">
+                  <X size={14} />
+                  {switchError}
+                </p>
+              )}
+            </div>
+            
+            <div className="flex gap-3 justify-end">
+              <button
+                onClick={cancelSwitch}
+                disabled={switchLoading}
+                className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={verifyPasswordAndSwitch}
+                disabled={switchLoading}
+                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 flex items-center gap-2"
+              >
+                {switchLoading ? 'Processing...' : 'Switch to Employer'}
+                {!switchLoading && <RefreshCw size={16} />}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Profile Info */}
       <form
