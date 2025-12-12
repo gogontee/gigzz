@@ -649,7 +649,7 @@ export default function AdminDashboard() {
   return (
     <>
       <Head>
-        <title>Admin Dashboard - Gigzz</title>
+        <title>Admin - Gigzz</title>
         <meta name="description" content="Gigzz Admin Dashboard" />
       </Head>
 
