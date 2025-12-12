@@ -19,7 +19,7 @@
     "framer-motion": "^11.0.17",
     "js-cookie": "^3.0.5",
     "lucide-react": "^0.321.0",
-    "next": "15.4.3",
+    "next": "^16.0.10",
     "next-nprogress-bar": "^2.4.7",
     "raw-body": "^3.0.1",
     "react": "18.3.1",
