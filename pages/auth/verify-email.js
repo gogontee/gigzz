@@ -44,11 +44,17 @@ export default function VerifyEmail() {
       }
 
       const userId = verificationData.user_id;
+      const userRole = verificationData.user_role; // Get user role
+
+      console.log(`👤 User role from verification: ${userRole}`);
 
       // 3. Update user email verification status
       const { error: updateError } = await supabase
         .from('users')
-        .update({ email_verified: true })
+        .update({ 
+          email_verified: true,
+          email_verified_at: new Date().toISOString()
+        })
         .eq('id', userId);
 
       if (updateError) {
@@ -73,7 +79,8 @@ export default function VerifyEmail() {
     
     if (verificationData) {
       const userId = verificationData.user_id;
-      startBackgroundTasks(userId, verificationData.token, verificationData.user_role);
+      const userRole = verificationData.user_role;
+      startBackgroundTasks(userId, verificationData.token, userRole);
     }
     
     setTimeout(() => router.push('/auth/login'), 3000);
@@ -81,6 +88,8 @@ export default function VerifyEmail() {
 
   // Run background tasks without blocking the main verification
   const startBackgroundTasks = (userId, verificationToken, userRole) => {
+    console.log(`🚀 Starting background tasks for ${userRole} with ID: ${userId}`);
+    
     // Clean up verification record in background
     supabase
       .from('email_verifications')
@@ -93,41 +102,108 @@ export default function VerifyEmail() {
     handlePendingPhoto(userId, userRole);
   };
 
-  // Handle photo upload completely in background
+  // Handle photo upload completely in background - FIXED VERSION
   const handlePendingPhoto = async (userId, userRole) => {
     try {
       const pendingPhotoKey = `pending_photo_${userId}`;
       const pendingPhoto = localStorage.getItem(pendingPhotoKey);
       
-      if (!pendingPhoto) return;
+      if (!pendingPhoto) {
+        console.log('📸 No pending photo found for user:', userId);
+        return;
+      }
 
-      console.log('📸 Uploading photo in background...');
+      console.log(`📸 Uploading photo in background for ${userRole}...`);
       const photoData = JSON.parse(pendingPhoto);
       const fileExtension = photoData.fileName.split('.').pop();
       const fileName = `avatar.${fileExtension}`;
+      const storagePath = `${userId}/${fileName}`;
       
-      const { error: uploadError } = await supabase.storage
-        .from('avatars')
-        .upload(`${userId}/${fileName}`, 
-          dataURLtoBlob(photoData.fileData), 
-          { upsert: true }
-        );
+      console.log('📁 Storage path:', storagePath);
+      console.log('📊 File type:', photoData.fileType);
 
-      if (!uploadError) {
-        const { data: urlData } = supabase.storage
-          .from('avatars')
-          .getPublicUrl(`${userId}/${fileName}`);
-
-        const profileTable = userRole === 'applicant' ? 'applicants' : 'employers';
-        await supabase
-          .from(profileTable)
-          .update({ avatar_url: urlData.publicUrl })
-          .eq('id', userId);
-        
-        console.log('✅ Photo uploaded successfully');
+      // Convert base64 to blob
+      const blob = dataURLtoBlob(photoData.fileData);
+      if (!blob) {
+        console.error('❌ Failed to convert photo to blob');
+        return;
       }
 
+      // Upload to Supabase Storage
+      const { error: uploadError } = await supabase.storage
+        .from('avatars')
+        .upload(storagePath, blob, { 
+          upsert: true,
+          contentType: photoData.fileType
+        });
+
+      if (uploadError) {
+        console.error('❌ Photo upload failed:', uploadError);
+        return;
+      }
+
+      // Get public URL
+      const { data: urlData } = supabase.storage
+        .from('avatars')
+        .getPublicUrl(storagePath);
+
+      console.log('✅ Photo uploaded successfully. Public URL:', urlData.publicUrl);
+
+      // CRITICAL FIX: Update the correct table with avatar_url
+      // Both applicants and employers tables should have avatar_url column
+      if (userRole === 'applicant') {
+        // Update applicants table
+        const { error: applicantError } = await supabase
+          .from('applicants')
+          .update({ 
+            avatar_url: urlData.publicUrl,
+            email_verified: true
+          })
+          .eq('id', userId);
+        
+        if (applicantError) {
+          console.error('❌ Failed to update applicants table:', applicantError);
+        } else {
+          console.log('✅ Applicants table updated with avatar');
+        }
+      } 
+      else if (userRole === 'employer') {
+        // Update employers table
+        const { error: employerError } = await supabase
+          .from('employers')
+          .update({ 
+            avatar_url: urlData.publicUrl,
+            email_verified: true
+          })
+          .eq('id', userId);
+        
+        if (employerError) {
+          console.error('❌ Failed to update employers table:', employerError);
+          console.log('ℹ️ Checking employers table structure...');
+          
+          // Debug: Check if employers table exists and has avatar_url column
+          const { data: employerData, error: checkError } = await supabase
+            .from('employers')
+            .select('*')
+            .eq('id', userId)
+            .single();
+            
+          if (checkError) {
+            console.error('❌ Cannot find employer record:', checkError);
+          } else {
+            console.log('ℹ️ Employer record found:', employerData);
+          }
+        } else {
+          console.log('✅ Employers table updated with avatar');
+        }
+      } else {
+        console.error('❌ Unknown user role:', userRole);
+      }
+
+      // Clean up localStorage
       localStorage.removeItem(pendingPhotoKey);
+      console.log('🧹 Cleaned up pending photo from localStorage');
+
     } catch (photoError) {
       console.error('⚠️ Photo upload error:', photoError);
     }
@@ -135,8 +211,15 @@ export default function VerifyEmail() {
 
   const dataURLtoBlob = (dataURL) => {
     try {
-      const byteString = atob(dataURL.split(',')[1]);
-      const mimeString = dataURL.split(',')[0].split(':')[1].split(';')[0];
+      // Handle case where dataURL might not have comma
+      const parts = dataURL.split(',');
+      if (parts.length < 2) {
+        console.error('Invalid dataURL format');
+        return null;
+      }
+      
+      const byteString = atob(parts[1]);
+      const mimeString = parts[0].split(':')[1].split(';')[0];
       const ab = new ArrayBuffer(byteString.length);
       const ia = new Uint8Array(ab);
       for (let i = 0; i < byteString.length; i++) {
@@ -144,7 +227,7 @@ export default function VerifyEmail() {
       }
       return new Blob([ab], { type: mimeString });
     } catch (error) {
-      console.error('Blob conversion error:', error);
+      console.error('❌ Blob conversion error:', error);
       return null;
     }
   };
