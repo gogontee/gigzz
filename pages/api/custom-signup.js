@@ -1,4 +1,4 @@
-// pages/api/custom-signup.js
+// pages/api/custom-signup.js - MINIMAL FIX
 import { createClient } from "@supabase/supabase-js";
 import { Resend } from "resend";
 
@@ -57,47 +57,89 @@ export default async function handler(req, res) {
     }
 
     const userId = authData.user.id;
+    
+    // FIX HERE: Map 'client' to 'employer' for the users table
     const userRole = role === 'client' ? 'employer' : 'applicant';
     const fullName = `${firstName} ${lastName}`;
 
-    console.log("✅ User created:", userId);
+    console.log("✅ User created:", userId, "Role in database:", userRole);
 
     // 3. Generate verification token
     const verificationToken = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
 
-    // 4. Insert into users table
+    // 4. Insert into users table - FIXED: Use userRole (which is 'employer' for clients)
     try {
-      await supabaseAdmin
+      const userData = {
+        id: userId,
+        role: userRole, // This is now 'employer' for clients
+        email_verified: false
+      };
+      
+      console.log("Inserting into users table with:", userData);
+      
+      const { data, error } = await supabaseAdmin
         .from('users')
-        .insert([{
-          id: userId,
-          role: userRole,
-          email_verified: false
-        }]);
+        .insert([userData]);
+        
+      if (error) {
+        console.error("❌ Users table insert error:", error);
+        // Let's see what the actual error is
+        throw new Error(`Failed to insert into users table: ${error.message}`);
+      }
+      
       console.log("✅ Users table updated");
     } catch (userError) {
-      console.log("⚠️ Users table insert failed:", userError.message);
+      console.error("❌ Users table insert failed:", userError.message);
+      // Don't swallow the error - return it so we can see it
+      return res.status(400).json({ 
+        error: `Failed to create user record: ${userError.message}` 
+      });
     }
 
-    // 5. Insert into profile table
+    // 5. Insert into profile table - FIXED: Use userRole here too
     try {
       const profileTable = userRole === 'employer' ? 'employers' : 'applicants';
       
-      const profileData = {
-        id: userId,
-        email: email,
-        ...(userRole === 'applicant' 
-          ? { full_name: fullName, country, state, city }
-          : { name: fullName, country, state, city }
-        )
-      };
+      let profileData;
+      
+      if (userRole === 'employer') {
+        // For employers table - match your exact schema
+        profileData = {
+          id: userId,
+          name: fullName,
+          company: `${firstName}'s Company`, // Required field in your schema
+          email: email,
+          // country, state, city not in your employers schema, so don't include them
+        };
+      } else {
+        // For applicants table
+        profileData = {
+          id: userId,
+          email: email,
+          full_name: fullName, 
+          country: country || null, 
+          state: state || null, 
+          city: city || null
+        };
+      }
 
-      await supabaseAdmin
+      console.log(`Inserting into ${profileTable} table with:`, profileData);
+
+      const { data, error } = await supabaseAdmin
         .from(profileTable)
         .insert([profileData]);
-      console.log("✅ Profile table updated");
+        
+      if (error) {
+        console.error(`❌ ${profileTable} table insert error:`, error);
+        throw new Error(`Failed to insert into ${profileTable} table: ${error.message}`);
+      }
+      
+      console.log(`✅ ${profileTable} table updated`);
     } catch (profileError) {
-      console.log("⚠️ Profile table insert failed:", profileError.message);
+      console.error("❌ Profile table insert failed:", profileError.message);
+      return res.status(400).json({ 
+        error: `Failed to create ${userRole} profile: ${profileError.message}` 
+      });
     }
 
     // 6. Store verification token
