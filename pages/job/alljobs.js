@@ -373,11 +373,6 @@ export default function AllJobs() {
         <div className="flex items-center justify-between mb-5">
           <h1 className="text-2xl font-extrabold text-black">
             {selectedCategory === "All Jobs" ? "All Jobs" : `${selectedCategory} Jobs`}
-            {filteredJobs.length > 0 && (
-              <span className="text-sm font-normal text-gray-600 ml-2">
-                ({filteredJobs.length} {filteredJobs.length === 1 ? 'job' : 'jobs'})
-              </span>
-            )}
           </h1>
           <div className="flex items-center gap-2">
             {/* Recycle Counter (for debugging) */}
@@ -509,7 +504,7 @@ export default function AllJobs() {
           <div className="flex justify-center mt-6">
             <div className="flex flex-col items-center gap-2">
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-orange-500"></div>
-              {recycleCount > 0 && (
+              {recycleCount > 0 && process.env.NODE_ENV === 'development' && (
                 <p className="text-xs text-gray-500">
                   Loading more jobs... ({recycleCount} recycled)
                 </p>
