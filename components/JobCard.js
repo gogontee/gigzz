@@ -13,16 +13,24 @@ export default function JobCard({ job, viewMode }) {
       ? job.avatar_url
       : "https://xatxjdsppcjgplmrtjcs.supabase.co/storage/v1/object/public/avatars/icon.png";
 
-  const formattedPay =
-    job.min_price && job.max_price
-      ? `₦${Number(job.min_price).toLocaleString()} - ₦${Number(
-          job.max_price
-        ).toLocaleString()}`
-      : job.min_price
-      ? `₦${Number(job.min_price).toLocaleString()}`
-      : job.max_price
-      ? `₦${Number(job.max_price).toLocaleString()}`
-      : "N/A";
+  // Format salary based on visibility
+  const getSalaryDisplay = () => {
+    if (job?.salary_range_visibility === false) {
+      return "Negotiable";
+    }
+    
+    if (job.min_price && job.max_price) {
+      return `₦${Number(job.min_price).toLocaleString()} - ₦${Number(
+        job.max_price
+      ).toLocaleString()}`;
+    } else if (job.min_price) {
+      return `₦${Number(job.min_price).toLocaleString()}`;
+    } else if (job.max_price) {
+      return `₦${Number(job.max_price).toLocaleString()}`;
+    } else {
+      return "N/A";
+    }
+  };
 
   return (
     <motion.div
@@ -49,12 +57,17 @@ export default function JobCard({ job, viewMode }) {
           {/* Job Title */}
           <h2 className="font-semibold text-lg">{job.title}</h2>
 
-          {/* Pay */}
+          {/* Pay - Now respects salary_range_visibility */}
           <div className="flex flex-col items-start md:items-end md:ml-4 mt-1 md:mt-0">
-            <span className="text-sm text-orange-500 font-medium">
-              {formattedPay}
+            <span className={`text-sm font-medium ${
+              job?.salary_range_visibility === false 
+                ? "text-gray-500" 
+                : "text-orange-500"
+            }`}>
+              {getSalaryDisplay()}
             </span>
-            {job.price_frequency && (
+            {/* Only show frequency if salary is visible and frequency exists */}
+            {job?.salary_range_visibility !== false && job.price_frequency && (
               <span className="text-xs text-gray-400">
                 {job.price_frequency}
               </span>

@@ -8,8 +8,8 @@ import MobileHeader from '../../components/MobileHeader';
 import Footer from '../../components/Footer';
 import { motion, AnimatePresence } from 'framer-motion';
 import JobCard from '../../components/JobCard';
-import WalletComponent from '../../components/WalletComponent'; // Import WalletComponent
-import { MapPin, Clock, DollarSign, FileText, X } from "lucide-react";
+import WalletComponent from '../../components/WalletComponent';
+import { MapPin, Clock, DollarSign, FileText, X, Briefcase, Link as LinkIcon, Upload } from "lucide-react";
 
 export const supabase = createPagesBrowserClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL,
@@ -183,16 +183,19 @@ export default function JobDetailPage() {
       return;
     }
 
-    if (!coverLetter.trim()) {
-      setModalMessage('⚠️ Please write a cover letter.');
-      setShowModal(true);
-      return;
-    }
+    // Only validate cover letter if cover_letter_visibility is true
+    if (job?.cover_letter_visibility) {
+      if (!coverLetter.trim()) {
+        setModalMessage('⚠️ Please write a cover letter.');
+        setShowModal(true);
+        return;
+      }
 
-    if (coverLetter.length > 1500) {
-      setModalMessage('⚠️ Cover letter cannot exceed 1500 characters.');
-      setShowModal(true);
-      return;
+      if (coverLetter.length > 1500) {
+        setModalMessage('⚠️ Cover letter cannot exceed 1500 characters.');
+        setShowModal(true);
+        return;
+      }
     }
 
     // Check if agent terms need to be accepted
@@ -271,7 +274,7 @@ export default function JobDetailPage() {
       {
         job_id: job.id,
         applicant_id: user.id,
-        cover_letter: coverLetter,
+        cover_letter: coverLetter || null,
         amount: bidAmount ? Number(bidAmount) : null,
         attachment: attachmentUrls.length > 0 ? attachmentUrls : null,
         links: links.filter((l) => l.trim() !== '')
@@ -420,14 +423,16 @@ export default function JobDetailPage() {
 
   if (!job) return <div className="p-4">Loading job details...</div>;
 
-  const formattedPay =
-    job.min_price && job.max_price
+  // Format pay based on salary_range_visibility
+  const formattedPay = job.salary_range_visibility
+    ? job.min_price && job.max_price
       ? `₦${Number(job.min_price).toLocaleString()} - ₦${Number(job.max_price).toLocaleString()}`
       : job.min_price
       ? `₦${Number(job.min_price).toLocaleString()}`
       : job.max_price
       ? `₦${Number(job.max_price).toLocaleString()}`
-      : 'N/A';
+      : 'N/A'
+    : 'Salary Negotiable';
 
   const isVerified = verifications?.approved?.toLowerCase() === 'verified';
   const getVerificationDot = () => {
@@ -483,34 +488,51 @@ export default function JobDetailPage() {
         </div>
       ) : (
         <>
-          <div className="mb-4">
-            <label className="text-sm font-semibold text-gray-900 mb-2 block">Cover Letter</label>
-            <textarea
-              value={coverLetter}
-              onChange={(e) => setCoverLetter(e.target.value)}
-              placeholder="Write a short cover letter (max 1500 characters)..."
-              maxLength={1500}
-              rows={5}
-              className="w-full border border-gray-300 rounded-xl p-4 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400 focus:border-transparent transition-all duration-200"
-            />
-            <p className="text-xs text-gray-500 mt-2">{coverLetter.length}/1500</p>
-          </div>
+          {/* Cover Letter - Only show if cover_letter_visibility is true */}
+          {job.cover_letter_visibility && (
+            <div className="mb-4">
+              <label className="text-sm font-semibold text-gray-900 mb-2 block">Cover Letter</label>
+              <textarea
+                value={coverLetter}
+                onChange={(e) => setCoverLetter(e.target.value)}
+                placeholder="Write a short cover letter (max 1500 characters)..."
+                maxLength={1500}
+                rows={5}
+                className="w-full border border-gray-300 rounded-xl p-4 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400 focus:border-transparent transition-all duration-200"
+              />
+              <p className="text-xs text-gray-500 mt-2">{coverLetter.length}/1500</p>
+            </div>
+          )}
 
-          <div className="mb-4">
-            <label className="text-sm font-semibold text-gray-900 mb-2 block">Your Bid (₦)</label>
-            <input
-              type="number"
-              value={bidAmount}
-              onChange={(e) => setBidAmount(e.target.value)}
-              placeholder="Enter your bid amount"
-              className="w-full border border-gray-300 rounded-xl p-3 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400 focus:border-transparent transition-all duration-200"
-            />
-          </div>
+          {/* Your Bid - Only show if salary_range_visibility is true */}
+          {job.salary_range_visibility && (
+            <div className="mb-4">
+              <label className="text-sm font-semibold text-gray-900 mb-2 block">Your Bid (₦)</label>
+              <input
+                type="number"
+                value={bidAmount}
+                onChange={(e) => setBidAmount(e.target.value)}
+                placeholder="Enter your bid amount"
+                className="w-full border border-gray-300 rounded-xl p-3 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400 focus:border-transparent transition-all duration-200"
+              />
+            </div>
+          )}
 
+          {/* Attachments Field with improved messaging */}
           <div className="mb-4">
             <div className="flex items-center justify-between mb-2">
               <label className="text-sm font-semibold text-gray-900">Attachments (Optional)</label>
               <span className="text-[9px] text-gray-500">Max 5 • JPG, JPEG, PNG, SVG, PDF</span>
+            </div>
+
+            <div className="bg-blue-50 p-3 rounded-lg mb-3 border border-blue-200">
+              <div className="flex items-start gap-2">
+                <Briefcase className="w-4 h-4 text-blue-500 mt-0.5 flex-shrink-0" />
+                <p className="text-xs text-blue-700">
+                  <strong>Pro Tip:</strong> Create a portfolio on MyGigzz to showcase your work professionally. 
+                  You can also upload your CV/resume here using the button below.
+                </p>
+              </div>
             </div>
 
             {attachments.length === 0 && (
@@ -548,13 +570,29 @@ export default function JobDetailPage() {
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
               >
+                <Upload className="w-4 h-4" />
                 + Add more attachments
               </motion.button>
             )}
           </div>
 
+          {/* Links Field with improved messaging */}
           <div className="mb-6">
-            <label className="text-sm font-semibold text-gray-900 mb-2 block">Links (max 3)</label>
+            <div className="flex items-center gap-2 mb-2">
+              <label className="text-sm font-semibold text-gray-900">Links (Optional)</label>
+              <span className="text-[9px] text-gray-500">Max 3</span>
+            </div>
+            
+            <div className="bg-purple-50 p-3 rounded-lg mb-3 border border-purple-200">
+              <div className="flex items-start gap-2">
+                <LinkIcon className="w-4 h-4 text-purple-500 mt-0.5 flex-shrink-0" />
+                <p className="text-xs text-purple-700">
+                  <strong>Showcase your work:</strong> Add links to your portfolio, previous projects, GitHub, Behance, 
+                  or any relevant work samples.
+                </p>
+              </div>
+            </div>
+
             {links.map((lnk, idx) => (
               <input
                 key={idx}
@@ -567,7 +605,7 @@ export default function JobDetailPage() {
                   }
                   setLinks(newLinks);
                 }}
-                placeholder="Enter link URL (Optional)"
+                placeholder="https://your-portfolio.com or https://github.com/username"
                 className="w-full border border-gray-300 rounded-xl p-3 text-sm mb-2 focus:outline-none focus:ring-2 focus:ring-orange-400 focus:border-transparent transition-all duration-200"
               />
             ))}
@@ -760,7 +798,7 @@ export default function JobDetailPage() {
                   <div className="flex flex-wrap items-center gap-6 text-sm">
                     <div>
                       <p className="text-2xl font-bold text-orange-400">{formattedPay}</p>
-                      {job.price_frequency && (
+                      {job.salary_range_visibility && job.price_frequency && (
                         <p className="text-gray-300 text-sm">{job.price_frequency}</p>
                       )}
                     </div>

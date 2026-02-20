@@ -1,6 +1,6 @@
 'use client';
 import React, { useState, useEffect } from 'react';
-import { Pencil, Trash2, X, Calendar, MapPin, DollarSign, Users, Briefcase, GraduationCap, ListChecks } from 'lucide-react';
+import { Pencil, Trash2, X, Calendar, MapPin, DollarSign, Users, Briefcase, GraduationCap, ListChecks, Mail, Save } from 'lucide-react';
 import { createPagesBrowserClient } from "@supabase/auth-helpers-nextjs";
 import { useRouter } from 'next/navigation';
 import Link from "next/link";
@@ -17,6 +17,7 @@ export default function JobListCard({ job, onDelete, onUpdate }) {
   const [loading, setLoading] = useState(false); 
   const [deleteLoading, setDeleteLoading] = useState(false);
   const [applicantsCount, setApplicantsCount] = useState(0);
+  const [showPriceFields, setShowPriceFields] = useState(false);
 
   // ✅ Fetch applicants COUNT
   useEffect(() => {
@@ -65,7 +66,12 @@ export default function JobListCard({ job, onDelete, onUpdate }) {
         educational_qualification: data.educational_qualification || '',
         location: data.location || '',
         tags: data.tags || '',
+        salary_range_visibility: data.salary_range_visibility || false,
+        cover_letter_visibility: data.cover_letter_visibility || false,
       });
+
+      // Show price fields if there are existing values
+      setShowPriceFields(!!(data.min_price || data.max_price || data.price_frequency));
 
       setIsEditing(true);
     } catch (err) {
@@ -79,21 +85,42 @@ export default function JobListCard({ job, onDelete, onUpdate }) {
   const handleCancel = () => {
     setIsEditing(false);
     setFormData({});
+    setShowPriceFields(false);
   };
 
   const handleChange = (e) => {
-    const { name, value } = e.target;
-    setFormData((prev) => ({ ...prev, [name]: value }));
+    const { name, value, type, checked } = e.target;
+    
+    if (type === 'checkbox') {
+      setFormData((prev) => ({ ...prev, [name]: checked }));
+    } else {
+      setFormData((prev) => ({ ...prev, [name]: value }));
+    }
   };
 
   const handleSave = async () => {
     try {
       setLoading(true);
 
+      // Determine salary_range_visibility based on whether price fields have values
+      const hasPriceValues = !!(formData.min_price || formData.max_price || formData.price_frequency);
+      
       const updatedData = {
-        ...formData,
+        title: formData.title,
+        category: formData.category,
+        type: formData.type,
+        description: formData.description || null,
         min_price: formData.min_price !== '' ? Number(formData.min_price) : null,
         max_price: formData.max_price !== '' ? Number(formData.max_price) : null,
+        price_frequency: formData.price_frequency || null,
+        application_deadline: formData.application_deadline || null,
+        responsibilities: formData.responsibilities || null,
+        requirements: formData.requirements || null,
+        educational_qualification: formData.educational_qualification || null,
+        location: formData.location || null,
+        tags: formData.tags || null,
+        salary_range_visibility: hasPriceValues, // Auto-set based on price field presence
+        cover_letter_visibility: formData.cover_letter_visibility || false,
       };
 
       const { error } = await supabase
@@ -167,37 +194,282 @@ export default function JobListCard({ job, onDelete, onUpdate }) {
     return new Date(dateString) < new Date();
   };
 
+  // Format salary display based on visibility
+  const getSalaryDisplay = () => {
+    if (job?.salary_range_visibility === false) {
+      return 'Negotiable';
+    }
+    
+    if (job?.min_price && job?.max_price) {
+      return `₦${job.min_price.toLocaleString()} - ₦${job.max_price.toLocaleString()}`;
+    } else if (job?.min_price) {
+      return `₦${job.min_price.toLocaleString()}`;
+    } else if (job?.max_price) {
+      return `₦${job.max_price.toLocaleString()}`;
+    } else {
+      return 'N/A';
+    }
+  };
+
+  // Get salary frequency display
+  const getSalaryFrequency = () => {
+    if (job?.salary_range_visibility === false) return null;
+    return job?.price_frequency || 'one-time';
+  };
+
   return (
     <div className="rounded-xl bg-white shadow-md border p-4 flex flex-col gap-2 hover:shadow-lg transition h-full">
       {isEditing ? (
-        <div className="flex flex-col gap-2">
-          {/* Editable Job Form */}
-          <div className="flex justify-between items-center">
-            <h3 className="text-lg font-semibold text-black">Edit Job</h3>
-            <button onClick={handleCancel} className="text-gray-400 hover:text-gray-600">
+        <div className="flex flex-col gap-3">
+          {/* Editable Job Form Header */}
+          <div className="flex justify-between items-center mb-2">
+            <h3 className="text-lg font-semibold text-black flex items-center gap-2">
+              <Pencil size={18} className="text-orange-500" />
+              Edit Job
+            </h3>
+            <button onClick={handleCancel} className="text-gray-400 hover:text-gray-600 p-1 hover:bg-gray-100 rounded-full transition">
               <X size={18} />
             </button>
           </div>
 
-          {/* Inputs */}
-          <input name="title" value={formData.title} onChange={handleChange} placeholder="Job Title" className="border rounded p-2 text-sm w-full" />
-          <input name="category" value={formData.category} onChange={handleChange} placeholder="Category" className="border rounded p-2 text-sm w-full" />
-          <input name="type" value={formData.type} onChange={handleChange} placeholder="Type" className="border rounded p-2 text-sm w-full" />
-          <textarea name="description" value={formData.description} onChange={handleChange} placeholder="Description" className="border rounded p-2 text-sm w-full resize-none" rows={3} />
-          <input name="application_deadline" type="date" value={formData.application_deadline} onChange={handleChange} className="border rounded p-2 text-sm w-full" />
-          <textarea name="responsibilities" value={formData.responsibilities} onChange={handleChange} placeholder="Responsibilities" className="border rounded p-2 text-sm w-full resize-none" rows={3} />
-          <textarea name="requirements" value={formData.requirements} onChange={handleChange} placeholder="Requirements" className="border rounded p-2 text-sm w-full resize-none" rows={3} />
-          <textarea name="educational_qualification" value={formData.educational_qualification} onChange={handleChange} placeholder="Qualification" className="border rounded p-2 text-sm w-full resize-none" rows={3} />
-          <input name="location" value={formData.location} onChange={handleChange} placeholder="Location" className="border rounded p-2 text-sm w-full" />
-          <div className="flex gap-2">
-            <input name="min_price" value={formData.min_price} onChange={handleChange} placeholder="Min Price" type="number" className="border rounded p-2 text-sm w-1/2" />
-            <input name="max_price" value={formData.max_price} onChange={handleChange} placeholder="Max Price" type="number" className="border rounded p-2 text-sm w-1/2" />
+          {/* Job Title - Required */}
+          <div>
+            <label className="text-xs font-medium text-gray-700 mb-1 block">
+              Job Title <span className="text-red-500">*</span>
+            </label>
+            <input 
+              name="title" 
+              value={formData.title} 
+              onChange={handleChange} 
+              placeholder="e.g., Senior Developer" 
+              required
+              className="border border-gray-300 rounded-lg p-2.5 text-sm w-full focus:ring-2 focus:ring-orange-500 focus:border-transparent transition"
+            />
           </div>
-          <input name="price_frequency" value={formData.price_frequency} onChange={handleChange} placeholder="Price Frequency (e.g., monthly)" className="border rounded p-2 text-sm w-full" />
 
-          <button onClick={handleSave} disabled={loading} className="bg-black text-white px-4 py-2 rounded hover:bg-orange-500 transition mt-2">
-            {loading ? 'Saving...' : 'Save'}
-          </button>
+          {/* Category & Type */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label className="text-xs font-medium text-gray-700 mb-1 block">Category</label>
+              <input 
+                name="category" 
+                value={formData.category} 
+                onChange={handleChange} 
+                placeholder="e.g., Tech, Design" 
+                className="border border-gray-300 rounded-lg p-2.5 text-sm w-full focus:ring-2 focus:ring-orange-500 focus:border-transparent transition"
+              />
+            </div>
+            <div>
+              <label className="text-xs font-medium text-gray-700 mb-1 block">Type</label>
+              <input 
+                name="type" 
+                value={formData.type} 
+                onChange={handleChange} 
+                placeholder="e.g., Full-time, Freelance" 
+                className="border border-gray-300 rounded-lg p-2.5 text-sm w-full focus:ring-2 focus:ring-orange-500 focus:border-transparent transition"
+              />
+            </div>
+          </div>
+
+          {/* Location */}
+          <div>
+            <label className="text-xs font-medium text-gray-700 mb-1 block">Location</label>
+            <input 
+              name="location" 
+              value={formData.location} 
+              onChange={handleChange} 
+              placeholder="e.g., Lagos, Remote" 
+              className="border border-gray-300 rounded-lg p-2.5 text-sm w-full focus:ring-2 focus:ring-orange-500 focus:border-transparent transition"
+            />
+          </div>
+
+          {/* Description */}
+          <div>
+            <label className="text-xs font-medium text-gray-700 mb-1 block">Description</label>
+            <textarea 
+              name="description" 
+              value={formData.description} 
+              onChange={handleChange} 
+              placeholder="Describe the role..." 
+              rows={3}
+              className="border border-gray-300 rounded-lg p-2.5 text-sm w-full resize-none focus:ring-2 focus:ring-orange-500 focus:border-transparent transition"
+            />
+          </div>
+
+          {/* Salary Range Toggle */}
+          <div className="bg-gray-50 p-3 rounded-lg border border-gray-200">
+            <label className="flex items-center gap-3 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={showPriceFields}
+                onChange={(e) => setShowPriceFields(e.target.checked)}
+                className="w-4 h-4 text-orange-500 focus:ring-2 focus:ring-orange-500 rounded"
+              />
+              <div>
+                <span className="text-sm font-medium text-gray-800">Add salary range for this job?</span>
+                <p className="text-xs text-gray-500 mt-0.5">
+                  If enabled, applicants will see the salary range.
+                </p>
+              </div>
+            </label>
+          </div>
+
+          {/* Conditional Price Fields */}
+          {showPriceFields && (
+            <div className="border border-gray-200 rounded-lg p-3 bg-white space-y-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="text-xs font-medium text-gray-700 mb-1 block">Min Price (₦)</label>
+                  <input
+                    type="number"
+                    name="min_price"
+                    value={formData.min_price}
+                    onChange={handleChange}
+                    placeholder="50000"
+                    className="border border-gray-300 rounded-lg p-2.5 text-sm w-full focus:ring-2 focus:ring-orange-500 focus:border-transparent transition"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs font-medium text-gray-700 mb-1 block">Max Price (₦)</label>
+                  <input
+                    type="number"
+                    name="max_price"
+                    value={formData.max_price}
+                    onChange={handleChange}
+                    placeholder="150000"
+                    className="border border-gray-300 rounded-lg p-2.5 text-sm w-full focus:ring-2 focus:ring-orange-500 focus:border-transparent transition"
+                  />
+                </div>
+              </div>
+              <div>
+                <label className="text-xs font-medium text-gray-700 mb-1 block">Price Frequency</label>
+                <select
+                  name="price_frequency"
+                  value={formData.price_frequency}
+                  onChange={handleChange}
+                  className="border border-gray-300 rounded-lg p-2.5 text-sm w-full focus:ring-2 focus:ring-orange-500 focus:border-transparent transition"
+                >
+                  <option value="">Select frequency</option>
+                  <option value="Per Job">Per Job</option>
+                  <option value="One-Time">One-Time</option>
+                  <option value="Daily">Daily</option>
+                  <option value="Weekly">Weekly</option>
+                  <option value="Monthly">Monthly</option>
+                </select>
+              </div>
+            </div>
+          )}
+
+          {/* Cover Letter Requirement */}
+          <div className="bg-gray-50 p-3 rounded-lg border border-gray-200">
+            <label className="flex items-start gap-3 cursor-pointer">
+              <input
+                type="checkbox"
+                name="cover_letter_visibility"
+                checked={formData.cover_letter_visibility || false}
+                onChange={handleChange}
+                className="mt-1 w-4 h-4 text-orange-500 focus:ring-2 focus:ring-orange-500 rounded"
+              />
+              <div>
+                <span className="text-sm font-medium text-gray-800">Require cover letter from applicants?</span>
+                <p className="text-xs text-gray-500 mt-0.5">
+                  If enabled, applicants must submit a cover letter when applying.
+                </p>
+              </div>
+            </label>
+          </div>
+
+          {/* Application Deadline - Optional */}
+          <div>
+            <label className="text-xs font-medium text-gray-700 mb-1 block">
+              Application Deadline <span className="text-gray-400 text-xs">(Optional)</span>
+            </label>
+            <input 
+              name="application_deadline" 
+              type="date" 
+              value={formData.application_deadline} 
+              onChange={handleChange} 
+              className="border border-gray-300 rounded-lg p-2.5 text-sm w-full focus:ring-2 focus:ring-orange-500 focus:border-transparent transition"
+            />
+          </div>
+
+          {/* Responsibilities */}
+          <div>
+            <label className="text-xs font-medium text-gray-700 mb-1 block">Responsibilities</label>
+            <textarea 
+              name="responsibilities" 
+              value={formData.responsibilities} 
+              onChange={handleChange} 
+              placeholder="List key responsibilities..." 
+              rows={2}
+              className="border border-gray-300 rounded-lg p-2.5 text-sm w-full resize-none focus:ring-2 focus:ring-orange-500 focus:border-transparent transition"
+            />
+          </div>
+
+          {/* Requirements */}
+          <div>
+            <label className="text-xs font-medium text-gray-700 mb-1 block">Requirements</label>
+            <textarea 
+              name="requirements" 
+              value={formData.requirements} 
+              onChange={handleChange} 
+              placeholder="List requirements..." 
+              rows={2}
+              className="border border-gray-300 rounded-lg p-2.5 text-sm w-full resize-none focus:ring-2 focus:ring-orange-500 focus:border-transparent transition"
+            />
+          </div>
+
+          {/* Educational Qualification */}
+          <div>
+            <label className="text-xs font-medium text-gray-700 mb-1 block">Educational Qualification</label>
+            <textarea 
+              name="educational_qualification" 
+              value={formData.educational_qualification} 
+              onChange={handleChange} 
+              placeholder="e.g., B.Sc. in Computer Science" 
+              rows={2}
+              className="border border-gray-300 rounded-lg p-2.5 text-sm w-full resize-none focus:ring-2 focus:ring-orange-500 focus:border-transparent transition"
+            />
+          </div>
+
+          {/* Tags */}
+          <div>
+            <label className="text-xs font-medium text-gray-700 mb-1 block">Tags (comma-separated)</label>
+            <input 
+              name="tags" 
+              value={formData.tags} 
+              onChange={handleChange} 
+              placeholder="e.g., react, frontend, javascript" 
+              className="border border-gray-300 rounded-lg p-2.5 text-sm w-full focus:ring-2 focus:ring-orange-500 focus:border-transparent transition"
+            />
+          </div>
+
+          {/* Save Button */}
+          <div className="flex gap-3 mt-4">
+            <button 
+              onClick={handleSave} 
+              disabled={loading || !formData.title} 
+              className="flex-1 bg-black text-white px-4 py-2.5 rounded-lg hover:bg-orange-500 transition font-medium text-sm flex items-center justify-center gap-2 disabled:bg-gray-400 disabled:cursor-not-allowed"
+            >
+              {loading ? (
+                <>
+                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                  Saving...
+                </>
+              ) : (
+                <>
+                  <Save size={16} />
+                  Save Changes
+                </>
+              )}
+            </button>
+            <button 
+              onClick={handleCancel} 
+              className="flex-1 border border-gray-300 text-gray-700 px-4 py-2.5 rounded-lg hover:bg-gray-50 transition font-medium text-sm"
+            >
+              Cancel
+            </button>
+          </div>
         </div>
       ) : (
         <>
@@ -217,9 +489,22 @@ export default function JobListCard({ job, onDelete, onUpdate }) {
           </div>
 
           <div className="text-sm text-gray-700 line-clamp-2">{job?.description || 'No job description available.'}</div>
+          
+          {/* Salary Display */}
           <div className="text-sm text-gray-500">
-            ₦{job?.min_price?.toLocaleString()} - ₦{job?.max_price?.toLocaleString()} ({job?.price_frequency || 'one-time'})
+            {getSalaryDisplay()}
+            {job?.salary_range_visibility !== false && getSalaryFrequency() && (
+              <> ({getSalaryFrequency()})</>
+            )}
           </div>
+
+          {/* Cover Letter Requirement Indicator */}
+          {job?.cover_letter_visibility && (
+            <div className="text-xs text-blue-600 flex items-center gap-1">
+              <Mail size={12} />
+              <span>Cover letter required</span>
+            </div>
+          )}
 
           <div className="text-sm text-gray-600">Applicants: {applicantsCount}</div>
 
@@ -288,28 +573,47 @@ export default function JobListCard({ job, onDelete, onUpdate }) {
                 <div className="bg-gray-50 rounded-xl p-3 sm:p-4">
                   <div className="flex items-center gap-2 mb-2">
                     <DollarSign className="text-green-600" size={18} />
-                    <h3 className="font-semibold text-gray-900 text-sm sm:text-base">Salary Range</h3>
+                    <h3 className="font-semibold text-gray-900 text-sm sm:text-base">Salary</h3>
                   </div>
                   <p className="text-base sm:text-lg font-bold text-gray-900">
-                    ₦{job.min_price?.toLocaleString()} - ₦{job.max_price?.toLocaleString()}
+                    {getSalaryDisplay()}
                   </p>
-                  <p className="text-xs sm:text-sm text-gray-600 capitalize">{job.price_frequency || 'one-time'}</p>
+                  {job?.salary_range_visibility !== false && job?.price_frequency && (
+                    <p className="text-xs sm:text-sm text-gray-600 capitalize">{job.price_frequency}</p>
+                  )}
+                  {job?.salary_range_visibility === false && (
+                    <p className="text-xs sm:text-sm text-gray-600">Salary not disclosed</p>
+                  )}
                 </div>
 
                 {/* Deadline */}
-                <div className="bg-gray-50 rounded-xl p-3 sm:p-4">
-                  <div className="flex items-center gap-2 mb-2">
-                    <Calendar className={isDeadlinePassed(job.application_deadline) ? "text-red-600" : "text-blue-600"} size={18} />
-                    <h3 className="font-semibold text-gray-900 text-sm sm:text-base">Application Deadline</h3>
+                {job.application_deadline && (
+                  <div className="bg-gray-50 rounded-xl p-3 sm:p-4">
+                    <div className="flex items-center gap-2 mb-2">
+                      <Calendar className={isDeadlinePassed(job.application_deadline) ? "text-red-600" : "text-blue-600"} size={18} />
+                      <h3 className="font-semibold text-gray-900 text-sm sm:text-base">Application Deadline</h3>
+                    </div>
+                    <p className={`text-base sm:text-lg font-bold ${isDeadlinePassed(job.application_deadline) ? 'text-red-600' : 'text-gray-900'}`}>
+                      {formatDate(job.application_deadline)}
+                    </p>
+                    {isDeadlinePassed(job.application_deadline) && (
+                      <p className="text-xs sm:text-sm text-red-600 font-medium">Deadline Passed</p>
+                    )}
                   </div>
-                  <p className={`text-base sm:text-lg font-bold ${isDeadlinePassed(job.application_deadline) ? 'text-red-600' : 'text-gray-900'}`}>
-                    {formatDate(job.application_deadline)}
-                  </p>
-                  {isDeadlinePassed(job.application_deadline) && (
-                    <p className="text-xs sm:text-sm text-red-600 font-medium">Deadline Passed</p>
-                  )}
-                </div>
+                )}
               </div>
+
+              {/* Cover Letter Requirement */}
+              {job?.cover_letter_visibility && (
+                <div className="bg-blue-50 rounded-xl p-3 sm:p-4 border border-blue-200">
+                  <div className="flex items-center gap-2">
+                    <Mail size={18} className="text-blue-600" />
+                    <span className="text-sm sm:text-base text-blue-800 font-medium">
+                      Cover letter is required for this position
+                    </span>
+                  </div>
+                </div>
+              )}
 
               {/* Job Description */}
               <div>
