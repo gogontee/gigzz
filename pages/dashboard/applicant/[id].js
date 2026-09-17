@@ -9,7 +9,19 @@ import Profile from '../../../components/Profile';
 import Application from '../../../components/Application';
 import Settings from '../../../components/Settings';
 import Wallet from '../../../components/WalletComponent';
-import { Briefcase, Coins, Layers, Bell, MessageSquare, Pencil, X, Star, Edit3, TrendingUp } from 'lucide-react';
+import Notification from '../../../components/Notification';
+import {
+  Briefcase,
+  Coins,
+  Layers,
+  MessageSquare,
+  Pencil,
+  X,
+  Star,
+  Edit3,
+  TrendingUp,
+  Bell,
+} from 'lucide-react';
 import useUnreadMessages from '../../../hooks/useUnreadMessages';
 import ProfilePromotion from '../../../components/ProfilePromotion';
 
@@ -19,11 +31,15 @@ export default function ApplicantDashboard() {
   const [applicationsCount, setApplicationsCount] = useState(0);
   const [tokens, setTokens] = useState(0);
   const [projectsCount, setProjectsCount] = useState(0);
-  const [unreadCountNotifications, setUnreadCountNotifications] = useState(0);
   const [showProfilePopup, setShowProfilePopup] = useState(false);
   const [showPromotionPopup, setShowPromotionPopup] = useState(false);
   const [hasSeenProfilePopup, setHasSeenProfilePopup] = useState(false);
   const [hasCompletedProfile, setHasCompletedProfile] = useState(false);
+
+  // 🔔 Notifications
+  const [showNotifications, setShowNotifications] = useState(false);
+  const [unreadCountNotifications, setUnreadCountNotifications] = useState(0);
+
   const fileInputRef = useRef(null);
 
   const unreadMessagesCount = useUnreadMessages();
@@ -34,14 +50,12 @@ export default function ApplicantDashboard() {
       const { data: userData } = await supabase.auth.getUser();
       if (!userData?.user) return;
 
-      // Check if user has seen the profile popup before
       const seenProfilePopup = localStorage.getItem(`hasSeenProfilePopup_${userData.user.id}`);
       const profileCompleted = localStorage.getItem(`hasCompletedProfile_${userData.user.id}`);
-      
+
       setHasSeenProfilePopup(!!seenProfilePopup);
       setHasCompletedProfile(!!profileCompleted);
 
-      // If user hasn't seen popup and hasn't completed profile, show it
       if (!seenProfilePopup && !profileCompleted) {
         setTimeout(() => {
           setShowProfilePopup(true);
@@ -50,6 +64,57 @@ export default function ApplicantDashboard() {
     };
 
     checkUserStatus();
+  }, []);
+
+  // 🔔 Fetch unread notification count + subscribe to realtime
+  useEffect(() => {
+    let mounted = true;
+    let channel = null;
+
+    const init = async () => {
+      const { data: userData } = await supabase.auth.getUser();
+      if (!userData?.user) return;
+
+      const userId = userData.user.id;
+
+      // Initial count
+      const { count } = await supabase
+        .from('notifications')
+        .select('*', { count: 'exact', head: true })
+        .eq('user_id', userId)
+        .eq('is_read', false);
+
+      if (mounted) setUnreadCountNotifications(count || 0);
+
+      // Realtime subscription — keep the badge fresh no matter what
+      channel = supabase
+        .channel(`applicant-notif-${userId}`)
+        .on(
+          'postgres_changes',
+          {
+            event: '*',
+            schema: 'public',
+            table: 'notifications',
+            filter: `user_id=eq.${userId}`,
+          },
+          async () => {
+            const { count: freshCount } = await supabase
+              .from('notifications')
+              .select('*', { count: 'exact', head: true })
+              .eq('user_id', userId)
+              .eq('is_read', false);
+            if (mounted) setUnreadCountNotifications(freshCount || 0);
+          }
+        )
+        .subscribe();
+    };
+
+    init();
+
+    return () => {
+      mounted = false;
+      if (channel) supabase.removeChannel(channel);
+    };
   }, []);
 
   // Fetch profile and stats
@@ -86,11 +151,10 @@ export default function ApplicantDashboard() {
     setApplicationsCount(applicationsCount || 0);
     setProjectsCount(projectsCount || 0);
 
-    // Check if profile is completed (has basic info filled)
     if (profileData) {
       const isProfileComplete = profileData.full_name && profileData.bio && profileData.skills;
       setHasCompletedProfile(isProfileComplete);
-      
+
       if (isProfileComplete) {
         localStorage.setItem(`hasCompletedProfile_${userId}`, 'true');
       }
@@ -99,25 +163,6 @@ export default function ApplicantDashboard() {
 
   useEffect(() => {
     fetchProfile();
-  }, []);
-
-  // Fetch notifications count
-  useEffect(() => {
-    const fetchNotifications = async () => {
-      const { data: userData } = await supabase.auth.getUser();
-      if (!userData?.user) return;
-
-      const { data, error } = await supabase
-        .from('notifications')
-        .select('*')
-        .or(`user_id.eq.${userData.user.id},user_id.is.null`)
-        .order('created_at', { ascending: false });
-
-      if (error) console.error(error);
-      else setUnreadCountNotifications(data.filter((n) => !n.is_read).length);
-    };
-
-    fetchNotifications();
   }, []);
 
   const handleAvatarChange = async (e) => {
@@ -154,8 +199,7 @@ export default function ApplicantDashboard() {
     if (userId) {
       localStorage.setItem(`hasSeenProfilePopup_${userId}`, 'true');
       setShowProfilePopup(false);
-      
-      // Show promotion popup after a delay if profile is completed
+
       setTimeout(() => {
         if (hasCompletedProfile) {
           setShowPromotionPopup(true);
@@ -166,6 +210,22 @@ export default function ApplicantDashboard() {
 
   const handleClosePromotionPopup = () => {
     setShowPromotionPopup(false);
+  };
+
+  // 🔔 Recount unread when modal closes (in case user marked things as read inside)
+  const handleCloseNotifications = async () => {
+    setShowNotifications(false);
+
+    const { data: userData } = await supabase.auth.getUser();
+    if (!userData?.user) return;
+
+    const { count } = await supabase
+      .from('notifications')
+      .select('*', { count: 'exact', head: true })
+      .eq('user_id', userData.user.id)
+      .eq('is_read', false);
+
+    setUnreadCountNotifications(count || 0);
   };
 
   return (
@@ -198,7 +258,7 @@ export default function ApplicantDashboard() {
                   <p className="text-sm text-gray-600">Let clients know more about you</p>
                 </div>
               </div>
-              
+
               <div className="space-y-3 mb-6">
                 <div className="flex items-center gap-3 text-sm text-gray-700">
                   <div className="w-6 h-6 bg-green-100 rounded-full flex items-center justify-center flex-shrink-0">
@@ -228,7 +288,7 @@ export default function ApplicantDashboard() {
                   Edit Profile Now
                 </button>
               </div>
-              
+
               <p className="text-xs text-gray-500 text-center mt-3">
                 Complete your profile to increase your chances of getting hired
               </p>
@@ -269,7 +329,7 @@ export default function ApplicantDashboard() {
                   <X className="w-5 h-5 text-gray-500" />
                 </button>
               </div>
-              
+
               <div className="space-y-4 mb-6">
                 <div className="flex items-start gap-3">
                   <Star className="w-5 h-5 text-yellow-500 mt-0.5 flex-shrink-0" />
@@ -278,7 +338,7 @@ export default function ApplicantDashboard() {
                     <p className="text-xs text-gray-600">Your profile appears on the main spotlight page</p>
                   </div>
                 </div>
-                
+
                 <div className="flex items-start gap-3">
                   <TrendingUp className="w-5 h-5 text-green-500 mt-0.5 flex-shrink-0" />
                   <div>
@@ -286,7 +346,7 @@ export default function ApplicantDashboard() {
                     <p className="text-xs text-gray-600">Appear at the top of client searches</p>
                   </div>
                 </div>
-                
+
                 <div className="flex items-start gap-3">
                   <Briefcase className="w-5 h-5 text-blue-500 mt-0.5 flex-shrink-0" />
                   <div>
@@ -333,14 +393,19 @@ export default function ApplicantDashboard() {
                 )}
               </a>
 
-              <a href="/dashboard/applicant/notifications" title="Notifications" className="relative">
-                <Bell className="w-6 h-6 text-gray-700 hover:text-orange-600" />
+              {/* 🔔 Notification bell */}
+              <button
+                onClick={() => setShowNotifications(true)}
+                title="Notifications"
+                className="relative"
+              >
+                <Bell className="w-6 h-6 text-gray-700 hover:text-orange-600 transition-colors" />
                 {unreadCountNotifications > 0 && (
-                  <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs w-4 h-4 flex items-center justify-center rounded-full">
-                    {unreadCountNotifications}
+                  <span className="absolute -top-1 -right-1 bg-orange-500 text-white text-[10px] min-w-[16px] h-4 px-1 flex items-center justify-center rounded-full font-bold">
+                    {unreadCountNotifications > 9 ? '9+' : unreadCountNotifications}
                   </span>
                 )}
-              </a>
+              </button>
 
               <div className="relative group">
                 <img
@@ -365,7 +430,7 @@ export default function ApplicantDashboard() {
             </div>
           </div>
 
-          {/* Stats - Updated for mobile responsiveness with smaller size */}
+          {/* Stats */}
           <div className="grid grid-cols-3 gap-1 md:gap-4">
             <MobileStatCard icon={<Coins className="text-orange-500 w-4 h-4 md:w-5 md:h-5" />} label="Tokens" value={tokens} />
             <MobileStatCard icon={<Briefcase className="text-orange-500 w-4 h-4 md:w-5 md:h-5" />} label="Apps" value={applicationsCount} />
@@ -374,12 +439,10 @@ export default function ApplicantDashboard() {
 
           {/* Promote Profile & Edit Profile Buttons */}
           <div className="flex flex-wrap gap-4 mt-6">
-            {/* Promote Profile */}
             {profile && (
               <ProfilePromotion profile={profile} refreshProfile={fetchProfile} />
             )}
 
-            {/* Edit Profile */}
             <a
               href="/dashboard/applicant/edit"
               className="mt-6 px-6 py-3 bg-orange-500 text-white rounded-xl shadow hover:bg-orange-600 transition"
@@ -409,11 +472,21 @@ export default function ApplicantDashboard() {
           <Wallet balance={tokens} refreshBalance={fetchProfile} />
         </div>
       )}
+
+      {/* 🔔 Notification modal */}
+      <AnimatePresence>
+        {showNotifications && profile?.id && (
+          <Notification
+            isOpen={showNotifications}
+            onClose={handleCloseNotifications}
+            userId={profile.id}
+          />
+        )}
+      </AnimatePresence>
     </ApplicantLayout>
   );
 }
 
-// New MobileStatCard for mobile screens - Much smaller
 function MobileStatCard({ icon, label, value }) {
   return (
     <div className="flex flex-col items-center justify-center bg-gray-100 p-2 md:p-3 rounded-lg md:rounded-xl shadow-sm text-center min-h-[80px] md:min-h-[100px]">

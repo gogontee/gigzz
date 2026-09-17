@@ -1,109 +1,178 @@
 // components/Settings.js
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { createPagesBrowserClient } from "@supabase/auth-helpers-nextjs";
 import { useRouter } from 'next/router';
-import { CheckCircle, X, Briefcase, RefreshCw } from 'lucide-react';
+import {
+  CheckCircle,
+  X,
+  Briefcase,
+  RefreshCw,
+  User,
+  ShieldCheck,
+  Camera,
+  Upload,
+  Loader2,
+} from 'lucide-react';
 
 const supabase = createPagesBrowserClient();
 
+const FALLBACK_AVATAR =
+  'https://xatxjdsppcjgplmrtjcs.supabase.co/storage/v1/object/public/avatars/icon.png';
+
 export default function Settings() {
-  const [profile, setProfile] = useState(null);
+  const router = useRouter();
+  const fileInputRef = useRef(null);
+
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [uploadingAvatar, setUploadingAvatar] = useState(false);
+
+  // Profile fields
+  const [profile, setProfile] = useState(null);
   const [fullName, setFullName] = useState('');
   const [phone, setPhone] = useState('');
   const [bio, setBio] = useState('');
+  const [company, setCompany] = useState('');
+  const [avatarUrl, setAvatarUrl] = useState('');
   const [showBioPreview, setShowBioPreview] = useState(false);
-  const router = useRouter();
 
-  // New states for account switching
-  const [showSwitchConfirm, setShowSwitchConfirm] = useState(false);
-  const [showPasswordConfirm, setShowPasswordConfirm] = useState(false);
-  const [password, setPassword] = useState('');
-  const [switchLoading, setSwitchLoading] = useState(false);
+  // Role switching
+  const [currentRole, setCurrentRole] = useState(null);     // active_role
+  const [primaryRole, setPrimaryRole] = useState(null);     // users.role
+  const [availableRoles, setAvailableRoles] = useState([]); // from user_roles
+  const [switching, setSwitching] = useState(false);
+  const [switchMessage, setSwitchMessage] = useState('');
   const [switchError, setSwitchError] = useState('');
-  const [switchSuccess, setSwitchSuccess] = useState('');
 
-  // Function to convert HTML to plain text
-  const htmlToPlainText = (html) => {
-    if (!html) return '';
-    
-    // Create a temporary div element
-    const tempDiv = document.createElement('div');
-    tempDiv.innerHTML = html;
-    
-    // Get the text content, which will be plain text
-    return tempDiv.textContent || tempDiv.innerText || '';
-  };
+  // 🔔 Avatar feedback
+  const [avatarMsg, setAvatarMsg] = useState('');
+  const [avatarErr, setAvatarErr] = useState('');
 
-  // Function to convert plain text to formatted display (with line breaks)
-  const formatPlainText = (text) => {
-    if (!text) return '';
-    
-    // Convert line breaks to <br> tags and preserve paragraphs
-    return text.split('\n\n').map(paragraph => 
-      paragraph.split('\n').join('<br>')
-    ).join('</p><p>');
-  };
-
-  // Fetch applicant profile
+  /* ---------------- Load data ---------------- */
   useEffect(() => {
-    const fetchProfile = async () => {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
+    const load = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        setLoading(false);
+        return;
+      }
 
-      if (user) {
-        const { data, error } = await supabase
-          .from('applicants')
-          .select('id, full_name, phone, bio')
+      // 1. users row
+      const { data: userRow } = await supabase
+        .from('users')
+        .select('role, active_role')
+        .eq('id', user.id)
+        .maybeSingle();
+
+      const active = userRow?.active_role || userRow?.role || 'applicant';
+      setCurrentRole(active);
+      setPrimaryRole(userRow?.role || 'applicant');
+
+      // 2. roles this user has enabled
+      const { data: roleRows } = await supabase
+        .from('user_roles')
+        .select('role')
+        .eq('user_id', user.id);
+
+      const roles = (roleRows || []).map((r) => r.role);
+      setAvailableRoles(roles);
+
+      // 3. Profile data — depends on current role
+      if (active === 'employer') {
+        const { data: employerData } = await supabase
+          .from('employers')
+          .select('id, name, company, avatar_url')
           .eq('id', user.id)
-          .single();
+          .maybeSingle();
 
-        if (!error && data) {
-          setProfile(data);
-          setFullName(data.full_name || '');
-          setPhone(data.phone || '');
-          // Convert any existing HTML bio to plain text
-          setBio(htmlToPlainText(data.bio || ''));
+        if (employerData) {
+          setProfile(employerData);
+          setFullName(employerData.name || '');
+          setCompany(employerData.company || '');
+          setAvatarUrl(employerData.avatar_url || '');
+        }
+      } else {
+        // applicant (default)
+        const { data: applicantData } = await supabase
+          .from('applicants')
+          .select('id, full_name, phone, bio, avatar_url')
+          .eq('id', user.id)
+          .maybeSingle();
+
+        if (applicantData) {
+          setProfile(applicantData);
+          setFullName(applicantData.full_name || '');
+          setPhone(applicantData.phone || '');
+          setBio(htmlToPlainText(applicantData.bio || ''));
+          setAvatarUrl(applicantData.avatar_url || '');
         }
       }
+
       setLoading(false);
     };
 
-    fetchProfile();
+    load();
   }, []);
 
-  // Update applicant profile
+  /* ---------------- Bio helpers ---------------- */
+  const htmlToPlainText = (html) => {
+    if (!html) return '';
+    if (typeof document === 'undefined') return html;
+    const div = document.createElement('div');
+    div.innerHTML = html;
+    return div.textContent || div.innerText || '';
+  };
+
+  const formatPlainText = (text) => {
+    if (!text) return '';
+    return text
+      .split('\n\n')
+      .map((p) => p.split('\n').join('<br>'))
+      .join('</p><p>');
+  };
+
+  /* ---------------- Save profile ---------------- */
   const handleProfileUpdate = async (e) => {
     e.preventDefault();
     setSaving(true);
 
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-
+    const { data: { user } } = await supabase.auth.getUser();
     if (!user) {
       alert('User not found.');
       setSaving(false);
       return;
     }
 
-    // Convert plain text bio to simple HTML with paragraphs and line breaks
-    const formattedBio = bio ? `<p>${formatPlainText(bio)}</p>` : '';
+    // Build update object based on active role
+    let table;
+    let updates;
 
-    const updates = {
-      id: user.id, // applicants.id = users.id
-      full_name: fullName,
-      phone,
-      bio: formattedBio,
-      updated_at: new Date(),
-    };
+    if (currentRole === 'employer') {
+      table = 'employers';
+      updates = {
+        id: user.id,
+        name: fullName,
+        company,
+        avatar_url: avatarUrl || null,
+        updated_at: new Date(),
+      };
+    } else {
+      table = 'applicants';
+      const formattedBio = bio ? `<p>${formatPlainText(bio)}</p>` : '';
+      updates = {
+        id: user.id,
+        full_name: fullName,
+        phone,
+        bio: formattedBio,
+        avatar_url: avatarUrl || null,
+        updated_at: new Date(),
+      };
+    }
 
     const { error } = await supabase
-      .from('applicants')
+      .from(table)
       .upsert(updates, { onConflict: 'id' });
 
     if (error) {
@@ -116,388 +185,402 @@ export default function Settings() {
     setSaving(false);
   };
 
-  const handleResetPassword = () => {
-    router.push('/auth/reset');
-  };
+  /* ---------------- Avatar upload ---------------- */
+  const handleAvatarChange = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
 
-  // Handle switch to employer account
-  const handleSwitchToEmployer = () => {
-    setShowSwitchConfirm(true);
-  };
-
-  const confirmSwitch = () => {
-    setShowSwitchConfirm(false);
-    setShowPasswordConfirm(true);
-  };
-
-  const cancelSwitch = () => {
-    setShowSwitchConfirm(false);
-    setShowPasswordConfirm(false);
-    setPassword('');
-    setSwitchError('');
-    setSwitchSuccess('');
-  };
-
-  const verifyPasswordAndSwitch = async () => {
-    if (!password.trim()) {
-      setSwitchError('Please enter your password');
+    // Validate file type
+    const ALLOWED = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
+    if (!ALLOWED.includes(file.type)) {
+      setAvatarErr('Only JPG, PNG, or WEBP allowed.');
+      setAvatarMsg('');
       return;
     }
 
-    setSwitchLoading(true);
-    setSwitchError('');
-    setSwitchSuccess('');
+    // Validate size — 5 MB max
+    if (file.size > 5 * 1024 * 1024) {
+      setAvatarErr('Image must be under 5 MB.');
+      setAvatarMsg('');
+      return;
+    }
+
+    setUploadingAvatar(true);
+    setAvatarErr('');
+    setAvatarMsg('');
 
     try {
-      // First, get the current user's email
-      const { data: { user }, error: userError } = await supabase.auth.getUser();
-      
-      if (userError || !user) {
-        setSwitchError('Unable to get user information. Please try again.');
-        setSwitchLoading(false);
-        return;
-      }
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('No user found');
 
-      const userEmail = user.email;
+      const ext = file.name.split('.').pop();
+      const path = `avatars/${user.id}-${Date.now()}.${ext}`;
 
-      // Verify the password by signing in
-      const { error: signInError } = await supabase.auth.signInWithPassword({
-        email: userEmail,
-        password: password,
-      });
+      // Upload
+      const { error: uploadError } = await supabase.storage
+        .from('avatars')
+        .upload(path, file, { upsert: true, contentType: file.type });
 
-      if (signInError) {
-        setSwitchError('Invalid password. Please try again.');
-        setSwitchLoading(false);
-        return;
-      }
+      if (uploadError) throw uploadError;
 
-      // Update user role to employer in the users table
-      let roleUpdateSuccessful = false;
-      
-      // Try updating users table first
-      const { error: usersUpdateError } = await supabase
-        .from('users')
-        .update({ role: 'employer' })
+      // Get public URL
+      const { data: urlData } = supabase.storage
+        .from('avatars')
+        .getPublicUrl(path);
+
+      const publicUrl = urlData.publicUrl;
+
+      // Save to the active role's table
+      const table = currentRole === 'employer' ? 'employers' : 'applicants';
+      const { error: updateError } = await supabase
+        .from(table)
+        .update({ avatar_url: publicUrl })
         .eq('id', user.id);
 
-      if (!usersUpdateError) {
-        roleUpdateSuccessful = true;
-      } else {
-        console.error('Users table update error:', usersUpdateError);
-        
-        // Try updating profiles table as fallback
-        const { error: profilesUpdateError } = await supabase
-          .from('profiles')
-          .update({ role: 'employer' })
-          .eq('id', user.id);
-          
-        if (!profilesUpdateError) {
-          roleUpdateSuccessful = true;
-        } else {
-          console.error('Profiles table update error:', profilesUpdateError);
-          
-          // Try creating an employer record in the employers table
-          const { error: createEmployerError } = await supabase
-            .from('employers')
-            .upsert({
-              id: user.id,
-              user_id: user.id,
-              name: fullName || user.email?.split('@')[0] || 'Employer',
-              email: userEmail,
-              phone: phone || '',
-              created_at: new Date().toISOString(),
-              updated_at: new Date().toISOString()
-            }, { onConflict: 'id' });
-            
-          if (!createEmployerError) {
-            roleUpdateSuccessful = true;
-          }
-        }
-      }
+      if (updateError) throw updateError;
 
-      if (!roleUpdateSuccessful) {
-        setSwitchError('Failed to update account type. Please contact support.');
-        setSwitchLoading(false);
-        return;
-      }
+      // ✅ Also mirror to the OTHER table (so switching keeps the avatar)
+      const otherTable = currentRole === 'employer' ? 'applicants' : 'employers';
+      await supabase
+        .from(otherTable)
+        .update({ avatar_url: publicUrl })
+        .eq('id', user.id);
+      // Silent fail — other row might not exist yet
 
-      // Also update the applicants table to mark this account as switched
-      if (profile?.id) {
-        await supabase
-          .from('applicants')
-          .update({ 
-            account_switched: true,
-            switched_at: new Date().toISOString()
-          })
-          .eq('id', profile.id);
-      }
-
-      // Success - show message and prepare for logout
-      setSwitchLoading(false);
-      setShowPasswordConfirm(false);
-      setPassword('');
-      setSwitchSuccess('Account switched to employer successfully! Signing out...');
-      
-      // Sign out after 2 seconds and redirect to login
-      setTimeout(async () => {
-        await supabase.auth.signOut();
-        router.push('/auth/login?role=employer');
-      }, 2000);
-
+      setAvatarUrl(publicUrl);
+      setAvatarMsg('Avatar updated successfully!');
     } catch (err) {
-      console.error('Switch error:', err);
-      setSwitchError('An unexpected error occurred. Please try again.');
-      setSwitchLoading(false);
+      console.error('Avatar upload failed:', err);
+      setAvatarErr(err.message || 'Upload failed. Please try again.');
+    } finally {
+      setUploadingAvatar(false);
+      // Reset input so the same file can be reselected if needed
+      if (fileInputRef.current) fileInputRef.current.value = '';
     }
+  };
+
+  /* ---------------- Switch role ---------------- */
+  const handleSwitchRole = async (targetRole) => {
+    setSwitching(true);
+    setSwitchError('');
+    setSwitchMessage('');
+
+    const { error } = await supabase.rpc('enable_role', {
+      p_role: targetRole,
+    });
+
+    setSwitching(false);
+
+    if (error) {
+      console.error('Switch error:', error);
+      setSwitchError(error.message || 'Failed to switch account.');
+      return;
+    }
+
+    setSwitchMessage(
+      `Switched to ${targetRole === 'employer' ? 'Employer' : 'Creative'} account. Redirecting…`
+    );
+
+    setTimeout(() => {
+      if (targetRole === 'employer') {
+        router.push('/dashboard/employer');
+      } else {
+        router.push('/dashboard/applicant');
+      }
+    }, 900);
+  };
+
+  const handleResetPassword = () => {
+    router.push('/auth/reset');
   };
 
   if (loading) {
     return <div className="p-10">Loading settings...</div>;
   }
 
+  /* ---------------- Render ---------------- */
+  const otherRole = currentRole === 'employer' ? 'applicant' : 'employer';
+  const otherRoleLabel = otherRole === 'employer' ? 'Employer' : 'Creative';
+  const hasOtherRoleEnabled = availableRoles.includes(otherRole);
+  const isAdmin = currentRole === 'admin' || primaryRole === 'admin';
+  const isEmployer = currentRole === 'employer';
+
   return (
     <div className="max-w-5xl mx-auto px-4 py-10 md:pt-20 md:pb-10">
       <h1 className="text-2xl font-bold mb-6">⚙️ Settings</h1>
 
-      {/* Switch Account Section */}
+      {/* ------------- Role Section ------------- */}
       <div className="bg-white rounded-lg shadow p-6 mb-8">
-        <div className="flex items-center justify-between">
+        <div className="flex items-start justify-between gap-4 flex-wrap">
           <div>
             <h2 className="text-xl font-semibold mb-2">🔄 Account Type</h2>
-            <p className="text-sm text-gray-600 mb-4">You're currently using an Applicant account</p>
+            <p className="text-sm text-gray-600">
+              You're currently using a{' '}
+              <span className="font-semibold text-gray-900">
+                {currentRole === 'employer'
+                  ? 'Employer'
+                  : currentRole === 'admin'
+                  ? 'Admin'
+                  : 'Creative'}
+              </span>{' '}
+              account.
+            </p>
           </div>
-          <button
-            type="button"
-            onClick={handleSwitchToEmployer}
-            className="flex items-center gap-2 bg-blue-50 text-blue-600 hover:bg-blue-100 px-4 py-2 rounded-lg transition"
-          >
-            <Briefcase size={18} />
-            Switch to Employer Account
-          </button>
+
+          {isAdmin ? (
+            <span className="inline-flex items-center gap-2 text-xs font-semibold px-3 py-1.5 rounded-full bg-purple-50 text-purple-700 border border-purple-200">
+              <ShieldCheck size={14} />
+              Admin — role switching disabled
+            </span>
+          ) : (
+            <button
+              type="button"
+              disabled={switching}
+              onClick={() => handleSwitchRole(otherRole)}
+              className="flex items-center gap-2 bg-blue-50 text-blue-600 hover:bg-blue-100 disabled:opacity-50 px-4 py-2 rounded-lg transition"
+            >
+              {otherRole === 'employer' ? (
+                <Briefcase size={18} />
+              ) : (
+                <User size={18} />
+              )}
+              {hasOtherRoleEnabled
+                ? `Switch to ${otherRoleLabel} Account`
+                : `Enable ${otherRoleLabel} Account`}
+            </button>
+          )}
         </div>
+
         <p className="text-sm text-gray-500 mt-3">
-          Switch to an employer account to list jobs and hire candidates.
+          {isAdmin
+            ? 'Admins manage the platform through the admin panel.'
+            : hasOtherRoleEnabled
+            ? `You can freely switch between Creative and Employer mode. Your data stays intact.`
+            : `Enable ${otherRoleLabel} mode to ${
+                otherRole === 'employer'
+                  ? 'list jobs and hire candidates'
+                  : 'apply to jobs and showcase your portfolio'
+              }. You can switch back anytime.`}
         </p>
-        
-        {/* Success Message */}
-        {switchSuccess && (
-          <div className="mt-4 p-3 bg-green-50 border border-green-200 rounded-lg flex items-center gap-2 text-green-700">
+
+        {switchMessage && (
+          <div className="mt-4 p-3 bg-green-50 border border-green-200 rounded-lg flex items-center gap-2 text-green-700 text-sm">
             <CheckCircle size={16} />
-            <span>{switchSuccess}</span>
+            <span>{switchMessage}</span>
+          </div>
+        )}
+        {switchError && (
+          <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded-lg flex items-center gap-2 text-red-700 text-sm">
+            <X size={16} />
+            <span>{switchError}</span>
           </div>
         )}
       </div>
 
-      {/* Switch Confirmation Modal */}
-      {showSwitchConfirm && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl p-6 max-w-md w-full">
-            <h3 className="text-xl font-bold mb-2 flex items-center gap-2">
-              <Briefcase size={20} />
-              Switch to Employer Account?
-            </h3>
-            <p className="text-gray-600 mb-6">
-              This will change your account type to Employer. You'll be able to:
-            </p>
-            <ul className="text-gray-600 mb-6 space-y-2">
-              <li className="flex items-start gap-2">
-                <div className="w-1.5 h-1.5 bg-blue-500 rounded-full mt-2"></div>
-                <span>List job openings and post vacancies</span>
-              </li>
-              <li className="flex items-start gap-2">
-                <div className="w-1.5 h-1.5 bg-blue-500 rounded-full mt-2"></div>
-                <span>Browse and hire job seekers</span>
-              </li>
-              <li className="flex items-start gap-2">
-                <div className="w-1.5 h-1.5 bg-blue-500 rounded-full mt-2"></div>
-                <span>Manage your company profile</span>
-              </li>
-              <li className="flex items-start gap-2">
-                <div className="w-1.5 h-1.5 bg-red-500 rounded-full mt-2"></div>
-                <span>You'll lose applicant-specific features</span>
-              </li>
-            </ul>
-            <p className="text-gray-600 mb-6">
-              You'll need to verify your password to confirm. After switching, you'll be signed out and redirected to login.
-            </p>
-            <div className="flex gap-3 justify-end">
-              <button
-                onClick={cancelSwitch}
-                className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={confirmSwitch}
-                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center gap-2"
-              >
-                Continue
-                <Briefcase size={16} />
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* ------------- Profile Info ------------- */}
+      {profile && (
+        <form
+          onSubmit={handleProfileUpdate}
+          className="bg-white rounded-lg shadow p-6 mb-8"
+        >
+          <h2 className="text-xl font-semibold mb-4">👤 Profile Information</h2>
 
-      {/* Password Confirmation Modal */}
-      {showPasswordConfirm && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl p-6 max-w-md w-full">
-            <h3 className="text-xl font-bold mb-2">Confirm Password</h3>
-            <p className="text-gray-600 mb-4">
-              Please enter your password to confirm account switch to Employer.
-            </p>
-            <p className="text-sm text-gray-500 mb-4 bg-yellow-50 p-2 rounded">
-              Note: You'll be signed out after switching and redirected to login.
-            </p>
-            
-            <div className="mb-6">
-              <label className="block text-sm font-medium mb-2">Password</label>
+          {/* ---------- Avatar Section ---------- */}
+          <div className="flex flex-col items-center gap-3 mb-6">
+            <div className="relative group">
+              <img
+                src={avatarUrl || FALLBACK_AVATAR}
+                alt="Avatar"
+                className="w-24 h-24 rounded-full object-cover border-4 border-gray-100 shadow-sm"
+              />
+
+              {/* Overlay camera button */}
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                disabled={uploadingAvatar}
+                className="absolute inset-0 rounded-full bg-black/40 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity disabled:opacity-100 disabled:bg-black/50"
+                aria-label="Change avatar"
+              >
+                {uploadingAvatar ? (
+                  <Loader2 className="w-6 h-6 animate-spin" />
+                ) : (
+                  <Camera className="w-6 h-6" />
+                )}
+              </button>
+
+              {/* Always-visible small button on mobile / when not hovering */}
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                disabled={uploadingAvatar}
+                className="md:hidden absolute -bottom-1 -right-1 w-8 h-8 rounded-full bg-orange-500 text-white flex items-center justify-center shadow-md hover:bg-orange-600 transition disabled:opacity-50"
+                aria-label="Change avatar"
+              >
+                {uploadingAvatar ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <Upload className="w-4 h-4" />
+                )}
+              </button>
+
               <input
-                type="password"
-                value={password}
-                onChange={(e) => {
-                  setPassword(e.target.value);
-                  setSwitchError('');
-                }}
-                className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                placeholder="Enter your password"
-                autoComplete="current-password"
+                ref={fileInputRef}
+                type="file"
+                accept="image/jpeg,image/jpg,image/png,image/webp"
+                onChange={handleAvatarChange}
+                className="hidden"
               />
-              {switchError && (
-                <p className="text-red-600 text-sm mt-2 flex items-center gap-1">
-                  <X size={14} />
-                  {switchError}
-                </p>
-              )}
             </div>
-            
-            <div className="flex gap-3 justify-end">
-              <button
-                onClick={cancelSwitch}
-                disabled={switchLoading}
-                className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={verifyPasswordAndSwitch}
-                disabled={switchLoading}
-                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 flex items-center gap-2"
-              >
-                {switchLoading ? 'Processing...' : 'Switch to Employer'}
-                {!switchLoading && <RefreshCw size={16} />}
-              </button>
+
+            <div className="text-center">
+              <p className="text-xs text-gray-500">
+                Click avatar to change it
+              </p>
+              <p className="text-[10px] text-gray-400 mt-0.5">
+                JPG, PNG, or WEBP · max 5 MB
+              </p>
             </div>
+
+            {/* Avatar feedback */}
+            {avatarMsg && (
+              <div className="p-2 bg-green-50 border border-green-200 rounded-lg flex items-center gap-2 text-green-700 text-xs">
+                <CheckCircle size={14} />
+                <span>{avatarMsg}</span>
+              </div>
+            )}
+            {avatarErr && (
+              <div className="p-2 bg-red-50 border border-red-200 rounded-lg flex items-center gap-2 text-red-700 text-xs">
+                <X size={14} />
+                <span>{avatarErr}</span>
+              </div>
+            )}
           </div>
-        </div>
+
+          {/* ---------- Name ---------- */}
+          <div className="mb-4">
+            <label className="block text-sm font-medium mb-1">
+              {isEmployer ? 'Your Name' : 'Full Name'}
+            </label>
+            <input
+              type="text"
+              value={fullName}
+              onChange={(e) => setFullName(e.target.value)}
+              className="w-full border rounded px-3 py-2"
+              required
+            />
+          </div>
+
+          {/* ---------- Company (employer only) ---------- */}
+          {isEmployer && (
+            <div className="mb-4">
+              <label className="block text-sm font-medium mb-1">
+                Company Name
+              </label>
+              <input
+                type="text"
+                value={company}
+                onChange={(e) => setCompany(e.target.value)}
+                placeholder="e.g. Bright Studios Ltd."
+                className="w-full border rounded px-3 py-2"
+              />
+              <p className="text-xs text-gray-500 mt-1">
+                Shown on your public employer profile.
+              </p>
+            </div>
+          )}
+
+          {/* ---------- Applicant-only: Phone + Bio ---------- */}
+          {!isEmployer && (
+            <>
+              <div className="mb-4">
+                <label className="block text-sm font-medium mb-1">Phone</label>
+                <input
+                  type="text"
+                  value={phone}
+                  onChange={(e) => setPhone(e.target.value)}
+                  className="w-full border rounded px-3 py-2"
+                />
+              </div>
+
+              <div className="mb-6">
+                <div className="flex items-center justify-between mb-2">
+                  <label className="block text-sm font-medium">Bio</label>
+                  <button
+                    type="button"
+                    onClick={() => setShowBioPreview(!showBioPreview)}
+                    className="text-sm text-orange-600 hover:text-orange-700 font-medium"
+                  >
+                    {showBioPreview ? 'Edit Bio' : 'Preview Bio'}
+                  </button>
+                </div>
+
+                {showBioPreview ? (
+                  <div className="border rounded p-4 bg-gray-50 min-h-[120px]">
+                    {bio ? (
+                      <div
+                        className="text-gray-700 leading-relaxed whitespace-pre-line"
+                        style={{ lineHeight: '1.6' }}
+                      >
+                        {bio}
+                      </div>
+                    ) : (
+                      <p className="text-gray-500 italic">No bio content to preview</p>
+                    )}
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    <textarea
+                      value={bio}
+                      onChange={(e) => setBio(e.target.value)}
+                      className="w-full border rounded px-3 py-2 min-h-[120px]"
+                      rows={6}
+                      placeholder={`Tell others about yourself, your skills, and experience...
+
+Use empty lines to separate paragraphs.
+
+Your bio will appear exactly as you type it here.`}
+                      style={{ whiteSpace: 'pre-wrap' }}
+                    />
+
+                    <div className="bg-blue-50 border border-blue-200 rounded p-3">
+                      <p className="text-sm text-blue-800 font-medium mb-2">Formatting Tips:</p>
+                      <ul className="text-xs text-blue-700 space-y-1">
+                        <li>• Press <strong>Enter</strong> for a new line</li>
+                        <li>• Use <strong>empty lines</strong> between paragraphs</li>
+                        <li>• Your text will appear exactly as you type it</li>
+                        <li>• No special formatting codes needed</li>
+                      </ul>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </>
+          )}
+
+          <div className="flex gap-3">
+            <button
+              type="submit"
+              disabled={saving || uploadingAvatar}
+              className="bg-orange-600 text-white px-6 py-2 rounded hover:bg-orange-700 transition disabled:opacity-50"
+            >
+              {saving ? 'Updating...' : 'Update Profile'}
+            </button>
+
+            {!isEmployer && showBioPreview && (
+              <button
+                type="button"
+                onClick={() => setShowBioPreview(false)}
+                className="bg-gray-500 text-white px-4 py-2 rounded hover:bg-gray-600 transition"
+              >
+                Edit Bio
+              </button>
+            )}
+          </div>
+        </form>
       )}
 
-      {/* Profile Info */}
-      <form
-        onSubmit={handleProfileUpdate}
-        className="bg-white rounded-lg shadow p-6 mb-8"
-      >
-        <h2 className="text-xl font-semibold mb-4">👤 Profile Information</h2>
-
-        <div className="mb-4">
-          <label className="block text-sm font-medium mb-1">Full Name</label>
-          <input
-            type="text"
-            value={fullName}
-            onChange={(e) => setFullName(e.target.value)}
-            className="w-full border rounded px-3 py-2"
-            required
-          />
-        </div>
-
-        <div className="mb-4">
-          <label className="block text-sm font-medium mb-1">Phone</label>
-          <input
-            type="text"
-            value={phone}
-            onChange={(e) => setPhone(e.target.value)}
-            className="w-full border rounded px-3 py-2"
-          />
-        </div>
-
-        <div className="mb-6">
-          <div className="flex items-center justify-between mb-2">
-            <label className="block text-sm font-medium">Bio</label>
-            <button
-              type="button"
-              onClick={() => setShowBioPreview(!showBioPreview)}
-              className="text-sm text-orange-600 hover:text-orange-700 font-medium"
-            >
-              {showBioPreview ? 'Edit Bio' : 'Preview Bio'}
-            </button>
-          </div>
-
-          {showBioPreview ? (
-            <div className="border rounded p-4 bg-gray-50 min-h-[120px]">
-              {bio ? (
-                <div 
-                  className="text-gray-700 leading-relaxed whitespace-pre-line"
-                  style={{ lineHeight: '1.6' }}
-                >
-                  {bio}
-                </div>
-              ) : (
-                <p className="text-gray-500 italic">No bio content to preview</p>
-              )}
-            </div>
-          ) : (
-            <div className="space-y-3">
-              <textarea
-                value={bio}
-                onChange={(e) => setBio(e.target.value)}
-                className="w-full border rounded px-3 py-2 min-h-[120px]"
-                rows={6}
-                placeholder="Tell others about yourself, your skills, and experience...
-                
-Use empty lines to separate paragraphs.
-                
-Your bio will appear exactly as you type it here."
-                style={{ whiteSpace: 'pre-wrap' }}
-              />
-              
-              {/* Formatting Help */}
-              <div className="bg-blue-50 border border-blue-200 rounded p-3">
-                <p className="text-sm text-blue-800 font-medium mb-2">Formatting Tips:</p>
-                <ul className="text-xs text-blue-700 space-y-1">
-                  <li>• Press <strong>Enter</strong> for a new line</li>
-                  <li>• Use <strong>empty lines</strong> between paragraphs</li>
-                  <li>• Your text will appear exactly as you type it</li>
-                  <li>• No special formatting codes needed</li>
-                </ul>
-              </div>
-            </div>
-          )}
-        </div>
-
-        <div className="flex gap-3">
-          <button
-            type="submit"
-            disabled={saving}
-            className="bg-orange-600 text-white px-6 py-2 rounded hover:bg-orange-700 transition disabled:opacity-50"
-          >
-            {saving ? 'Updating...' : 'Update Profile'}
-          </button>
-          
-          {showBioPreview && (
-            <button
-              type="button"
-              onClick={() => setShowBioPreview(false)}
-              className="bg-gray-500 text-white px-4 py-2 rounded hover:bg-gray-600 transition"
-            >
-              Edit Bio
-            </button>
-          )}
-        </div>
-      </form>
-
-      {/* Security */}
+      {/* ------------- Security ------------- */}
       <div className="bg-white rounded-lg shadow p-6">
         <h2 className="text-xl font-semibold mb-4">🔐 Security</h2>
         <p className="text-sm text-gray-700 mb-2">
@@ -511,12 +594,12 @@ Your bio will appear exactly as you type it here."
         </button>
       </div>
 
-      {/* Bio Preview Section */}
-      {bio && (
+      {/* ------------- Bio Preview (applicant only) ------------- */}
+      {!isEmployer && bio && (
         <div className="bg-white rounded-lg shadow p-6 mt-6">
           <h2 className="text-xl font-semibold mb-4">👀 Bio Preview</h2>
           <div className="border rounded-lg p-6 bg-gray-50">
-            <div 
+            <div
               className="text-gray-800 leading-relaxed whitespace-pre-line"
               style={{ lineHeight: '1.6' }}
             >

@@ -1,7 +1,6 @@
 'use client';
 import { useEffect, useState } from 'react';
 import { createPagesBrowserClient } from "@supabase/auth-helpers-nextjs";
-import ApplicantLayout from '../../../components/dashboard/ApplicantLayout';
 import JobCard from '../../../components/JobCard';
 
 const supabase = createPagesBrowserClient();
@@ -9,7 +8,7 @@ const supabase = createPagesBrowserClient();
 export default function ApplicationsPage() {
   const [applications, setApplications] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [expanded, setExpanded] = useState(null); // track which cover letter is expanded
+  const [expanded, setExpanded] = useState(null);
 
   useEffect(() => {
     const fetchApplications = async () => {
@@ -47,14 +46,24 @@ export default function ApplicationsPage() {
   }, []);
 
   return (
-    <ApplicantLayout>
+    <div className="min-h-screen bg-white text-black">
       <div className="max-w-5xl mx-auto px-4 py-10 md:pt-20 md:pb-10">
+        {/* Optional back link — uncomment if this page needs one */}
+        {/*
+        <button
+          onClick={() => window.history.back()}
+          className="mb-4 text-sm text-gray-500 hover:text-orange-600 transition-colors"
+        >
+          ← Back
+        </button>
+        */}
+
         <h1 className="text-2xl font-bold mb-6">📄 Your Applications</h1>
 
         {loading ? (
           <p>Loading applications...</p>
         ) : applications.length === 0 ? (
-          <p className="text-gray-600">You haven’t applied to any job yet.</p>
+          <p className="text-gray-600">You haven't applied to any job yet.</p>
         ) : (
           <div className="space-y-8">
             {applications.map((app) => (
@@ -97,6 +106,6 @@ export default function ApplicationsPage() {
           </div>
         )}
       </div>
-    </ApplicantLayout>
+    </div>
   );
 }

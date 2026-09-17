@@ -9,7 +9,19 @@ import Profile from '../../../components/Profile';
 import Application from '../../../components/Application';
 import Settings from '../../../components/Settings';
 import Wallet from '../../../components/WalletComponent';
-import { Briefcase, Coins, Layers, Bell, MessageSquare, Pencil, X, AlertTriangle, Wallet as WalletIcon, Pointer } from 'lucide-react';
+import Notification from '../../../components/Notification';
+import {
+  Briefcase,
+  Coins,
+  Layers,
+  MessageSquare,
+  Pencil,
+  X,
+  Star,
+  Edit3,
+  TrendingUp,
+  Bell,
+} from 'lucide-react';
 import useUnreadMessages from '../../../hooks/useUnreadMessages';
 import ProfilePromotion from '../../../components/ProfilePromotion';
 
@@ -19,13 +31,91 @@ export default function ApplicantDashboard() {
   const [applicationsCount, setApplicationsCount] = useState(0);
   const [tokens, setTokens] = useState(0);
   const [projectsCount, setProjectsCount] = useState(0);
+  const [showProfilePopup, setShowProfilePopup] = useState(false);
+  const [showPromotionPopup, setShowPromotionPopup] = useState(false);
+  const [hasSeenProfilePopup, setHasSeenProfilePopup] = useState(false);
+  const [hasCompletedProfile, setHasCompletedProfile] = useState(false);
+
+  // 🔔 Notifications
+  const [showNotifications, setShowNotifications] = useState(false);
   const [unreadCountNotifications, setUnreadCountNotifications] = useState(0);
-  const [incompleteFields, setIncompleteFields] = useState([]);
-  const [showTokenWarning, setShowTokenWarning] = useState(false);
-  const [showAvatarPrompt, setShowAvatarPrompt] = useState(false);
+
   const fileInputRef = useRef(null);
 
   const unreadMessagesCount = useUnreadMessages();
+
+  // Check if user is new and show appropriate popups
+  useEffect(() => {
+    const checkUserStatus = async () => {
+      const { data: userData } = await supabase.auth.getUser();
+      if (!userData?.user) return;
+
+      const seenProfilePopup = localStorage.getItem(`hasSeenProfilePopup_${userData.user.id}`);
+      const profileCompleted = localStorage.getItem(`hasCompletedProfile_${userData.user.id}`);
+
+      setHasSeenProfilePopup(!!seenProfilePopup);
+      setHasCompletedProfile(!!profileCompleted);
+
+      if (!seenProfilePopup && !profileCompleted) {
+        setTimeout(() => {
+          setShowProfilePopup(true);
+        }, 1000);
+      }
+    };
+
+    checkUserStatus();
+  }, []);
+
+  // 🔔 Fetch unread notification count + subscribe to realtime
+  useEffect(() => {
+    let mounted = true;
+    let channel = null;
+
+    const init = async () => {
+      const { data: userData } = await supabase.auth.getUser();
+      if (!userData?.user) return;
+
+      const userId = userData.user.id;
+
+      // Initial count
+      const { count } = await supabase
+        .from('notifications')
+        .select('*', { count: 'exact', head: true })
+        .eq('user_id', userId)
+        .eq('is_read', false);
+
+      if (mounted) setUnreadCountNotifications(count || 0);
+
+      // Realtime subscription — keep the badge fresh no matter what
+      channel = supabase
+        .channel(`applicant-notif-${userId}`)
+        .on(
+          'postgres_changes',
+          {
+            event: '*',
+            schema: 'public',
+            table: 'notifications',
+            filter: `user_id=eq.${userId}`,
+          },
+          async () => {
+            const { count: freshCount } = await supabase
+              .from('notifications')
+              .select('*', { count: 'exact', head: true })
+              .eq('user_id', userId)
+              .eq('is_read', false);
+            if (mounted) setUnreadCountNotifications(freshCount || 0);
+          }
+        )
+        .subscribe();
+    };
+
+    init();
+
+    return () => {
+      mounted = false;
+      if (channel) supabase.removeChannel(channel);
+    };
+  }, []);
 
   // Fetch profile and stats
   const fetchProfile = async () => {
@@ -61,46 +151,18 @@ export default function ApplicantDashboard() {
     setApplicationsCount(applicationsCount || 0);
     setProjectsCount(projectsCount || 0);
 
-    // Check for incomplete profile fields
     if (profileData) {
-      const missingFields = [];
-      if (!profileData.avatar_url) missingFields.push('avatar_url');
-      if (!profileData.phone) missingFields.push('phone');
-      if (!profileData.full_address) missingFields.push('full_address');
-      if (!profileData.bio) missingFields.push('bio');
-      if (!profileData.specialties) missingFields.push('specialties');
-      
-      setIncompleteFields(missingFields);
-      
-      // Show avatar prompt if avatar_url is null
-      setShowAvatarPrompt(!profileData.avatar_url);
-    }
+      const isProfileComplete = profileData.full_name && profileData.bio && profileData.skills;
+      setHasCompletedProfile(isProfileComplete);
 
-    // Show token warning if balance is 0
-    setShowTokenWarning((tokenData?.balance || 0) === 0);
+      if (isProfileComplete) {
+        localStorage.setItem(`hasCompletedProfile_${userId}`, 'true');
+      }
+    }
   };
 
   useEffect(() => {
     fetchProfile();
-  }, []);
-
-  // Fetch notifications count
-  useEffect(() => {
-    const fetchNotifications = async () => {
-      const { data: userData } = await supabase.auth.getUser();
-      if (!userData?.user) return;
-
-      const { data, error } = await supabase
-        .from('notifications')
-        .select('*')
-        .or(`user_id.eq.${userData.user.id},user_id.is.null`)
-        .order('created_at', { ascending: false });
-
-      if (error) console.error(error);
-      else setUnreadCountNotifications(data.filter((n) => !n.is_read).length);
-    };
-
-    fetchNotifications();
   }, []);
 
   const handleAvatarChange = async (e) => {
@@ -129,22 +191,41 @@ export default function ApplicantDashboard() {
 
     if (!updateError) {
       setProfile((prev) => ({ ...prev, avatar_url: data.publicUrl }));
-      // Remove avatar_url from incomplete fields if it was there
-      setIncompleteFields(prev => prev.filter(field => field !== 'avatar_url'));
-      // Hide the avatar prompt after successful upload
-      setShowAvatarPrompt(false);
     }
   };
 
-  const getFieldMessage = (field) => {
-    const messages = {
-      avatar_url: 'Add your profile photo',
-      phone: 'Add your phone number',
-      full_address: 'Add your full address',
-      bio: 'Add your bio',
-      specialties: 'Add your specialties'
-    };
-    return messages[field] || 'Complete this field';
+  const handleEditProfileClick = () => {
+    const userId = profile?.id;
+    if (userId) {
+      localStorage.setItem(`hasSeenProfilePopup_${userId}`, 'true');
+      setShowProfilePopup(false);
+
+      setTimeout(() => {
+        if (hasCompletedProfile) {
+          setShowPromotionPopup(true);
+        }
+      }, 1500);
+    }
+  };
+
+  const handleClosePromotionPopup = () => {
+    setShowPromotionPopup(false);
+  };
+
+  // 🔔 Recount unread when modal closes (in case user marked things as read inside)
+  const handleCloseNotifications = async () => {
+    setShowNotifications(false);
+
+    const { data: userData } = await supabase.auth.getUser();
+    if (!userData?.user) return;
+
+    const { count } = await supabase
+      .from('notifications')
+      .select('*', { count: 'exact', head: true })
+      .eq('user_id', userData.user.id)
+      .eq('is_read', false);
+
+    setUnreadCountNotifications(count || 0);
   };
 
   return (
@@ -153,6 +234,138 @@ export default function ApplicantDashboard() {
       activeTab={activeTab}
       onTabChange={setActiveTab}
     >
+      {/* Profile Completion Popup */}
+      <AnimatePresence>
+        {showProfilePopup && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
+          >
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              className="bg-white rounded-2xl p-6 max-w-md w-full mx-auto"
+            >
+              <div className="flex items-center gap-3 mb-4">
+                <div className="w-12 h-12 bg-orange-100 rounded-full flex items-center justify-center">
+                  <Edit3 className="w-6 h-6 text-orange-600" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-semibold text-gray-900">Complete Your Profile</h3>
+                  <p className="text-sm text-gray-600">Let clients know more about you</p>
+                </div>
+              </div>
+
+              <div className="space-y-3 mb-6">
+                <div className="flex items-center gap-3 text-sm text-gray-700">
+                  <div className="w-6 h-6 bg-green-100 rounded-full flex items-center justify-center flex-shrink-0">
+                    <span className="text-green-600 text-xs">1</span>
+                  </div>
+                  Add your professional bio and skills
+                </div>
+                <div className="flex items-center gap-3 text-sm text-gray-700">
+                  <div className="w-6 h-6 bg-green-100 rounded-full flex items-center justify-center flex-shrink-0">
+                    <span className="text-green-600 text-xs">2</span>
+                  </div>
+                  Upload a professional profile picture
+                </div>
+                <div className="flex items-center gap-3 text-sm text-gray-700">
+                  <div className="w-6 h-6 bg-green-100 rounded-full flex items-center justify-center flex-shrink-0">
+                    <span className="text-green-600 text-xs">3</span>
+                  </div>
+                  Showcase your portfolio projects
+                </div>
+              </div>
+
+              <div className="flex gap-3">
+                <button
+                  onClick={handleEditProfileClick}
+                  className="flex-1 bg-orange-500 text-white py-3 rounded-xl font-semibold hover:bg-orange-600 transition-colors"
+                >
+                  Edit Profile Now
+                </button>
+              </div>
+
+              <p className="text-xs text-gray-500 text-center mt-3">
+                Complete your profile to increase your chances of getting hired
+              </p>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Profile Promotion Popup */}
+      <AnimatePresence>
+        {showPromotionPopup && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
+          >
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              className="bg-white rounded-2xl p-6 max-w-md w-full mx-auto"
+            >
+              <div className="flex justify-between items-start mb-4">
+                <div className="flex items-center gap-3">
+                  <div className="w-12 h-12 bg-purple-100 rounded-full flex items-center justify-center">
+                    <TrendingUp className="w-6 h-6 text-purple-600" />
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-semibold text-gray-900">Boost Your Visibility</h3>
+                    <p className="text-sm text-gray-600">Get discovered by more clients</p>
+                  </div>
+                </div>
+                <button
+                  onClick={handleClosePromotionPopup}
+                  className="p-1 hover:bg-gray-100 rounded-full transition-colors"
+                >
+                  <X className="w-5 h-5 text-gray-500" />
+                </button>
+              </div>
+
+              <div className="space-y-4 mb-6">
+                <div className="flex items-start gap-3">
+                  <Star className="w-5 h-5 text-yellow-500 mt-0.5 flex-shrink-0" />
+                  <div>
+                    <p className="text-sm font-medium text-gray-900">Featured in Spotlight</p>
+                    <p className="text-xs text-gray-600">Your profile appears on the main spotlight page</p>
+                  </div>
+                </div>
+
+                <div className="flex items-start gap-3">
+                  <TrendingUp className="w-5 h-5 text-green-500 mt-0.5 flex-shrink-0" />
+                  <div>
+                    <p className="text-sm font-medium text-gray-900">Higher Search Ranking</p>
+                    <p className="text-xs text-gray-600">Appear at the top of client searches</p>
+                  </div>
+                </div>
+
+                <div className="flex items-start gap-3">
+                  <Briefcase className="w-5 h-5 text-blue-500 mt-0.5 flex-shrink-0" />
+                  <div>
+                    <p className="text-sm font-medium text-gray-900">Direct Job Offers</p>
+                    <p className="text-xs text-gray-600">Clients can contact you directly</p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="bg-gradient-to-r from-purple-50 to-pink-50 rounded-xl p-4 mb-4">
+                <p className="text-sm text-purple-800 text-center">
+                  <strong>Pro Tip:</strong> Promote your profile to get 3x more visibility!
+                </p>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       {/* Dashboard tab */}
       {activeTab === 'dashboard' && (
         <motion.div
@@ -165,9 +378,9 @@ export default function ApplicantDashboard() {
           <div className="flex items-center justify-between flex-wrap gap-4">
             <div>
               <h2 className="text-2xl font-semibold">
-                Hello!, {profile?.full_name || 'Creative'}
+                Welcome back, {profile?.full_name || 'Creative'}
               </h2>
-              <p className="text-sm text-gray-500">wishing you goodluck today!</p>
+              <p className="text-sm text-gray-500">Let's start making money today!</p>
             </div>
 
             <div className="flex items-center gap-4">
@@ -180,83 +393,32 @@ export default function ApplicantDashboard() {
                 )}
               </a>
 
-              <a href="/dashboard/applicant/notifications" title="Notifications" className="relative">
-                <Bell className="w-6 h-6 text-gray-700 hover:text-orange-600" />
+              {/* 🔔 Notification bell */}
+              <button
+                onClick={() => setShowNotifications(true)}
+                title="Notifications"
+                className="relative"
+              >
+                <Bell className="w-6 h-6 text-gray-700 hover:text-orange-600 transition-colors" />
                 {unreadCountNotifications > 0 && (
-                  <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs w-4 h-4 flex items-center justify-center rounded-full">
-                    {unreadCountNotifications}
+                  <span className="absolute -top-1 -right-1 bg-orange-500 text-white text-[10px] min-w-[16px] h-4 px-1 flex items-center justify-center rounded-full font-bold">
+                    {unreadCountNotifications > 9 ? '9+' : unreadCountNotifications}
                   </span>
                 )}
-              </a>
+              </button>
 
               <div className="relative group">
-                {/* Avatar Upload Area */}
-                <div className="relative">
-                  {profile?.avatar_url ? (
-                    <img
-                      src={profile.avatar_url}
-                      alt="Avatar"
-                      className="w-10 h-10 min-w-[40px] min-h-[40px] rounded-full border-2 border-orange-500 object-cover"
-                      onError={(e) => {
-                        e.target.src = 'https://xatxjdsppcjgplmrtjcs.supabase.co/storage/v1/object/public/avatars/default.jpg';
-                      }}
-                    />
-                  ) : (
-                    <img
-                      src="https://xatxjdsppcjgplmrtjcs.supabase.co/storage/v1/object/public/avatars/default.jpg"
-                      alt="Default Avatar"
-                      className="w-10 h-10 min-w-[40px] min-h-[40px] rounded-full border-2 border-orange-500 object-cover"
-                    />
-                  )}
-                  
-                  {/* Edit Button */}
-                  <button
-                    onClick={() => fileInputRef.current.click()}
-                    className="absolute bottom-0 right-0 bg-white p-1 rounded-full shadow group-hover:flex hidden md:group-hover:flex md:flex hover:bg-orange-100"
-                  >
-                    <Pencil size={14} className="text-gray-700" />
-                  </button>
-
-                  {/* Bouncing Finger Icon with Popup */}
-                  <AnimatePresence>
-                    {showAvatarPrompt && (
-                      <motion.div
-                        initial={{ opacity: 0, scale: 0 }}
-                        animate={{ opacity: 1, scale: 1 }}
-                        exit={{ opacity: 0, scale: 0 }}
-                        className="absolute top-12 -right-14 z-10"
-                      >
-                        {/* Bouncing Finger Icon */}
-                        <motion.div
-                          animate={{
-                            y: [0, -10, 0],
-                            rotate: [0, -5, 0],
-                          }}
-                          transition={{
-                            duration: 1,
-                            repeat: Infinity,
-                            ease: "easeInOut"
-                          }}
-                          className="flex justify-center mb-2"
-                        >
-                          <Pointer className="w-5 h-5 text-orange-500 transform rotate-45" />
-                        </motion.div>
-
-                        {/* Popup Message - Now positioned below the finger */}
-                        <motion.div
-                          initial={{ opacity: 0, y: 10 }}
-                          animate={{ opacity: 1, y: 0 }}
-                          className="bg-white border border-orange-200 rounded-lg p-2 shadow-lg min-w-[150px]"
-                        >
-                          <p className="text-xs text-gray-700 font-medium text-center">
-                            Click here to upload your profile photo
-                          </p>
-                        </motion.div>
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
-                </div>
-
+                <img
+                  src={profile?.avatar_url || '/default-avatar.png'}
+                  alt="Avatar"
+                  className="w-10 h-10 min-w-[40px] min-h-[40px] rounded-full border-2 border-orange-500 object-cover"
+                />
+                <button
+                  onClick={() => fileInputRef.current.click()}
+                  className="absolute bottom-0 right-0 bg-white p-1 rounded-full shadow group-hover:flex hidden md:group-hover:flex md:flex hover:bg-orange-100"
+                >
+                  <Pencil size={14} className="text-gray-700" />
+                </button>
                 <input
                   type="file"
                   accept="image/*"
@@ -268,111 +430,26 @@ export default function ApplicantDashboard() {
             </div>
           </div>
 
-          {/* Incomplete Profile Warnings */}
-          <AnimatePresence>
-            {incompleteFields.length > 0 && (
-              <motion.div
-                initial={{ opacity: 0, y: -10 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -10 }}
-                className="bg-yellow-50 border border-yellow-200 rounded-lg p-4"
-              >
-                <div className="flex items-start gap-3">
-                  <AlertTriangle className="w-5 h-5 text-yellow-600 mt-0.5 flex-shrink-0" />
-                  <div className="flex-1">
-                    <h3 className="text-yellow-800 font-medium text-sm mb-2">
-                      Scroll down, use the "Edit Profile" button to Complete your profile and get more gigs
-                    </h3>
-                    <div className="space-y-1">
-                      {incompleteFields.map(field => (
-                        <p key={field} className="text-yellow-700 text-sm">
-                          • {getFieldMessage(field)}
-                        </p>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-              </motion.div>
-            )}
-          </AnimatePresence>
-
-          {/* Token Warning */}
-          <AnimatePresence>
-            {showTokenWarning && (
-              <motion.div
-                initial={{ opacity: 0, y: -10 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -10 }}
-                className="bg-blue-50 border border-blue-200 rounded-lg p-4"
-              >
-                <div className="flex items-start gap-3">
-                  <WalletIcon className="w-5 h-5 text-blue-600 mt-0.5 flex-shrink-0" />
-                  <div className="flex-1">
-                    <div className="flex justify-between items-start">
-                      <h3 className="text-blue-800 font-medium text-sm mb-1">
-                        Top up your token wallet!
-                      </h3>
-                      <button
-                        onClick={() => setShowTokenWarning(false)}
-                        className="text-blue-600 hover:text-blue-800"
-                      >
-                        <X size={16} />
-                      </button>
-                    </div>
-                    <p className="text-blue-700 text-sm">
-                      Don't miss out on juicy gigs! Click the Wallet button in the sidebar to add tokens.
-                    </p>
-                  </div>
-                </div>
-              </motion.div>
-            )}
-          </AnimatePresence>
-
           {/* Stats */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <StatCard icon={<Coins className="text-orange-500" />} label="Token Balance" value={tokens} />
-            <StatCard icon={<Briefcase className="text-orange-500" />} label="Applications" value={applicationsCount} />
-            <StatCard icon={<Layers className="text-orange-500" />} label="Portfolios" value={projectsCount} />
+          <div className="grid grid-cols-3 gap-1 md:gap-4">
+            <MobileStatCard icon={<Coins className="text-orange-500 w-4 h-4 md:w-5 md:h-5" />} label="Tokens" value={tokens} />
+            <MobileStatCard icon={<Briefcase className="text-orange-500 w-4 h-4 md:w-5 md:h-5" />} label="Apps" value={applicationsCount} />
+            <MobileStatCard icon={<Layers className="text-orange-500 w-4 h-4 md:w-5 md:h-5" />} label="Projects" value={projectsCount} />
           </div>
 
           {/* Promote Profile & Edit Profile Buttons */}
           <div className="flex flex-wrap gap-4 mt-6">
-            {/* Promote Profile */}
             {profile && (
               <ProfilePromotion profile={profile} refreshProfile={fetchProfile} />
             )}
 
-            {/* Edit Profile Button with Flicker Effect */}
-            <motion.a
+            <a
               href="/dashboard/applicant/edit"
-              className="mt-6 px-6 py-3 bg-orange-500 text-white rounded-xl shadow hover:bg-orange-600 transition relative"
-              animate={
-                incompleteFields.length > 0 ? {
-                  scale: [1, 1.05, 1],
-                  boxShadow: [
-                    '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
-                    '0 10px 15px -3px rgba(249, 115, 22, 0.3), 0 4px 6px -2px rgba(0, 0, 0, 0.05)',
-                    '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)'
-                  ]
-                } : {}
-              }
-              transition={{
-                duration: 2,
-                repeat: incompleteFields.length > 0 ? Infinity : 0,
-                ease: "easeInOut"
-              }}
+              className="mt-6 px-6 py-3 bg-orange-500 text-white rounded-xl shadow hover:bg-orange-600 transition"
+              onClick={handleEditProfileClick}
             >
               Edit Profile
-              {incompleteFields.length > 0 && (
-                <motion.span
-                  className="absolute -top-1 -right-1 bg-red-500 text-white text-xs w-5 h-5 flex items-center justify-center rounded-full"
-                  animate={{ scale: [1, 1.2, 1] }}
-                  transition={{ duration: 1, repeat: Infinity }}
-                >
-                  !
-                </motion.span>
-              )}
-            </motion.a>
+            </a>
           </div>
         </motion.div>
       )}
@@ -395,17 +472,30 @@ export default function ApplicantDashboard() {
           <Wallet balance={tokens} refreshBalance={fetchProfile} />
         </div>
       )}
+
+      {/* 🔔 Notification modal */}
+      <AnimatePresence>
+        {showNotifications && profile?.id && (
+          <Notification
+            isOpen={showNotifications}
+            onClose={handleCloseNotifications}
+            userId={profile.id}
+          />
+        )}
+      </AnimatePresence>
     </ApplicantLayout>
   );
 }
 
-function StatCard({ icon, label, value }) {
+function MobileStatCard({ icon, label, value }) {
   return (
-    <div className="flex items-center gap-4 bg-gray-100 p-4 rounded-xl shadow-sm">
-      <div className="p-2 bg-white rounded-full shadow">{icon}</div>
+    <div className="flex flex-col items-center justify-center bg-gray-100 p-2 md:p-3 rounded-lg md:rounded-xl shadow-sm text-center min-h-[80px] md:min-h-[100px]">
+      <div className="p-1.5 md:p-2 bg-white rounded-full shadow mb-1 md:mb-2">
+        {icon}
+      </div>
       <div>
-        <p className="text-gray-600 text-sm">{label}</p>
-        <p className="text-lg font-semibold">{value}</p>
+        <p className="text-gray-600 text-[10px] md:text-xs font-medium">{label}</p>
+        <p className="text-xs md:text-sm font-bold">{value}</p>
       </div>
     </div>
   );

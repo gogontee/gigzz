@@ -27,8 +27,8 @@ export default function AdminDashboard() {
   const [loading, setLoading] = useState(true);
   const [sharesModalOpen, setSharesModalOpen] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
-  const [chartView, setChartView] = useState('weekly'); // 'weekly', 'monthly', 'yearly'
-  
+  const [chartView, setChartView] = useState('weekly');
+
   // Data states
   const [tokenTransactions, setTokenTransactions] = useState([]);
   const [applicants, setApplicants] = useState([]);
@@ -51,13 +51,12 @@ export default function AdminDashboard() {
   const SIMEON_USER_ID = 'a4509ac3-5f77-48f9-b65c-69c1de21c7fe';
   const SIMEON_SHARE_PERCENTAGE = 80;
 
-  // SIMPLE AUTHORIZATION CHECK - FIXED VERSION
+  // SIMPLE AUTHORIZATION CHECK
   useEffect(() => {
     const checkAuthorization = async () => {
       try {
-        // Get current user
         const { data: { user }, error: authError } = await supabase.auth.getUser();
-        
+
         if (authError || !user) {
           console.log('No user found, redirecting to login');
           router.push('/auth/login');
@@ -67,7 +66,6 @@ export default function AdminDashboard() {
         setUser(user);
         console.log('User found:', user.id);
 
-        // SIMPLE CHECK: If user is Philip or Jerry, allow access immediately
         if (user.id === PHILIP_USER_ID || user.id === SIMEON_USER_ID) {
           console.log('Hardcoded director - granting access');
           setIsAuthorized(true);
@@ -76,7 +74,6 @@ export default function AdminDashboard() {
           return;
         }
 
-        // For other users, check directors table with PROPER error handling
         console.log('Checking directors table for user:', user.id);
         const { data: director, error: directorError } = await supabase
           .from('directors')
@@ -96,7 +93,7 @@ export default function AdminDashboard() {
           console.log('No director record found');
           setIsAuthorized(false);
         }
-        
+
         setLoading(false);
       } catch (error) {
         console.error('Authorization error:', error);
@@ -105,7 +102,6 @@ export default function AdminDashboard() {
       }
     };
 
-    // Check screen size
     const checkScreenSize = () => {
       setIsMobile(window.innerWidth < 768);
     };
@@ -117,11 +113,10 @@ export default function AdminDashboard() {
     return () => window.removeEventListener('resize', checkScreenSize);
   }, [router]);
 
-  // Set up real-time subscription for live updates
+  // Real-time subscription
   useEffect(() => {
     if (!isAuthorized) return;
 
-    // Subscribe to token_transactions changes
     const subscription = supabase
       .channel('token_transactions_changes')
       .on(
@@ -133,13 +128,11 @@ export default function AdminDashboard() {
         },
         (payload) => {
           console.log('Real-time update received:', payload);
-          // Reload data when transactions change
           loadAllData();
         }
       )
       .subscribe();
 
-    // Set up interval for periodic refresh (every 30 seconds)
     const interval = setInterval(() => {
       loadAllData();
     }, 30000);
@@ -153,8 +146,7 @@ export default function AdminDashboard() {
   const loadAllData = useCallback(async () => {
     try {
       console.log('Loading all data...');
-      
-      // Load ALL token transactions with tokens_in values
+
       const { data: transactions, error: transactionsError } = await supabase
         .from('token_transactions')
         .select('*')
@@ -167,7 +159,6 @@ export default function AdminDashboard() {
         setTokenTransactions(transactions || []);
       }
 
-      // Load applicants
       const { data: applicantsData, error: applicantsError } = await supabase
         .from('applicants')
         .select('*')
@@ -180,7 +171,6 @@ export default function AdminDashboard() {
         setApplicants(applicantsData || []);
       }
 
-      // Load employers
       const { data: employersData, error: employersError } = await supabase
         .from('employers')
         .select('*')
@@ -193,14 +183,12 @@ export default function AdminDashboard() {
         setEmployers(employersData || []);
       }
 
-      // Process transactions with user names
       if (transactions && transactions.length > 0) {
         const processedTransactions = await Promise.all(
           transactions.map(async (transaction) => {
             let userName = 'Unknown User';
-            
+
             try {
-              // Check applicants table
               const { data: applicant } = await supabase
                 .from('applicants')
                 .select('full_name')
@@ -210,7 +198,6 @@ export default function AdminDashboard() {
               if (applicant?.full_name) {
                 userName = applicant.full_name;
               } else {
-                // Check employers table
                 const { data: employer } = await supabase
                   .from('employers')
                   .select('name')
@@ -234,14 +221,12 @@ export default function AdminDashboard() {
         );
 
         setTokenTransactions(processedTransactions);
-        
-        // Calculate all time series data
+
         calculateWeeklyData(processedTransactions);
         calculateMonthlyData(processedTransactions);
         calculateYearlyData(processedTransactions);
         calculateStats(processedTransactions, applicantsData || [], employersData || []);
       } else {
-        // If no transactions, set empty data
         setWeeklyData([]);
         setMonthlyData([]);
         setYearlyData([]);
@@ -268,13 +253,13 @@ export default function AdminDashboard() {
     }).reverse();
 
     const dailyData = last7Days.map(date => {
-      const dayTransactions = transactions.filter(t => 
+      const dayTransactions = transactions.filter(t =>
         t.created_at && t.created_at.split('T')[0] === date
       );
-      
+
       const revenue = dayTransactions.reduce((sum, t) => sum + ((t.tokens_in || 0) * 250), 0);
       const tokens = dayTransactions.reduce((sum, t) => sum + (t.tokens_in || 0), 0);
-      
+
       return {
         date: new Date(date).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }),
         fullDate: date,
@@ -304,10 +289,10 @@ export default function AdminDashboard() {
         const transactionDate = new Date(t.created_at);
         return transactionDate.getFullYear() === year && transactionDate.getMonth() === month;
       });
-      
+
       const revenue = monthTransactions.reduce((sum, t) => sum + ((t.tokens_in || 0) * 250), 0);
       const tokens = monthTransactions.reduce((sum, t) => sum + (t.tokens_in || 0), 0);
-      
+
       return {
         date: monthName,
         fullDate: `${year}-${month + 1}`,
@@ -330,10 +315,10 @@ export default function AdminDashboard() {
         const transactionDate = new Date(t.created_at);
         return transactionDate.getFullYear() === year;
       });
-      
+
       const revenue = yearTransactions.reduce((sum, t) => sum + ((t.tokens_in || 0) * 250), 0);
       const tokens = yearTransactions.reduce((sum, t) => sum + (t.tokens_in || 0), 0);
-      
+
       return {
         date: year.toString(),
         fullDate: year.toString(),
@@ -350,18 +335,15 @@ export default function AdminDashboard() {
     const totalTokens = transactions.reduce((sum, t) => sum + (t.tokens_in || 0), 0);
     const totalRevenue = totalTokens * 250;
     const totalUsers = (applicants?.length || 0) + (employers?.length || 0);
-    
-    // Weekly growth calculation
+
     const thisWeekRevenue = weeklyData.reduce((sum, day) => sum + day.revenue, 0);
-    const lastWeekRevenue = thisWeekRevenue * 0.8; // Simplified calculation
+    const lastWeekRevenue = thisWeekRevenue * 0.8;
     const weeklyGrowth = lastWeekRevenue > 0 ? ((thisWeekRevenue - lastWeekRevenue) / lastWeekRevenue) * 100 : 0;
-    
-    // Monthly growth calculation
+
     const thisMonthRevenue = monthlyData[monthlyData.length - 1]?.revenue || 0;
     const lastMonthRevenue = monthlyData[monthlyData.length - 2]?.revenue || thisMonthRevenue * 0.8;
     const monthlyGrowth = lastMonthRevenue > 0 ? ((thisMonthRevenue - lastMonthRevenue) / lastMonthRevenue) * 100 : 0;
-    
-    // Yearly growth calculation
+
     const thisYearRevenue = yearlyData[yearlyData.length - 1]?.revenue || 0;
     const lastYearRevenue = yearlyData[yearlyData.length - 2]?.revenue || thisYearRevenue * 0.8;
     const yearlyGrowth = lastYearRevenue > 0 ? ((thisYearRevenue - lastYearRevenue) / lastYearRevenue) * 100 : 0;
@@ -376,7 +358,6 @@ export default function AdminDashboard() {
     });
   };
 
-  // Get current chart data based on selected view
   const getCurrentChartData = () => {
     switch (chartView) {
       case 'monthly':
@@ -401,7 +382,6 @@ export default function AdminDashboard() {
     }
   };
 
-  // Calculate user shares based on user ID
   const calculateUserShares = () => {
     let userSharePercentage = 0;
     let userName = 'User';
@@ -415,7 +395,7 @@ export default function AdminDashboard() {
     }
 
     const userShareAmount = (stats.totalRevenue * userSharePercentage) / 100;
-    
+
     return {
       userName,
       percentage: userSharePercentage,
@@ -566,7 +546,7 @@ export default function AdminDashboard() {
                         <p className="text-sm text-blue-800 font-medium mb-3">
                           Real-time Calculation Tool
                         </p>
-                        
+
                         <div className="mb-3">
                           <label className="block text-xs text-blue-700 mb-1">
                             Enter token amount to calculate:
@@ -668,10 +648,12 @@ export default function AdminDashboard() {
                   <span className="text-xs text-green-600 font-medium">Live</span>
                 </div>
               </div>
-              <div className="flex items-center space-x-4">
-                <div className="text-xs md:text-sm text-gray-600">
+
+              <div className="flex items-center space-x-2 md:space-x-4">
+                <div className="text-xs md:text-sm text-gray-600 hidden sm:block">
                   Welcome, {user?.email}
                 </div>
+
                 {(user?.id === PHILIP_USER_ID || user?.id === SIMEON_USER_ID) && (
                   <motion.button
                     whileHover={{ scale: 1.05 }}
@@ -680,7 +662,8 @@ export default function AdminDashboard() {
                     className="bg-orange-500 text-white px-4 py-1.5 md:px-6 md:py-2 rounded-lg font-semibold hover:bg-orange-600 transition-colors duration-200 shadow-md flex items-center space-x-2 text-sm md:text-base"
                   >
                     <span className="text-sm md:text-base">👑</span>
-                    <span>My Shares</span>
+                    <span className="hidden sm:inline">My Shares</span>
+                    <span className="sm:hidden">Shares</span>
                   </motion.button>
                 )}
               </div>
@@ -694,8 +677,8 @@ export default function AdminDashboard() {
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.1 }}
             className={`grid gap-4 mb-6 ${
-              isMobile 
-                ? 'grid-cols-2' 
+              isMobile
+                ? 'grid-cols-2'
                 : 'grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6'
             }`}
           >
@@ -730,8 +713,8 @@ export default function AdminDashboard() {
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.2 }}
             className={`gap-6 mb-8 ${
-              isMobile 
-                ? 'grid grid-cols-1' 
+              isMobile
+                ? 'grid grid-cols-1'
                 : 'grid grid-cols-1 lg:grid-cols-2'
             }`}
           >
@@ -761,21 +744,21 @@ export default function AdminDashboard() {
               <ResponsiveContainer width="100%" height={isMobile ? 250 : 300}>
                 <BarChart data={currentChartData}>
                   <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis 
-                    dataKey="date" 
-                    fontSize={isMobile ? 10 : 12} 
+                  <XAxis
+                    dataKey="date"
+                    fontSize={isMobile ? 10 : 12}
                     angle={chartView === 'yearly' ? 0 : -45}
                     textAnchor={chartView === 'yearly' ? 'middle' : 'end'}
                     height={chartView === 'yearly' ? 30 : 60}
                   />
                   <YAxis fontSize={isMobile ? 10 : 12} />
-                  <Tooltip 
+                  <Tooltip
                     formatter={(value) => [`₦${Number(value).toLocaleString()}`, 'Revenue']}
                     labelFormatter={(label) => `Period: ${label}`}
                   />
-                  <Bar 
-                    dataKey="revenue" 
-                    fill="#f97316" 
+                  <Bar
+                    dataKey="revenue"
+                    fill="#f97316"
                     radius={[4, 4, 0, 0]}
                   />
                 </BarChart>
@@ -791,8 +774,8 @@ export default function AdminDashboard() {
               <ResponsiveContainer width="100%" height={isMobile ? 250 : 300}>
                 <LineChart data={currentChartData}>
                   <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis 
-                    dataKey="date" 
+                  <XAxis
+                    dataKey="date"
                     fontSize={isMobile ? 10 : 12}
                     angle={chartView === 'yearly' ? 0 : -45}
                     textAnchor={chartView === 'yearly' ? 'middle' : 'end'}
@@ -800,10 +783,10 @@ export default function AdminDashboard() {
                   />
                   <YAxis fontSize={isMobile ? 10 : 12} />
                   <Tooltip />
-                  <Line 
-                    type="monotone" 
-                    dataKey="tokens" 
-                    stroke="#f97316" 
+                  <Line
+                    type="monotone"
+                    dataKey="tokens"
+                    stroke="#f97316"
                     strokeWidth={3}
                     dot={{ fill: '#f97316', strokeWidth: 2, r: 4 }}
                   />
@@ -812,7 +795,6 @@ export default function AdminDashboard() {
             </div>
           </motion.section>
 
-          {/* Rest of the components remain the same */}
           <motion.section
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
@@ -895,8 +877,8 @@ export default function AdminDashboard() {
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.4 }}
             className={`gap-6 ${
-              isMobile 
-                ? 'grid grid-cols-1' 
+              isMobile
+                ? 'grid grid-cols-1'
                 : 'grid grid-cols-1 lg:grid-cols-2 gap-8'
             }`}
           >
@@ -1005,6 +987,7 @@ export default function AdminDashboard() {
         </main>
 
         <SharesModal />
+
       </div>
     </>
   );

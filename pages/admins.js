@@ -5,7 +5,7 @@ import { motion } from "framer-motion";
 import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
 import { supabase } from "../utils/supabaseClient";
-import { X, AlertCircle } from "lucide-react"; // Added X icon import
+import { X, AlertCircle, Bell } from "lucide-react";
 
 // Lazy imports for forms
 const LearnMoreForm = dynamic(() => import("../components/LearnMoreForm"), {
@@ -24,6 +24,21 @@ const ApplicantsList = dynamic(() => import("../components/ApplicantsList"), {
   ssr: false,
   loading: () => <div className="p-4">Loading applicants...</div>
 });
+
+// Admin notification composer
+const AdminNotificationModal = dynamic(
+  () => import("../components/AdminNotificationModal"),
+  { ssr: false }
+);
+
+// 🆕 Notification management (log of sent broadcasts)
+const NotificationManagement = dynamic(
+  () => import("../components/NotificationManagement"),
+  {
+    ssr: false,
+    loading: () => <div className="p-4">Loading notifications...</div>,
+  }
+);
 
 export default function AdminPanel() {
   const router = useRouter();
@@ -48,7 +63,6 @@ export default function AdminPanel() {
   const [editingItem, setEditingItem] = useState(null);
   const [editContent, setEditContent] = useState("");
 
-  // Get current user on component mount
   useEffect(() => {
     getCurrentUser();
   }, []);
@@ -71,7 +85,6 @@ export default function AdminPanel() {
 
     setLoading(true);
     try {
-      // Check if the entered code matches the editorscode for the current user
       const { data, error } = await supabase
         .from("passcodes")
         .select("editorscode")
@@ -113,7 +126,6 @@ export default function AdminPanel() {
     }
   };
 
-  // Fetch data functions
   const fetchLearnMore = async () => {
     setLoading(true);
     try {
@@ -168,50 +180,41 @@ export default function AdminPanel() {
   const fetchAnalytics = async () => {
     setLoading(true);
     try {
-      // Total jobs
       const { count: totalJobs } = await supabase
         .from("jobs")
         .select("*", { count: "exact", head: true });
 
-      // Total applicants
       const { count: totalApplicants } = await supabase
         .from("applicants")
         .select("*", { count: "exact", head: true });
 
-      // Total clients (employers)
       const { count: totalClients } = await supabase
         .from("employers")
         .select("*", { count: "exact", head: true });
 
-      // Total portfolios (projects)
       const { count: totalPortfolios } = await supabase
         .from("projects")
         .select("*", { count: "exact", head: true });
 
-      // Jobs by agents
       const { count: agentJobs } = await supabase
         .from("jobs")
         .select("*", { count: "exact", head: true })
         .eq("agent", true);
 
-      // Total testimonials
       const { count: totalTestimonials } = await supabase
         .from("testimonials")
         .select("*", { count: "exact", head: true });
 
-      // Unsubscribed talents (balance = 0)
       const { count: unsubscribedTalents } = await supabase
         .from("token_wallets")
         .select("*", { count: "exact", head: true })
         .eq("balance", 0);
 
-      // Pending verifications
       const { count: pendingVerifications } = await supabase
         .from("verifications")
         .select("*", { count: "exact", head: true })
         .eq("approved", "pending");
 
-      // Verified clients
       const { count: verifiedClients } = await supabase
         .from("verifications")
         .select("*", { count: "exact", head: true })
@@ -235,7 +238,6 @@ export default function AdminPanel() {
     }
   };
 
-  // Delete functions
   const deleteLearnMore = async (id) => {
     if (!confirm("Are you sure you want to delete this content?")) return;
 
@@ -290,12 +292,11 @@ export default function AdminPanel() {
     }
   };
 
-  // Update functions with rich text editor
   const updateLearnMore = async (id) => {
     try {
       const { error } = await supabase
         .from("learn_more")
-        .update({ 
+        .update({
           content: editContent,
           updated_at: new Date().toISOString()
         })
@@ -315,7 +316,7 @@ export default function AdminPanel() {
     try {
       const { error } = await supabase
         .from("news")
-        .update({ 
+        .update({
           content: editContent,
           updated_at: new Date().toISOString()
         })
@@ -331,13 +332,11 @@ export default function AdminPanel() {
     }
   };
 
-  // Close function for editing modals
   const closeEditModal = () => {
     setEditingItem(null);
     setEditContent("");
   };
 
-  // Load data when content changes
   useEffect(() => {
     if (!isLoggedIn) return;
 
@@ -367,7 +366,6 @@ export default function AdminPanel() {
           animate={{ opacity: 1, y: 0 }}
           className="max-w-md w-full bg-white p-8 rounded-lg shadow-lg relative"
         >
-          {/* Exit button */}
           <button
             onClick={() => router.push("/")}
             className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 transition"
@@ -375,11 +373,11 @@ export default function AdminPanel() {
           >
             <X size={20} />
           </button>
-          
+
           <h1 className="text-2xl font-bold mb-6 text-center text-gray-800">
             Admin Access
           </h1>
-          
+
           {!currentUser && (
             <div className="bg-yellow-50 border border-yellow-200 text-yellow-800 px-4 py-3 rounded mb-4">
               Please sign in to access the admin panel.
@@ -436,7 +434,7 @@ export default function AdminPanel() {
             </p>
           )}
         </div>
-        
+
         <div className="flex flex-col gap-2">
           {/* Manage Learn More Content */}
           <button
@@ -530,14 +528,39 @@ export default function AdminPanel() {
             </div>
           )}
 
+          {/* Notification Section */}
+          <button
+            onClick={() => setOpenMenu(openMenu === "notifications" ? null : "notifications")}
+            className="w-full text-left px-4 py-2 rounded hover:bg-purple-500 hover:text-white transition font-semibold flex items-center justify-between"
+          >
+            <span>Notifications</span>
+            <Bell size={16} />
+          </button>
+          {openMenu === "notifications" && (
+            <div className="flex flex-col ml-4 mt-2 gap-1">
+              <button
+                onClick={() => setActiveContent("sendNotification")}
+                className="px-3 py-1 rounded hover:bg-purple-100 transition text-gray-700 text-left"
+              >
+                Send Notification
+              </button>
+              <button
+                onClick={() => setActiveContent("manageNotifications")}
+                className="px-3 py-1 rounded hover:bg-purple-100 transition text-gray-700 text-left"
+              >
+                View Sent Notifications
+              </button>
+            </div>
+          )}
+
           {/* Other sidebar items */}
-          <button 
+          <button
             onClick={() => setActiveContent("manageJobs")}
             className="w-full text-left px-4 py-2 rounded hover:bg-orange-500 hover:text-white transition font-semibold"
           >
             Manage Job Listings
           </button>
-          <button 
+          <button
             onClick={() => setActiveContent("analytics")}
             className="w-full text-left px-4 py-2 rounded hover:bg-orange-500 hover:text-white transition font-semibold"
           >
@@ -545,7 +568,7 @@ export default function AdminPanel() {
           </button>
 
           {/* Logout button */}
-          <button 
+          <button
             onClick={() => {
               setIsLoggedIn(false);
               setActiveContent(null);
@@ -562,7 +585,6 @@ export default function AdminPanel() {
 
       {/* Content Area */}
       <main className="flex-1 p-6 md:p-12 md:pt-20 overflow-y-auto">
-        {/* Content Header with Exit */}
         <div className="flex items-center justify-between mb-6">
           <div>
             <h1 className="text-2xl font-bold text-gray-800">Admin Dashboard</h1>
@@ -671,7 +693,7 @@ export default function AdminPanel() {
                           Edit
                         </button>
                       </div>
-                      <div 
+                      <div
                         className="text-gray-600 mb-2 line-clamp-2"
                         dangerouslySetInnerHTML={{ __html: item.content }}
                       />
@@ -805,7 +827,7 @@ export default function AdminPanel() {
                           Edit
                         </button>
                       </div>
-                      <div 
+                      <div
                         className="text-gray-600 mb-2 line-clamp-2"
                         dangerouslySetInnerHTML={{ __html: item.content }}
                       />
@@ -965,7 +987,7 @@ export default function AdminPanel() {
           </div>
         )}
 
-        {/* Manage Applicants - ApplicantsList Component */}
+        {/* Manage Applicants */}
         {activeContent === "manageApplicants" && (
           <div className="bg-white rounded-xl shadow-md overflow-hidden relative">
             <div className="p-6 border-b">
@@ -1013,7 +1035,84 @@ export default function AdminPanel() {
           </div>
         )}
 
-        {/* Manage Employers (Placeholder for future) */}
+        {/* Send Notification Section */}
+        {activeContent === "sendNotification" && (
+          <div className="bg-white rounded-lg shadow-md relative">
+            <div className="flex items-center justify-between p-6 border-b">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-purple-100 flex items-center justify-center">
+                  <Bell className="w-5 h-5 text-purple-600" />
+                </div>
+                <div>
+                  <h2 className="text-xl font-semibold">Send Notification</h2>
+                  <p className="text-sm text-gray-600">
+                    Broadcast a message to selected users
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setActiveContent(null)}
+                className="text-gray-400 hover:text-gray-600 transition"
+                aria-label="Close"
+              >
+                <X size={20} />
+              </button>
+            </div>
+            <div className="p-6">
+              <p className="text-gray-600 mb-6">
+                Choose your audience, compose a message, and send it to users instantly.
+                Recipients will see it in their notification bell.
+              </p>
+              <button
+                onClick={() => setActiveContent("sendNotificationOpen")}
+                className="w-full sm:w-auto inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-semibold transition-colors shadow-sm"
+              >
+                <Bell className="w-4 h-4" />
+                Open Notification Composer
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Notification Composer Modal */}
+        <AdminNotificationModal
+          isOpen={activeContent === "sendNotificationOpen"}
+          onClose={() => setActiveContent("sendNotification")}
+          onSent={() => {
+            console.log("Notification broadcast sent.");
+          }}
+        />
+
+        {/* View Sent Notifications — real component */}
+        {activeContent === "manageNotifications" && (
+          <div className="bg-white rounded-lg shadow-md relative">
+            <div className="flex items-center justify-between p-6 border-b">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-purple-100 flex items-center justify-center">
+                  <Bell className="w-5 h-5 text-purple-600" />
+                </div>
+                <div>
+                  <h2 className="text-xl font-semibold">Sent Notifications</h2>
+                  <p className="text-sm text-gray-600">
+                    Manage all admin broadcasts
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setActiveContent(null)}
+                className="text-gray-400 hover:text-gray-600 transition"
+                aria-label="Close"
+              >
+                <X size={20} />
+              </button>
+            </div>
+            <div className="p-6">
+              <NotificationManagement />
+            </div>
+          </div>
+        )}
+
+        {/* Manage Employers (Placeholder) */}
         {activeContent === "manageEmployers" && (
           <div className="bg-white rounded-lg shadow-md relative">
             <div className="flex items-center justify-between p-6 border-b">
@@ -1047,7 +1146,7 @@ export default function AdminPanel() {
           </div>
         )}
 
-        {/* Manage All Users (Placeholder for future) */}
+        {/* Manage All Users (Placeholder) */}
         {activeContent === "manageUsers" && (
           <div className="bg-white rounded-lg shadow-md relative">
             <div className="flex items-center justify-between p-6 border-b">
@@ -1088,7 +1187,7 @@ export default function AdminPanel() {
           <div className="bg-white p-6 rounded shadow-md">
             <h2 className="text-xl font-semibold mb-4">Welcome to Admin Panel</h2>
             <p className="text-gray-600 mb-6">Select a sidebar option to manage content, jobs, users, or view analytics.</p>
-            
+
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mt-8">
               <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
                 <h3 className="font-semibold text-blue-800 mb-2">Quick Actions</h3>
@@ -1098,7 +1197,7 @@ export default function AdminPanel() {
                   <li>• <button onClick={() => setActiveContent("analytics")} className="hover:text-blue-900 hover:underline">Check Analytics</button></li>
                 </ul>
               </div>
-              
+
               <div className="bg-green-50 p-4 rounded-lg border border-green-200">
                 <h3 className="font-semibold text-green-800 mb-2">Content Management</h3>
                 <ul className="space-y-2 text-sm text-green-700">
@@ -1107,13 +1206,12 @@ export default function AdminPanel() {
                   <li>• <button onClick={() => setActiveContent("editLearn")} className="hover:text-green-900 hover:underline">Edit Content</button></li>
                 </ul>
               </div>
-              
-              <div className="bg-orange-50 p-4 rounded-lg border border-orange-200">
-                <h3 className="font-semibold text-orange-800 mb-2">Platform Stats</h3>
-                <ul className="space-y-2 text-sm text-orange-700">
-                  <li>• Total Applicants: {analytics.totalApplicants || "Loading..."}</li>
-                  <li>• Total Jobs: {analytics.totalJobs || "Loading..."}</li>
-                  <li>• Total Clients: {analytics.totalClients || "Loading..."}</li>
+
+              <div className="bg-purple-50 p-4 rounded-lg border border-purple-200">
+                <h3 className="font-semibold text-purple-800 mb-2">Notifications</h3>
+                <ul className="space-y-2 text-sm text-purple-700">
+                  <li>• <button onClick={() => setActiveContent("sendNotification")} className="hover:text-purple-900 hover:underline">Send Notification</button></li>
+                  <li>• <button onClick={() => setActiveContent("manageNotifications")} className="hover:text-purple-900 hover:underline">View Sent</button></li>
                 </ul>
               </div>
             </div>

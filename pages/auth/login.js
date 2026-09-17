@@ -30,7 +30,6 @@ export default function LoginPage() {
   useEffect(() => {
     if (router.query.verified === 'true') {
       setSuccessMsg('Email verified successfully! You can now log in to your account.');
-      // Clear the query parameter from URL
       const newQuery = { ...router.query };
       delete newQuery.verified;
       router.replace({ pathname: router.pathname, query: newQuery }, undefined, { shallow: true });
@@ -38,7 +37,7 @@ export default function LoginPage() {
 
     if (router.query.error) {
       let errorMessage = 'An error occurred during authentication.';
-      
+
       switch (router.query.error) {
         case 'verification_failed':
           errorMessage = 'Email verification failed. Please try again or request a new verification email.';
@@ -55,9 +54,8 @@ export default function LoginPage() {
         default:
           errorMessage = router.query.message || 'An error occurred. Please try again.';
       }
-      
+
       setErrorMsg(errorMessage);
-      // Clear the query parameter from URL
       const newQuery = { ...router.query };
       delete newQuery.error;
       delete newQuery.message;
@@ -82,67 +80,78 @@ export default function LoginPage() {
 
   // Function to handle pending photo upload
   const handlePendingPhotoUpload = async (user) => {
-  const pendingPhotoKey = `pending_photo_${user.id}`;
-  const pendingPhotoData = localStorage.getItem(pendingPhotoKey);
-  
-  if (pendingPhotoData && user.email_confirmed_at) {
-    try {
-      setUploadingPhoto(true);
-      const { fileData, fileName, fileType, folder } = JSON.parse(pendingPhotoData);
-      
-      // Convert base64 back to file
-      const file = base64ToFile(fileData, fileName, fileType);
-      
-      const filePath = `${folder}/${user.id}-${Date.now()}-${fileName}`;
-      
-      // Upload to Supabase Storage
-      const { error: uploadError } = await supabase.storage
-        .from('profilephoto')
-        .upload(filePath, file);
+    const pendingPhotoKey = `pending_photo_${user.id}`;
+    const pendingPhotoData = localStorage.getItem(pendingPhotoKey);
 
-      if (!uploadError) {
-        // Get public URL
+    if (pendingPhotoData && user.email_confirmed_at) {
+      try {
+        setUploadingPhoto(true);
+        const { fileData, fileName, fileType } = JSON.parse(pendingPhotoData);
+
+        const file = base64ToFile(fileData, fileName, fileType);
+
+        // Store at the root of the bucket under the user's own folder.
+        // e.g. avatars/<userId>-<timestamp>-avatar.jpg
+        const ext = fileName.split('.').pop();
+        const filePath = `${user.id}-${Date.now()}.${ext}`;
+
+        // ✅ Upload to the avatars bucket (has correct RLS policies)
+        const { error: uploadError } = await supabase.storage
+          .from('avatars')
+          .upload(filePath, file, { upsert: true, contentType: fileType });
+
+        if (uploadError) {
+          console.error('Photo upload failed:', uploadError);
+          return;
+        }
+
         const { data: publicUrlData } = supabase.storage
-          .from('profilephoto')
+          .from('avatars')
           .getPublicUrl(filePath);
 
-        // Update user profile with photo URL
+        // Fetch the user's role to know which profile table to update
         const { data: userProfile } = await supabase
           .from('users')
-          .select('role')
+          .select('role, active_role')
           .eq('id', user.id)
           .single();
 
         if (userProfile) {
-          const profileTable = userProfile.role === 'applicant' ? 'applicants' : 'employers';
-          
-          const { error: updateError } = await supabase.from(profileTable)
+          const effectiveRole = userProfile.active_role || userProfile.role;
+          const profileTable = effectiveRole === 'applicant' ? 'applicants' : 'employers';
+
+          const { error: updateError } = await supabase
+            .from(profileTable)
             .update({ avatar_url: publicUrlData.publicUrl })
             .eq('id', user.id);
 
           if (!updateError) {
-            // ✅ ADDED: Force refresh of user data
+            // Mirror to the other role's table if it exists
+            const otherTable = effectiveRole === 'applicant' ? 'employers' : 'applicants';
+            await supabase
+              .from(otherTable)
+              .update({ avatar_url: publicUrlData.publicUrl })
+              .eq('id', user.id);
+            // Silent — the other row might not exist yet
+
             await supabase.auth.refreshSession();
-            
-            // Clean up
+
             localStorage.removeItem(pendingPhotoKey);
             setHasPendingPhoto(false);
             setSuccessMsg('Profile photo uploaded successfully!');
-            
-            // ✅ ADDED: Optional - small delay then refresh page
+
             setTimeout(() => {
               window.location.reload();
             }, 1000);
           }
         }
+      } catch (error) {
+        console.error('Pending photo upload failed:', error);
+      } finally {
+        setUploadingPhoto(false);
       }
-    } catch (error) {
-      console.error('Pending photo upload failed:', error);
-    } finally {
-      setUploadingPhoto(false);
     }
-  }
-};
+  };
 
   const handleLogin = async (e) => {
     e.preventDefault();
@@ -157,7 +166,6 @@ export default function LoginPage() {
       });
 
       if (authError) {
-        // Handle specific error cases
         if (authError.message.includes('Invalid login credentials')) {
           setErrorMsg('Invalid email or password. Please try again.');
         } else if (authError.message.includes('Email not confirmed')) {
@@ -184,9 +192,10 @@ export default function LoginPage() {
         return;
       }
 
+      // ✅ Fetch BOTH role and active_role
       const { data: userProfile, error: profileError } = await supabase
         .from('users')
-        .select('role')
+        .select('role, active_role')
         .eq('id', user.id)
         .single();
 
@@ -201,14 +210,16 @@ export default function LoginPage() {
       const pendingPhotoData = localStorage.getItem(pendingPhotoKey);
       if (pendingPhotoData) {
         setHasPendingPhoto(true);
-        // Start photo upload in background (don't wait for it)
         handlePendingPhotoUpload(user);
       }
 
-      const role = userProfile.role;
+      // ✅ Use active_role first, fall back to primary role
+      const role = userProfile.active_role || userProfile.role;
 
-      // Redirect based on role
-      if (role === 'applicant') {
+      // ✅ Clean role-based redirect
+      if (role === 'admin') {
+        router.push('/dashboard/employer');
+      } else if (role === 'applicant') {
         router.push('/dashboard/applicant');
       } else if (role === 'employer') {
         router.push('/dashboard/employer');
@@ -302,8 +313,7 @@ export default function LoginPage() {
               <div className="flex-1">
                 <p className="text-red-800 font-medium">Error</p>
                 <p className="text-red-700 text-sm mt-1">{errorMsg}</p>
-                
-                {/* Show resend verification button for email confirmation errors */}
+
                 {(errorMsg.includes('verify your email') || errorMsg.includes('Email not confirmed')) && (
                   <button
                     onClick={handleResendVerification}
@@ -350,7 +360,7 @@ export default function LoginPage() {
             disabled={loading || uploadingPhoto}
             className={`w-full p-3 rounded-lg text-white font-medium transition ${
               loading || uploadingPhoto
-                ? 'bg-gray-500 cursor-not-allowed' 
+                ? 'bg-gray-500 cursor-not-allowed'
                 : 'bg-black hover:bg-orange-600'
             }`}
           >
@@ -370,14 +380,12 @@ export default function LoginPage() {
           </button>
         </form>
 
-        {/* Add this tagline section */}
         <div className="text-center py-3">
           <p className="text-xs text-gray-600 leading-tight">
             Log in to explore premium opportunities or list your openings
           </p>
         </div>
 
-        {/* Pending Photo Notice */}
         {hasPendingPhoto && !uploadingPhoto && (
           <div className="bg-orange-50 border border-orange-200 rounded-lg p-4">
             <div className="flex items-start gap-3">
@@ -407,7 +415,6 @@ export default function LoginPage() {
           </p>
         </div>
 
-        {/* Additional Help Section */}
         <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mt-4">
           <p className="text-blue-800 text-sm text-center">
             💡 <strong>Need help?</strong> Contact{' '}

@@ -2,6 +2,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { useUser, useSupabaseClient } from '@supabase/auth-helpers-react';
+import { Bell } from 'lucide-react';
 
 import Sidebar from '../../../components/dashboard/ClientSidebar';
 import JobPostForm from '../../../components/client/JobPostForm';
@@ -13,7 +14,8 @@ import JobListCard from '../../../components/client/JobListCard';
 import Verify from '../../../components/Verify';
 import Messages from '../../../components/Messages';
 import Portfolio from '../../../components/Portfolios';
-import Wallet from '../../../components/WalletComponent'; // ✅ Changed from Token to Wallet
+import Wallet from '../../../components/WalletComponent';
+import Notification from '../../../components/Notification';
 
 const isValidComponent = (Comp) =>
   typeof Comp === 'function' || (typeof Comp === 'object' && Comp !== null);
@@ -29,6 +31,10 @@ export default function EmployerDashboard() {
   const [activeSection, setActiveSection] = useState('overview');
   const [loading, setLoading] = useState(true);
   const [importErrors, setImportErrors] = useState([]);
+
+  // 🔔 Notifications
+  const [showNotifications, setShowNotifications] = useState(false);
+  const [unreadCountNotifications, setUnreadCountNotifications] = useState(0);
 
   // pagination states
   const [offset, setOffset] = useState(0);
@@ -48,9 +54,60 @@ export default function EmployerDashboard() {
     if (!isValidComponent(Verify)) errs.push('Verify');
     if (!isValidComponent(Messages)) errs.push('Messages');
     if (!isValidComponent(Portfolio)) errs.push('Portfolios');
-    if (!isValidComponent(Wallet)) errs.push('Wallet'); // ✅ Updated to Wallet
+    if (!isValidComponent(Wallet)) errs.push('Wallet');
+    if (!isValidComponent(Notification)) errs.push('Notification');
     setImportErrors(errs);
   }, []);
+
+  // 🔔 Fetch unread notification count + subscribe to realtime
+  useEffect(() => {
+    if (!user?.id) return;
+
+    let mounted = true;
+    let channel = null;
+
+    const init = async () => {
+      const userId = user.id;
+
+      // Initial count
+      const { count } = await supabase
+        .from('notifications')
+        .select('*', { count: 'exact', head: true })
+        .eq('user_id', userId)
+        .eq('is_read', false);
+
+      if (mounted) setUnreadCountNotifications(count || 0);
+
+      // Realtime subscription — keeps the badge fresh
+      channel = supabase
+        .channel(`employer-notif-${userId}`)
+        .on(
+          'postgres_changes',
+          {
+            event: '*',
+            schema: 'public',
+            table: 'notifications',
+            filter: `user_id=eq.${userId}`,
+          },
+          async () => {
+            const { count: freshCount } = await supabase
+              .from('notifications')
+              .select('*', { count: 'exact', head: true })
+              .eq('user_id', userId)
+              .eq('is_read', false);
+            if (mounted) setUnreadCountNotifications(freshCount || 0);
+          }
+        )
+        .subscribe();
+    };
+
+    init();
+
+    return () => {
+      mounted = false;
+      if (channel) supabase.removeChannel(channel);
+    };
+  }, [user?.id, supabase]);
 
   // ✅ fetch initial data
   const fetchInitial = useCallback(async () => {
@@ -80,7 +137,7 @@ export default function EmployerDashboard() {
         .select('*')
         .eq('employer_id', user.id)
         .order('created_at', { ascending: false })
-        .range(0, 9); // 10 jobs
+        .range(0, 9);
 
       if (jobErr) console.error('Failed to load jobs:', jobErr);
 
@@ -95,8 +152,8 @@ export default function EmployerDashboard() {
       setJobs(jobPosts || []);
       setWallet(walletData);
 
-      setOffset(10); // next fetch starts at 10
-      setHasMore(jobPosts && jobPosts.length === 10); // if we got full 10, assume more exists
+      setOffset(10);
+      setHasMore(jobPosts && jobPosts.length === 10);
     } catch (error) {
       console.error('Error fetching initial data:', error);
     } finally {
@@ -115,7 +172,7 @@ export default function EmployerDashboard() {
         .select('*')
         .eq('employer_id', user.id)
         .order('created_at', { ascending: false })
-        .range(offset, offset + 29); // next 30
+        .range(offset, offset + 29);
 
       if (error) {
         console.error('Error loading more jobs:', error);
@@ -124,7 +181,7 @@ export default function EmployerDashboard() {
 
       setJobs((prev) => [...prev, ...(moreJobs || [])]);
       setOffset(offset + 30);
-      setHasMore(moreJobs && moreJobs.length === 30); // only show button if 30 returned
+      setHasMore(moreJobs && moreJobs.length === 30);
     } catch (error) {
       console.error('Error loading more jobs:', error);
     } finally {
@@ -135,6 +192,20 @@ export default function EmployerDashboard() {
   useEffect(() => {
     if (user) fetchInitial();
   }, [user, fetchInitial]);
+
+  // 🔔 Recount unread when modal closes
+  const handleCloseNotifications = async () => {
+    setShowNotifications(false);
+
+    if (!user?.id) return;
+    const { count } = await supabase
+      .from('notifications')
+      .select('*', { count: 'exact', head: true })
+      .eq('user_id', user.id)
+      .eq('is_read', false);
+
+    setUnreadCountNotifications(count || 0);
+  };
 
   if (!user) return <div className="p-4">Redirecting to login...</div>;
   if (loading) return <div className="p-4">Loading...</div>;
@@ -168,8 +239,24 @@ export default function EmployerDashboard() {
               Welcome {employer?.name || 'Client'}
             </h1>
           </div>
-          <div className="flex gap-4">
+          <div className="flex gap-4 items-center">
             {activeSection !== 'wallet' && <WalletSummary wallet={wallet} />}
+
+            {/* 🔔 Notification bell */}
+            <button
+              onClick={() => setShowNotifications(true)}
+              title="Notifications"
+              className="relative"
+              aria-label="Notifications"
+            >
+              <Bell className="w-6 h-6 text-gray-700 hover:text-orange-600 transition-colors" />
+              {unreadCountNotifications > 0 && (
+                <span className="absolute -top-1 -right-1 bg-orange-500 text-white text-[10px] min-w-[16px] h-4 px-1 flex items-center justify-center rounded-full font-bold">
+                  {unreadCountNotifications > 9 ? '9+' : unreadCountNotifications}
+                </span>
+              )}
+            </button>
+
             <button
               onClick={() => setActiveSection('post')}
               className="bg-black text-white px-3 py-1.5 text-sm rounded-lg hover:bg-orange-600 transition lg:px-4 lg:py-2 lg:text-base lg:rounded-full"
@@ -242,7 +329,7 @@ export default function EmployerDashboard() {
             </div>
           )}
 
-          {activeSection === 'token' && <Wallet wallet={wallet} refreshBalance={fetchInitial} />} {/* ✅ Changed to Wallet */}
+          {activeSection === 'token' && <Wallet wallet={wallet} refreshBalance={fetchInitial} />}
           {activeSection === 'profile' && employer && (
             <EmployerProfileEditor employer={employer} onUpdated={fetchInitial} />
           )}
@@ -257,6 +344,15 @@ export default function EmployerDashboard() {
           {activeSection === 'calls' && <VideoCallModal />}
         </div>
       </div>
+
+      {/* 🔔 Notification modal */}
+      {showNotifications && user?.id && (
+        <Notification
+          isOpen={showNotifications}
+          onClose={handleCloseNotifications}
+          userId={user.id}
+        />
+      )}
     </div>
   );
 }

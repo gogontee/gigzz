@@ -1,4 +1,4 @@
-// pages/api/custom-signup.js - MINIMAL FIX
+// pages/api/custom-signup.js
 import { createClient } from "@supabase/supabase-js";
 import { Resend } from "resend";
 
@@ -22,7 +22,18 @@ export default async function handler(req, res) {
   }
 
   try {
-    const { email, password, firstName, lastName, role, country, state, city } = req.body;
+    const {
+      email,
+      password,
+      firstName,
+      lastName,
+      role,
+      country,
+      state,
+      city,
+      lga,               // 🆕
+      termsAgreement,    // 🆕
+    } = req.body;
 
     console.log("🔄 Starting signup for:", email);
 
@@ -30,9 +41,11 @@ export default async function handler(req, res) {
     try {
       const { data: { users }, error: listError } = await supabaseAdmin.auth.admin.listUsers();
       if (!listError && users) {
-        const userExists = users.some(user => user.email === email);
+        const userExists = users.some((user) => user.email === email);
         if (userExists) {
-          return res.status(400).json({ error: "An account with this email already exists. Please sign in instead." });
+          return res.status(400).json({
+            error: "An account with this email already exists. Please sign in instead.",
+          });
         }
       }
     } catch (checkError) {
@@ -41,14 +54,14 @@ export default async function handler(req, res) {
 
     // 2. Create user in Auth
     const { data: authData, error: signUpError } = await supabaseAdmin.auth.admin.createUser({
-      email: email,
-      password: password,
+      email,
+      password,
       email_confirm: true,
       user_metadata: {
         first_name: firstName,
         last_name: lastName,
-        role: role,
-      }
+        role,
+      },
     });
 
     if (signUpError) {
@@ -57,118 +70,126 @@ export default async function handler(req, res) {
     }
 
     const userId = authData.user.id;
-    
-    // FIX HERE: Map 'client' to 'employer' for the users table
-    const userRole = role === 'client' ? 'employer' : 'applicant';
+
+    // Map 'client' → 'employer'
+    const userRole = role === "client" ? "employer" : "applicant";
     const fullName = `${firstName} ${lastName}`;
 
     console.log("✅ User created:", userId, "Role in database:", userRole);
 
     // 3. Generate verification token
-    const verificationToken = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
+    const verificationToken =
+      Math.random().toString(36).substring(2, 15) +
+      Math.random().toString(36).substring(2, 15);
 
-    // 4. Insert into users table - FIXED: Use userRole (which is 'employer' for clients)
+    // 4. Insert into users table
     try {
       const userData = {
         id: userId,
-        role: userRole, // This is now 'employer' for clients
-        email_verified: false
+        role: userRole,
+        email_verified: false,
       };
-      
+
       console.log("Inserting into users table with:", userData);
-      
-      const { data, error } = await supabaseAdmin
-        .from('users')
+
+      const { error } = await supabaseAdmin
+        .from("users")
         .insert([userData]);
-        
+
       if (error) {
         console.error("❌ Users table insert error:", error);
-        // Let's see what the actual error is
         throw new Error(`Failed to insert into users table: ${error.message}`);
       }
-      
+
       console.log("✅ Users table updated");
     } catch (userError) {
       console.error("❌ Users table insert failed:", userError.message);
-      // Don't swallow the error - return it so we can see it
-      return res.status(400).json({ 
-        error: `Failed to create user record: ${userError.message}` 
+      return res.status(400).json({
+        error: `Failed to create user record: ${userError.message}`,
       });
     }
 
-    // 5. Insert into profile table - FIXED: Use userRole here too
+    // 5. Insert into profile table
     try {
-      const profileTable = userRole === 'employer' ? 'employers' : 'applicants';
-      
+      const profileTable = userRole === "employer" ? "employers" : "applicants";
+
       let profileData;
-      
-      if (userRole === 'employer') {
-        // For employers table - match your exact schema
+
+      if (userRole === "employer") {
+        // Employers table
         profileData = {
           id: userId,
           name: fullName,
-          company: `${firstName}'s Company`, // Required field in your schema
-          email: email,
-          // country, state, city not in your employers schema, so don't include them
+          company: `${firstName}'s Company`,
+          email,
+          country: country || null,       // 🆕 included (add columns if missing)
+          state: state || null,           // 🆕
+          city: city || null,             // 🆕
+          lga: lga || null,               // 🆕
+          terms_agreement: termsAgreement === true, // 🆕
         };
       } else {
-        // For applicants table
+        // Applicants table
         profileData = {
           id: userId,
-          email: email,
-          full_name: fullName, 
-          country: country || null, 
-          state: state || null, 
-          city: city || null
+          email,
+          full_name: fullName,
+          country: country || null,
+          state: state || null,
+          city: city || null,
+          lga: lga || null,               // 🆕
+          terms_agreement: termsAgreement === true, // 🆕
         };
       }
 
       console.log(`Inserting into ${profileTable} table with:`, profileData);
 
-      const { data, error } = await supabaseAdmin
+      const { error } = await supabaseAdmin
         .from(profileTable)
         .insert([profileData]);
-        
+
       if (error) {
         console.error(`❌ ${profileTable} table insert error:`, error);
         throw new Error(`Failed to insert into ${profileTable} table: ${error.message}`);
       }
-      
+
       console.log(`✅ ${profileTable} table updated`);
     } catch (profileError) {
       console.error("❌ Profile table insert failed:", profileError.message);
-      return res.status(400).json({ 
-        error: `Failed to create ${userRole} profile: ${profileError.message}` 
+      return res.status(400).json({
+        error: `Failed to create ${userRole} profile: ${profileError.message}`,
       });
     }
 
     // 6. Store verification token
     try {
       await supabaseAdmin
-        .from('email_verifications')
-        .insert([{
-          user_id: userId,
-          email: email,
-          token: verificationToken,
-          expires_at: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
-          user_role: userRole
-        }]);
+        .from("email_verifications")
+        .insert([
+          {
+            user_id: userId,
+            email,
+            token: verificationToken,
+            expires_at: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
+            user_role: userRole,
+          },
+        ]);
       console.log("✅ Verification token stored");
     } catch (verificationError) {
       console.log("⚠️ Verification storage failed:", verificationError.message);
     }
 
-    // 7. Send verification email via Resend - USING THE BEAUTIFUL DESIGN
+    // 7. Send verification email via Resend
     let emailSent = false;
     let emailErrorDetails = null;
-    
+
     try {
-      const baseUrl = process.env.NEXTAUTH_URL || 'https://mygigzz.com';
+      const baseUrl = process.env.NEXTAUTH_URL || "https://mygigzz.com";
       const verificationUrl = `${baseUrl}/auth/verify-email?token=${verificationToken}`;
-      
+
       console.log("📧 Attempting to send email to:", email);
-      
-      const { data, error } = await resend.emails.send({
+
+      const { error } = await resend.emails.send({
         from: "hello@mygigzz.com",
         to: email,
         subject: "Confirm your Gigzz account - Action required",
@@ -182,28 +203,25 @@ export default async function handler(req, res) {
 </head>
 <body style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; background: #f8f9fa; padding: 20px;">
     <div style="background: #ffffff; border-radius: 12px; padding: 40px 30px; box-shadow: 0 2px 10px rgba(0,0,0,0.05);">
-        
-        <!-- Header with Your Logo -->
+
         <div style="text-align: center; padding: 20px 0 30px 0;">
-            <img 
-                src="https://mygigzz.com/images/gigzzblack.png" 
-                alt="Gigzz" 
+            <img
+                src="https://mygigzz.com/images/gigzzblack.png"
+                alt="Gigzz"
                 style="max-width: 120px; height: auto;"
             />
             <h2 style="color: #000000; margin: 20px 0 10px 0; font-size: 24px;">Verify Your Email Address</h2>
         </div>
 
-        <!-- Content -->
         <div style="color: #333333; line-height: 1.6; margin-bottom: 25px;">
-            <p>Hello${firstName ? ` ${firstName}` : ''},</p>
-            
+            <p>Hello${firstName ? ` ${firstName}` : ""},</p>
+
             <p>Thank you for creating a Gigzz account. We're excited to have you join our community of talented creatives and clients.</p>
-            
+
             <p>To complete your registration and start exploring opportunities, please verify your email address by clicking the button below:</p>
 
-            <!-- CTA Button -->
             <div style="text-align: center; margin: 35px 0;">
-                <a href="${verificationUrl}" 
+                <a href="${verificationUrl}"
                    style="background: #000000; color: #ffffff; padding: 16px 40px; text-decoration: none; border-radius: 8px; display: inline-block; font-weight: bold; font-size: 16px; letter-spacing: 0.5px;">
                     Verify Email Address
                 </a>
@@ -213,7 +231,6 @@ export default async function handler(req, res) {
                 This verification link will expire in 24 hours.
             </p>
 
-            <!-- Fallback Link -->
             <div style="background: #f8f9fa; padding: 15px; border-radius: 6px; margin: 20px 0;">
                 <p style="margin: 0 0 8px 0; font-size: 14px; color: #666;">
                     <strong>Alternative:</strong> If the button doesn't work, copy and paste this link into your browser:
@@ -224,22 +241,20 @@ export default async function handler(req, res) {
             </div>
         </div>
 
-        <!-- Security Notice -->
         <div style="background: #f8f9fa; border-left: 4px solid #000000; padding: 15px; margin: 25px 0;">
             <p style="color: #666666; margin: 0; font-size: 14px;">
                 <strong>Note:</strong> This email was sent because someone signed up for Gigzz with this email address. If this wasn't you, please disregard this message.
             </p>
         </div>
 
-        <!-- Footer -->
         <div style="border-top: 1px solid #eeeeee; padding: 25px 0 0 0; text-align: center;">
             <p style="color: #999999; font-size: 12px; margin: 0 0 10px 0;">
-                If you have any questions, contact our support team at 
+                If you have any questions, contact our support team at
                 <a href="mailto:support@mygigzz.com" style="color: #000000;">support@mygigzz.com</a>
             </p>
             <p style="color: #999999; font-size: 12px; margin: 0;">
                 Gigzz Inc., 10 Admiralty Way, Lekki, Lagos 10001<br>
-                <a href="https://mygigzz.com/privacy" style="color: #999999; text-decoration: none;">Privacy Policy</a> • 
+                <a href="https://mygigzz.com/privacy" style="color: #999999; text-decoration: none;">Privacy Policy</a> •
                 <a href="https://mygigzz.com/terms" style="color: #999999; text-decoration: none;">Terms of Service</a>
             </p>
         </div>
@@ -261,16 +276,15 @@ export default async function handler(req, res) {
       emailErrorDetails = emailError;
     }
 
-    return res.status(200).json({ 
-      success: true, 
-      message: emailSent 
-        ? "Account created successfully! Check your email for verification." 
+    return res.status(200).json({
+      success: true,
+      message: emailSent
+        ? "Account created successfully! Check your email for verification."
         : "Account created! Email verification failed - please contact support.",
-      userId: userId,
-      emailSent: emailSent,
-      ...(emailErrorDetails && { emailError: emailErrorDetails.message })
+      userId,
+      emailSent,
+      ...(emailErrorDetails && { emailError: emailErrorDetails.message }),
     });
-
   } catch (err) {
     console.error("💥 FATAL SERVER ERROR:", err);
     return res.status(500).json({ error: "Server error. Please try again." });

@@ -48,6 +48,9 @@ export default function JobDetailPage() {
   const [user, setUser] = useState(null);
   const [activeTab, setActiveTab] = useState('description');
 
+  // NEW: control whether the modal should show auth buttons
+  const [showAuthButtons, setShowAuthButtons] = useState(false);
+
   // form states
   const [coverLetter, setCoverLetter] = useState('');
   const [bidAmount, setBidAmount] = useState('');
@@ -75,6 +78,32 @@ export default function JobDetailPage() {
     window.addEventListener('resize', checkMobile);
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
+
+  /* ------------------------------------------------------------------
+     PAGE PERSISTENCE
+     Save the current job id in localStorage so that after the user
+     signs up / logs in, we can redirect them back here.
+  ------------------------------------------------------------------ */
+  useEffect(() => {
+    if (id) {
+      try {
+        localStorage.setItem('gigzz_redirect_job_id', String(id));
+      } catch (e) {
+        // localStorage might be unavailable (private mode, etc.)
+        console.warn('Could not persist job id:', e);
+      }
+    }
+  }, [id]);
+
+  // Optional: if a stored redirect exists but the user is already
+  // logged in, clear it (we don't need it anymore).
+  useEffect(() => {
+    if (user && id) {
+      try {
+        localStorage.removeItem('gigzz_redirect_job_id');
+      } catch (e) {}
+    }
+  }, [user, id]);
 
   useEffect(() => {
     const fetchAuthUser = async () => {
@@ -140,7 +169,7 @@ export default function JobDetailPage() {
 
   // Only show location tab if category is not "remote"
   const showLocationTab = job?.category?.toLowerCase() !== 'remote';
-  
+
   // Filter tabs based on conditions
   const tabs = [
     { id: 'description', label: 'Description' },
@@ -159,6 +188,7 @@ export default function JobDetailPage() {
   const handleApply = async () => {
     if (!user) {
       setModalMessage('❌ You must login to apply for this job.');
+      setShowAuthButtons(true); // show signup/login buttons in modal
       setShowModal(true);
       return;
     }
@@ -171,14 +201,16 @@ export default function JobDetailPage() {
 
     if (employerCheck) {
       setModalMessage(
-        '⚠️ You cannot apply to jobs using a Client account. Please signup as a Creative to apply.'
+        '⚠️ You cannot apply to jobs using a Client account. Kindly signup as an Applicant/Creative to apply.'
       );
+      setShowAuthButtons(false);
       setShowModal(true);
       return;
     }
 
     if (alreadyApplied) {
       setModalMessage('⚠️ You have already applied for this job.');
+      setShowAuthButtons(false);
       setShowModal(true);
       return;
     }
@@ -186,13 +218,15 @@ export default function JobDetailPage() {
     // Only validate cover letter if cover_letter_visibility is true
     if (job?.cover_letter_visibility) {
       if (!coverLetter.trim()) {
-        setModalMessage('⚠️ Please write a cover letter.');
+        setModalMessage('⚠️ Kindly write a cover letter.');
+        setShowAuthButtons(false);
         setShowModal(true);
         return;
       }
 
       if (coverLetter.length > 1500) {
         setModalMessage('⚠️ Cover letter cannot exceed 1500 characters.');
+        setShowAuthButtons(false);
         setShowModal(true);
         return;
       }
@@ -200,7 +234,8 @@ export default function JobDetailPage() {
 
     // Check if agent terms need to be accepted
     if (job?.condition && !acceptedAgentTerms) {
-      setModalMessage('⚠️ Please read and accept the agent terms and conditions.');
+      setModalMessage('⚠️ Kindly read and accept this agent terms and conditions.');
+      setShowAuthButtons(false);
       setShowModal(true);
       return;
     }
@@ -208,6 +243,7 @@ export default function JobDetailPage() {
     // Check if Gigzz terms are accepted
     if (!acceptedGigzzTerms) {
       setModalMessage('⚠️ Please accept the Gigzz Terms of Use.');
+      setShowAuthButtons(false);
       setShowModal(true);
       return;
     }
@@ -237,6 +273,7 @@ export default function JobDetailPage() {
     if (updateError) {
       setSubmitting(false);
       setModalMessage('❌ Failed to deduct tokens. Try again.');
+      setShowAuthButtons(false);
       setShowModal(true);
       return;
     }
@@ -247,6 +284,7 @@ export default function JobDetailPage() {
       if (!ALLOWED_MIME.includes(file.type)) {
         setSubmitting(false);
         setModalMessage('❌ Invalid file type detected. Allowed: jpg, jpeg, png, svg, pdf');
+        setShowAuthButtons(false);
         setShowModal(true);
         return;
       }
@@ -260,6 +298,7 @@ export default function JobDetailPage() {
         console.error(uploadError);
         setSubmitting(false);
         setModalMessage('❌ Failed to upload attachment(s).');
+        setShowAuthButtons(false);
         setShowModal(true);
         return;
       }
@@ -286,12 +325,14 @@ export default function JobDetailPage() {
     if (error) {
       console.error(error);
       setModalMessage('❌ Something went wrong. Please try again.');
+      setShowAuthButtons(false);
       setShowModal(true);
       return;
     }
 
     setAlreadyApplied(true);
     setModalMessage('🎉 Application successful! 3 tokens have been deducted.');
+    setShowAuthButtons(false);
     setShowModal(true);
 
     setCoverLetter('');
@@ -308,6 +349,7 @@ export default function JobDetailPage() {
       setShowWalletComponent(true);
     } else {
       setModalMessage('⚠️ Insufficient token balance. Kindly fund your token and try again.');
+      setShowAuthButtons(false);
       setShowModal(true);
     }
   };
@@ -448,7 +490,7 @@ export default function JobDetailPage() {
   };
 
   const renderForm = () => (
-    <motion.div 
+    <motion.div
       className="border border-gray-200 rounded-2xl p-6 shadow-lg bg-white"
       whileHover={{ scale: 1.01 }}
       transition={{ duration: 0.2 }}
@@ -529,7 +571,7 @@ export default function JobDetailPage() {
               <div className="flex items-start gap-2">
                 <Briefcase className="w-4 h-4 text-blue-500 mt-0.5 flex-shrink-0" />
                 <p className="text-xs text-blue-700">
-                  <strong>Pro Tip:</strong> Create a portfolio on MyGigzz to showcase your work professionally. 
+                  <strong>Pro Tip:</strong> Create a portfolio on MyGigzz to showcase your work professionally.
                   You can also upload your CV/resume here using the button below.
                 </p>
               </div>
@@ -582,13 +624,12 @@ export default function JobDetailPage() {
               <label className="text-sm font-semibold text-gray-900">Links (Optional)</label>
               <span className="text-[9px] text-gray-500">Max 3</span>
             </div>
-            
+
             <div className="bg-purple-50 p-3 rounded-lg mb-3 border border-purple-200">
               <div className="flex items-start gap-2">
                 <LinkIcon className="w-4 h-4 text-purple-500 mt-0.5 flex-shrink-0" />
                 <p className="text-xs text-purple-700">
-                  <strong>Showcase your work:</strong> Add links to your portfolio, previous projects, GitHub, Behance, 
-                  or any relevant work samples.
+                  <strong>Showcase your work:</strong> Add previous projects link or any relevant work samples if any. Note: this is optional.
                 </p>
               </div>
             </div>
@@ -671,7 +712,7 @@ export default function JobDetailPage() {
                     <div className="text-sm text-gray-700 whitespace-pre-line leading-relaxed bg-gray-50 p-4 rounded-lg">
                       {job.condition}
                     </div>
-                    
+
                     <label className="flex items-start gap-3 mt-4 p-3 bg-orange-50 rounded-lg border border-orange-200">
                       <input
                         type="checkbox"
@@ -738,7 +779,7 @@ export default function JobDetailPage() {
           {/* Main Content */}
           <div className={isMobile ? '' : 'lg:col-span-3'}>
             {/* Header Section */}
-            <motion.div 
+            <motion.div
               className="bg-gradient-to-r from-black to-gray-900 rounded-2xl p-6 md:p-8 text-white mb-8"
               initial={{ opacity: 0, y: -20 }}
               animate={{ opacity: 1, y: 0 }}
@@ -854,7 +895,7 @@ export default function JobDetailPage() {
             )}
 
             {/* Similar Jobs */}
-            <motion.div 
+            <motion.div
               className="mt-12"
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
@@ -865,8 +906,8 @@ export default function JobDetailPage() {
                 <p className="text-gray-500 text-center py-8">No similar jobs found.</p>
               ) : (
                 <div className={`grid gap-4 ${
-                  isMobile 
-                    ? 'grid-cols-2' 
+                  isMobile
+                    ? 'grid-cols-2'
                     : 'grid-cols-1 md:grid-cols-2'
                 }`}>
                   {similarJobs.map((similarJob) => (
@@ -917,14 +958,57 @@ export default function JobDetailPage() {
               className="bg-white rounded-2xl p-6 max-w-md w-full shadow-xl"
             >
               <p className="text-gray-700 mb-6 text-center">{modalMessage}</p>
-              <motion.button
-                onClick={() => setShowModal(false)}
-                className="w-full px-4 py-3 text-sm bg-black text-white rounded-xl hover:bg-orange-400 transition-all duration-200 font-semibold"
-                whileHover={{ scale: 1.03 }}
-                whileTap={{ scale: 0.98 }}
-              >
-                OK
-              </motion.button>
+
+              {/* NEW: Auth buttons shown only when the user is not logged in */}
+              {showAuthButtons ? (
+                <div className="flex flex-col gap-3">
+                  <motion.button
+                    onClick={() => {
+                      setShowModal(false);
+                      router.push('/auth/signup');
+                    }}
+                    className="w-full px-4 py-3 text-sm bg-black text-white rounded-xl hover:bg-orange-400 transition-all duration-200 font-semibold"
+                    whileHover={{ scale: 1.03 }}
+                    whileTap={{ scale: 0.98 }}
+                  >
+                    Create an Account
+                  </motion.button>
+                  <motion.button
+                    onClick={() => {
+                      setShowModal(false);
+                      router.push('/auth/login');
+                    }}
+                    className="w-full px-4 py-3 text-sm border-2 border-black text-black rounded-xl hover:bg-orange-50 transition-all duration-200 font-semibold"
+                    whileHover={{ scale: 1.03 }}
+                    whileTap={{ scale: 0.98 }}
+                  >
+                    Login
+                  </motion.button>
+                  <motion.button
+                    onClick={() => {
+                      setShowModal(false);
+                      setShowAuthButtons(false);
+                    }}
+                    className="w-full px-4 py-2 text-xs text-gray-500 hover:text-gray-700 transition-all duration-200"
+                    whileHover={{ scale: 1.02 }}
+                    whileTap={{ scale: 0.98 }}
+                  >
+                    Cancel
+                  </motion.button>
+                </div>
+              ) : (
+                <motion.button
+                  onClick={() => {
+                    setShowModal(false);
+                    setShowAuthButtons(false);
+                  }}
+                  className="w-full px-4 py-3 text-sm bg-black text-white rounded-xl hover:bg-orange-400 transition-all duration-200 font-semibold"
+                  whileHover={{ scale: 1.03 }}
+                  whileTap={{ scale: 0.98 }}
+                >
+                  OK
+                </motion.button>
+              )}
             </motion.div>
           </motion.div>
         )}
@@ -998,8 +1082,8 @@ export default function JobDetailPage() {
               >
                 <X className="w-5 h-5 text-gray-600" />
               </motion.button>
-              
-              <WalletComponent 
+
+              <WalletComponent
                 onClose={() => setShowWalletComponent(false)}
                 showCloseButton={false}
               />

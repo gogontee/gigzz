@@ -1,6 +1,7 @@
 import "../styles/globals.css";
 import Layout from "../components/Layout";
 import CookieBanner from "../components/CookieBanner";
+import AnalyticsGate from "../components/AnalyticsGate";
 import { AnimatePresence, motion } from "framer-motion";
 import Head from "next/head";
 import { useRouter } from "next/router";
@@ -9,9 +10,6 @@ import { createPagesBrowserClient } from "@supabase/auth-helpers-nextjs";
 import { SessionContextProvider } from "@supabase/auth-helpers-react";
 import { AppProgressBar as ProgressBar } from "next-nprogress-bar";
 import { UserProvider } from "../context/UserContext";
-
-// ✅ Added Vercel Analytics
-import { Analytics } from "@vercel/analytics/react";
 
 function MyApp({ Component, pageProps }) {
   const router = useRouter();
@@ -159,10 +157,12 @@ function MyApp({ Component, pageProps }) {
                   transition={{ duration: 0.2 }}
                 >
                   <Component {...pageProps} />
-                  <CookieBanner />
                 </motion.div>
               </AnimatePresence>
             </Layout>
+
+            {/* ✅ Cookie banner now mounted ONCE at app level, outside AnimatePresence */}
+            <CookieBanner />
 
             <ProgressBar
               height="3px"
@@ -171,8 +171,8 @@ function MyApp({ Component, pageProps }) {
               shallowRouting
             />
 
-            {/* ✅ Vercel Analytics placed correctly */}
-            <Analytics />
+            {/* ✅ Analytics only fires after user consents to "all" */}
+            <AnalyticsGate />
           </UserProvider>
         </SessionContextProvider>
       )}

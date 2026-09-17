@@ -68,7 +68,7 @@ export default function ContactPage() {
           </h1>
 
           <p className="text-lg mb-6">
-            Whether you're a client, creative, or curious visitor, we'd love to hear from you. Reach out to us using the form below or contact us directly.
+            Whether you're a client, creative, or curious visitor, we’d love to hear from you. Reach out to us using the form below or email us directly.
           </p>
 
           <form className="space-y-6" onSubmit={handleSubmit}>
@@ -122,25 +122,14 @@ export default function ContactPage() {
 
           {success && <p className="mt-4 text-green-600 font-medium">{success}</p>}
 
-          <div className="mt-10 space-y-2 text-sm text-gray-600">
-            <div>
-              Email us at{" "}
-              <a
-                href="mailto:gigzzafrica@gmail.com"
-                className="text-orange-600 underline hover:text-orange-700"
-              >
-                gigzzafrica@gmail.com
-              </a>
-            </div>
-            <div>
-              Call or WhatsApp us at{" "}
-              <a
-                href="tel:+2347016851730"
-                className="text-orange-600 underline hover:text-orange-700"
-              >
-                +234 701 685 1730
-              </a>
-            </div>
+          <div className="mt-10 text-sm text-gray-600">
+            Or email us at{" "}
+            <a
+              href="mailto:support@gigzz.com"
+              className="text-orange-600 underline"
+            >
+              gigzzafrica@gmail.com
+            </a>
           </div>
         </main>
 
