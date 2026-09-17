@@ -9,7 +9,23 @@ import Footer from '../../components/Footer';
 import { motion, AnimatePresence } from 'framer-motion';
 import JobCard from '../../components/JobCard';
 import WalletComponent from '../../components/WalletComponent';
-import { MapPin, Clock, DollarSign, FileText, X, Briefcase, Link as LinkIcon, Upload } from "lucide-react";
+import Verify from '../../components/Verify';
+import {
+  MapPin,
+  Clock,
+  DollarSign,
+  FileText,
+  X,
+  Briefcase,
+  Link as LinkIcon,
+  Upload,
+  ShieldCheck,
+  TrendingUp,
+  Zap,
+  Timer,
+  ArrowRight,
+  CheckCircle2,
+} from 'lucide-react';
 
 export const supabase = createPagesBrowserClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL,
@@ -21,17 +37,17 @@ const ALLOWED_MIME = [
   'image/jpg',
   'image/png',
   'image/svg+xml',
-  'application/pdf'
+  'application/pdf',
 ];
 
 const tabVariants = {
   hidden: { opacity: 0, y: 10 },
   visible: { opacity: 1, y: 0, transition: { duration: 0.3 } },
-  exit: { opacity: 0, y: -10, transition: { duration: 0.2 } }
+  exit: { opacity: 0, y: -10, transition: { duration: 0.2 } },
 };
 
 const cardHoverVariants = {
-  hover: { scale: 1.03, transition: { duration: 0.2 } }
+  hover: { scale: 1.03, transition: { duration: 0.2 } },
 };
 
 export default function JobDetailPage() {
@@ -48,7 +64,7 @@ export default function JobDetailPage() {
   const [user, setUser] = useState(null);
   const [activeTab, setActiveTab] = useState('description');
 
-  // NEW: control whether the modal should show auth buttons
+  // Auth buttons in modal
   const [showAuthButtons, setShowAuthButtons] = useState(false);
 
   // form states
@@ -72,6 +88,10 @@ export default function JobDetailPage() {
   const [showTopUpPrompt, setShowTopUpPrompt] = useState(false);
   const [showWalletComponent, setShowWalletComponent] = useState(false);
 
+  // Verification prompt
+  const [showVerifyPopup, setShowVerifyPopup] = useState(false);
+  const [showVerifyModal, setShowVerifyModal] = useState(false);
+
   useEffect(() => {
     const checkMobile = () => setIsMobile(window.innerWidth <= 768);
     checkMobile();
@@ -81,22 +101,17 @@ export default function JobDetailPage() {
 
   /* ------------------------------------------------------------------
      PAGE PERSISTENCE
-     Save the current job id in localStorage so that after the user
-     signs up / logs in, we can redirect them back here.
   ------------------------------------------------------------------ */
   useEffect(() => {
     if (id) {
       try {
         localStorage.setItem('gigzz_redirect_job_id', String(id));
       } catch (e) {
-        // localStorage might be unavailable (private mode, etc.)
         console.warn('Could not persist job id:', e);
       }
     }
   }, [id]);
 
-  // Optional: if a stored redirect exists but the user is already
-  // logged in, clear it (we don't need it anymore).
   useEffect(() => {
     if (user && id) {
       try {
@@ -105,10 +120,13 @@ export default function JobDetailPage() {
     }
   }, [user, id]);
 
+  /* ------------------------------------------------------------------
+     AUTH USER + alreadyApplied
+  ------------------------------------------------------------------ */
   useEffect(() => {
     const fetchAuthUser = async () => {
       const {
-        data: { user }
+        data: { user },
       } = await supabase.auth.getUser();
       setUser(user);
 
@@ -126,6 +144,55 @@ export default function JobDetailPage() {
     fetchAuthUser();
   }, [id]);
 
+  /* ------------------------------------------------------------------
+     VERIFICATION PROMPT
+     - Only for authenticated applicants
+     - Skip if pending / verified
+     - Once per session
+  ------------------------------------------------------------------ */
+  useEffect(() => {
+    if (!user?.id) return;
+
+    const sessionKey = `verifyPromptJob_${user.id}`;
+    if (sessionStorage.getItem(sessionKey)) return;
+
+    const run = async () => {
+      // 1. Skip employers
+      const { data: employerCheck } = await supabase
+        .from('employers')
+        .select('id')
+        .eq('id', user.id)
+        .maybeSingle();
+
+      if (employerCheck) return; // employer — no prompt
+
+      // 2. Fetch verification row
+      const { data: v } = await supabase
+        .from('verifications')
+        .select('approved')
+        .eq('user_id', user.id)
+        .maybeSingle();
+
+      const approved = v?.approved?.toLowerCase();
+      const needsVerification =
+        !v ||
+        !approved ||
+        approved === 'rejected' ||
+        approved === 'unverified' ||
+        approved === 'unverify';
+
+      if (needsVerification) {
+        sessionStorage.setItem(sessionKey, 'true');
+        setTimeout(() => setShowVerifyPopup(true), 1800);
+      }
+    };
+
+    run();
+  }, [user?.id]);
+
+  /* ------------------------------------------------------------------
+     JOB + POSTER + VERIFICATIONS + SIMILAR JOBS
+  ------------------------------------------------------------------ */
   useEffect(() => {
     if (!id) return;
     const fetchJob = async () => {
@@ -167,28 +234,33 @@ export default function JobDetailPage() {
     fetchJob();
   }, [id]);
 
-  // Only show location tab if category is not "remote"
+  /* ------------------------------------------------------------------
+     Tabs
+  ------------------------------------------------------------------ */
   const showLocationTab = job?.category?.toLowerCase() !== 'remote';
 
-  // Filter tabs based on conditions
   const tabs = [
     { id: 'description', label: 'Description' },
     { id: 'responsibilities', label: 'Responsibilities' },
     { id: 'requirements', label: 'Requirements' },
     { id: 'qualification', label: 'Qualification' },
-    ...(showLocationTab ? [{ id: 'location', label: 'Location' }] : [])
-  ].filter(tab => {
+    ...(showLocationTab ? [{ id: 'location', label: 'Location' }] : []),
+  ].filter((tab) => {
     if (tab.id === 'responsibilities' && !job?.responsibilities) return false;
     if (tab.id === 'requirements' && !job?.requirements) return false;
-    if (tab.id === 'qualification' && !job?.educational_qualification) return false;
+    if (tab.id === 'qualification' && !job?.educational_qualification)
+      return false;
     if (tab.id === 'location' && !job?.location) return false;
     return true;
   });
 
+  /* ------------------------------------------------------------------
+     Apply handler
+  ------------------------------------------------------------------ */
   const handleApply = async () => {
     if (!user) {
       setModalMessage('❌ You must login to apply for this job.');
-      setShowAuthButtons(true); // show signup/login buttons in modal
+      setShowAuthButtons(true);
       setShowModal(true);
       return;
     }
@@ -215,7 +287,6 @@ export default function JobDetailPage() {
       return;
     }
 
-    // Only validate cover letter if cover_letter_visibility is true
     if (job?.cover_letter_visibility) {
       if (!coverLetter.trim()) {
         setModalMessage('⚠️ Kindly write a cover letter.');
@@ -232,15 +303,15 @@ export default function JobDetailPage() {
       }
     }
 
-    // Check if agent terms need to be accepted
     if (job?.condition && !acceptedAgentTerms) {
-      setModalMessage('⚠️ Kindly read and accept this agent terms and conditions.');
+      setModalMessage(
+        '⚠️ Kindly read and accept this agent terms and conditions.'
+      );
       setShowAuthButtons(false);
       setShowModal(true);
       return;
     }
 
-    // Check if Gigzz terms are accepted
     if (!acceptedGigzzTerms) {
       setModalMessage('⚠️ Please accept the Gigzz Terms of Use.');
       setShowAuthButtons(false);
@@ -283,13 +354,17 @@ export default function JobDetailPage() {
     for (let file of validFiles) {
       if (!ALLOWED_MIME.includes(file.type)) {
         setSubmitting(false);
-        setModalMessage('❌ Invalid file type detected. Allowed: jpg, jpeg, png, svg, pdf');
+        setModalMessage(
+          '❌ Invalid file type detected. Allowed: jpg, jpeg, png, svg, pdf'
+        );
         setShowAuthButtons(false);
         setShowModal(true);
         return;
       }
       const ext = file.name.split('.').pop();
-      const path = `${user.id}/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
+      const path = `${user.id}/${Date.now()}-${Math.random()
+        .toString(36)
+        .slice(2)}.${ext}`;
       const { error: uploadError } = await supabase.storage
         .from('attachments')
         .upload(path, file, { upsert: false, contentType: file.type });
@@ -316,8 +391,8 @@ export default function JobDetailPage() {
         cover_letter: coverLetter || null,
         amount: bidAmount ? Number(bidAmount) : null,
         attachment: attachmentUrls.length > 0 ? attachmentUrls : null,
-        links: links.filter((l) => l.trim() !== '')
-      }
+        links: links.filter((l) => l.trim() !== ''),
+      },
     ]);
 
     setSubmitting(false);
@@ -348,7 +423,9 @@ export default function JobDetailPage() {
     if (wantsToTopUp) {
       setShowWalletComponent(true);
     } else {
-      setModalMessage('⚠️ Insufficient token balance. Kindly fund your token and try again.');
+      setModalMessage(
+        '⚠️ Insufficient token balance. Kindly fund your token and try again.'
+      );
       setShowAuthButtons(false);
       setShowModal(true);
     }
@@ -387,6 +464,21 @@ export default function JobDetailPage() {
     }
   };
 
+  /* ------------------------------------------------------------------
+     Verify prompt actions
+  ------------------------------------------------------------------ */
+  const handleVerifyNow = () => {
+    setShowVerifyPopup(false);
+    setShowVerifyModal(true);
+  };
+
+  const handleVerifyLater = () => {
+    setShowVerifyPopup(false);
+  };
+
+  /* ------------------------------------------------------------------
+     Tab content
+  ------------------------------------------------------------------ */
   const renderTabContent = () => {
     switch (activeTab) {
       case 'description':
@@ -442,7 +534,8 @@ export default function JobDetailPage() {
             exit="exit"
           >
             <p className="text-gray-700 whitespace-pre-line leading-relaxed">
-              {job.educational_qualification || 'No specific qualification required.'}
+              {job.educational_qualification ||
+                'No specific qualification required.'}
             </p>
           </motion.div>
         );
@@ -465,10 +558,11 @@ export default function JobDetailPage() {
 
   if (!job) return <div className="p-4">Loading job details...</div>;
 
-  // Format pay based on salary_range_visibility
   const formattedPay = job.salary_range_visibility
     ? job.min_price && job.max_price
-      ? `₦${Number(job.min_price).toLocaleString()} - ₦${Number(job.max_price).toLocaleString()}`
+      ? `₦${Number(job.min_price).toLocaleString()} - ₦${Number(
+          job.max_price
+        ).toLocaleString()}`
       : job.min_price
       ? `₦${Number(job.min_price).toLocaleString()}`
       : job.max_price
@@ -489,6 +583,9 @@ export default function JobDetailPage() {
     }
   };
 
+  /* ------------------------------------------------------------------
+     Form renderer
+  ------------------------------------------------------------------ */
   const renderForm = () => (
     <motion.div
       className="border border-gray-200 rounded-2xl p-6 shadow-lg bg-white"
@@ -496,10 +593,11 @@ export default function JobDetailPage() {
       transition={{ duration: 0.2 }}
     >
       {!alreadyApplied && (
-        <h2 className="text-xl font-bold mb-4 text-gray-900">Apply to this Job</h2>
+        <h2 className="text-xl font-bold mb-4 text-gray-900">
+          Apply to this Job
+        </h2>
       )}
 
-      {/* Agent Tag */}
       {job.condition && (
         <div className="mb-4">
           <span className="inline-flex items-center gap-1 bg-orange-100 text-orange-800 px-3 py-1 rounded-full text-xs font-medium border border-orange-200">
@@ -530,10 +628,11 @@ export default function JobDetailPage() {
         </div>
       ) : (
         <>
-          {/* Cover Letter - Only show if cover_letter_visibility is true */}
           {job.cover_letter_visibility && (
             <div className="mb-4">
-              <label className="text-sm font-semibold text-gray-900 mb-2 block">Cover Letter</label>
+              <label className="text-sm font-semibold text-gray-900 mb-2 block">
+                Cover Letter
+              </label>
               <textarea
                 value={coverLetter}
                 onChange={(e) => setCoverLetter(e.target.value)}
@@ -542,14 +641,17 @@ export default function JobDetailPage() {
                 rows={5}
                 className="w-full border border-gray-300 rounded-xl p-4 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400 focus:border-transparent transition-all duration-200"
               />
-              <p className="text-xs text-gray-500 mt-2">{coverLetter.length}/1500</p>
+              <p className="text-xs text-gray-500 mt-2">
+                {coverLetter.length}/1500
+              </p>
             </div>
           )}
 
-          {/* Your Bid - Only show if salary_range_visibility is true */}
           {job.salary_range_visibility && (
             <div className="mb-4">
-              <label className="text-sm font-semibold text-gray-900 mb-2 block">Your Bid (₦)</label>
+              <label className="text-sm font-semibold text-gray-900 mb-2 block">
+                Your Bid (₦)
+              </label>
               <input
                 type="number"
                 value={bidAmount}
@@ -560,19 +662,23 @@ export default function JobDetailPage() {
             </div>
           )}
 
-          {/* Attachments Field with improved messaging */}
           <div className="mb-4">
             <div className="flex items-center justify-between mb-2">
-              <label className="text-sm font-semibold text-gray-900">Attachments (Optional)</label>
-              <span className="text-[9px] text-gray-500">Max 5 • JPG, JPEG, PNG, SVG, PDF</span>
+              <label className="text-sm font-semibold text-gray-900">
+                Attachments (Optional)
+              </label>
+              <span className="text-[9px] text-gray-500">
+                Max 5 • JPG, JPEG, PNG, SVG, PDF
+              </span>
             </div>
 
             <div className="bg-blue-50 p-3 rounded-lg mb-3 border border-blue-200">
               <div className="flex items-start gap-2">
                 <Briefcase className="w-4 h-4 text-blue-500 mt-0.5 flex-shrink-0" />
                 <p className="text-xs text-blue-700">
-                  <strong>Pro Tip:</strong> Create a portfolio on MyGigzz to showcase your work professionally.
-                  You can also upload your CV/resume here using the button below.
+                  <strong>Pro Tip:</strong> Create a portfolio on MyGigzz to
+                  showcase your work professionally. You can also upload your
+                  CV/resume here using the button below.
                 </p>
               </div>
             </div>
@@ -596,11 +702,13 @@ export default function JobDetailPage() {
                   onChange={(e) => handleFileChange(e, idx)}
                   className="w-full border border-gray-300 rounded-xl p-3 text-sm file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-black file:text-white hover:file:bg-orange-400 transition-all duration-200"
                 />
-                {idx === attachments.length - 1 && attachments.length < 5 && att && (
-                  <p className="text-xs text-green-600 mt-2">
-                    ✅ File added. Would you like to add more attachments?
-                  </p>
-                )}
+                {idx === attachments.length - 1 &&
+                  attachments.length < 5 &&
+                  att && (
+                    <p className="text-xs text-green-600 mt-2">
+                      ✅ File added. Would you like to add more attachments?
+                    </p>
+                  )}
               </div>
             ))}
 
@@ -618,10 +726,11 @@ export default function JobDetailPage() {
             )}
           </div>
 
-          {/* Links Field with improved messaging */}
           <div className="mb-6">
             <div className="flex items-center gap-2 mb-2">
-              <label className="text-sm font-semibold text-gray-900">Links (Optional)</label>
+              <label className="text-sm font-semibold text-gray-900">
+                Links (Optional)
+              </label>
               <span className="text-[9px] text-gray-500">Max 3</span>
             </div>
 
@@ -629,7 +738,9 @@ export default function JobDetailPage() {
               <div className="flex items-start gap-2">
                 <LinkIcon className="w-4 h-4 text-purple-500 mt-0.5 flex-shrink-0" />
                 <p className="text-xs text-purple-700">
-                  <strong>Showcase your work:</strong> Add previous projects link or any relevant work samples if any. Note: this is optional.
+                  <strong>Showcase your work:</strong> Add previous projects
+                  link or any relevant work samples if any. Note: this is
+                  optional.
                 </p>
               </div>
             </div>
@@ -652,7 +763,6 @@ export default function JobDetailPage() {
             ))}
           </div>
 
-          {/* Gigzz Terms & Conditions (Always Required) */}
           <div className="mb-4 p-4 bg-gray-50 rounded-xl border border-gray-200">
             <label className="flex items-start gap-3">
               <input
@@ -664,16 +774,23 @@ export default function JobDetailPage() {
               />
               <div className="flex-1">
                 <span className="text-sm font-medium text-gray-900">
-                  I accept the <a href="/terms" target="_blank" className="text-orange-600 hover:text-orange-800 font-semibold underline">Gigzz Terms of Use</a>
+                  I accept the{' '}
+                  <a
+                    href="/terms"
+                    target="_blank"
+                    className="text-orange-600 hover:text-orange-800 font-semibold underline"
+                  >
+                    Gigzz Terms of Use
+                  </a>
                 </span>
                 <p className="text-xs text-gray-600 mt-1">
-                  By applying, you agree to our terms and conditions governing job applications and service usage.
+                  By applying, you agree to our terms and conditions governing
+                  job applications and service usage.
                 </p>
               </div>
             </label>
           </div>
 
-          {/* Agent Terms Section (Only for Agent Posted Jobs) */}
           {job.condition && (
             <div className="mb-6">
               <motion.button
@@ -686,14 +803,26 @@ export default function JobDetailPage() {
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     <FileText className="w-4 h-4 text-orange-600" />
-                    <span className="font-semibold text-orange-800">See Agent Terms & Conditions</span>
+                    <span className="font-semibold text-orange-800">
+                      See Agent Terms & Conditions
+                    </span>
                   </div>
                   <motion.div
                     animate={{ rotate: showAgentTerms ? 180 : 0 }}
                     transition={{ duration: 0.2 }}
                   >
-                    <svg className="w-4 h-4 text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                    <svg
+                      className="w-4 h-4 text-orange-600"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M19 9l-7 7-7-7"
+                      />
                     </svg>
                   </motion.div>
                 </div>
@@ -708,7 +837,9 @@ export default function JobDetailPage() {
                     transition={{ duration: 0.3 }}
                     className="mt-4 p-4 bg-white border border-orange-200 rounded-xl"
                   >
-                    <h4 className="font-semibold text-gray-900 mb-3">Agent Terms & Conditions</h4>
+                    <h4 className="font-semibold text-gray-900 mb-3">
+                      Agent Terms & Conditions
+                    </h4>
                     <div className="text-sm text-gray-700 whitespace-pre-line leading-relaxed bg-gray-50 p-4 rounded-lg">
                       {job.condition}
                     </div>
@@ -717,15 +848,19 @@ export default function JobDetailPage() {
                       <input
                         type="checkbox"
                         checked={acceptedAgentTerms}
-                        onChange={(e) => setAcceptedAgentTerms(e.target.checked)}
+                        onChange={(e) =>
+                          setAcceptedAgentTerms(e.target.checked)
+                        }
                         className="mt-1 text-orange-600 focus:ring-orange-500"
                       />
                       <div className="flex-1">
                         <span className="text-sm font-medium text-gray-900">
-                          I have read and accept the agent's terms and conditions
+                          I have read and accept the agent's terms and
+                          conditions
                         </span>
                         <p className="text-xs text-gray-600 mt-1">
-                          By checking this box, you acknowledge that you understand and agree to the terms set by the agent.
+                          By checking this box, you acknowledge that you
+                          understand and agree to the terms set by the agent.
                         </p>
                       </div>
                     </label>
@@ -743,7 +878,11 @@ export default function JobDetailPage() {
               });
               handleApply();
             }}
-            disabled={submitting || (job.condition && !acceptedAgentTerms) || !acceptedGigzzTerms}
+            disabled={
+              submitting ||
+              (job.condition && !acceptedAgentTerms) ||
+              !acceptedGigzzTerms
+            }
             className="w-full bg-black text-white px-6 py-3 rounded-xl hover:bg-orange-400 transition-all duration-200 font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
             whileHover={{ scale: submitting ? 1 : 1.03 }}
             whileTap={{ scale: 0.98 }}
@@ -790,31 +929,44 @@ export default function JobDetailPage() {
                   <div className="flex items-center gap-4 mb-4">
                     <div className="relative">
                       <img
-                        src={poster?.avatar_url || 'https://xatxjdsppcjgplmrtjcs.supabase.co/storage/v1/object/public/avatars/icon.png'}
+                        src={
+                          poster?.avatar_url ||
+                          'https://xatxjdsppcjgplmrtjcs.supabase.co/storage/v1/object/public/avatars/icon.png'
+                        }
                         alt="Poster Avatar"
                         className="w-16 h-16 rounded-full object-cover border-2 border-white"
                       />
                       {!isVerified && (
                         <span
                           className="absolute w-4 h-4 rounded-full border-2 border-white"
-                          style={{ backgroundColor: getVerificationDot(), bottom: 0, right: 0 }}
+                          style={{
+                            backgroundColor: getVerificationDot(),
+                            bottom: 0,
+                            right: 0,
+                          }}
                         />
                       )}
                     </div>
                     <div>
-                      <h1 className="text-2xl md:text-4xl font-bold mb-2">{job.title}</h1>
+                      <h1 className="text-2xl md:text-4xl font-bold mb-2">
+                        {job.title}
+                      </h1>
                       <div className="flex flex-wrap items-center gap-1">
                         {isVerified && (
-                          <span className={`inline-flex items-center gap-0.5 bg-green-600 px-1 py-0.5 rounded-full font-medium ${
-                            isMobile ? 'text-[7px]' : 'text-[7px]'
-                          }`}>
+                          <span
+                            className={`inline-flex items-center gap-0.5 bg-green-600 px-1 py-0.5 rounded-full font-medium ${
+                              isMobile ? 'text-[7px]' : 'text-[7px]'
+                            }`}
+                          >
                             ✔ Verified Client
                           </span>
                         )}
                         {job.condition && (
-                          <span className={`inline-flex items-center gap-1 bg-orange-400 px-2 py-0.5 rounded-full font-medium ${
-                            isMobile ? 'text-xs' : 'text-xs'
-                          }`}>
+                          <span
+                            className={`inline-flex items-center gap-1 bg-orange-400 px-2 py-0.5 rounded-full font-medium ${
+                              isMobile ? 'text-xs' : 'text-xs'
+                            }`}
+                          >
                             🤝 Agent Posted
                           </span>
                         )}
@@ -838,16 +990,21 @@ export default function JobDetailPage() {
 
                   <div className="flex flex-wrap items-center gap-6 text-sm">
                     <div>
-                      <p className="text-2xl font-bold text-orange-400">{formattedPay}</p>
+                      <p className="text-2xl font-bold text-orange-400">
+                        {formattedPay}
+                      </p>
                       {job.salary_range_visibility && job.price_frequency && (
-                        <p className="text-gray-300 text-sm">{job.price_frequency}</p>
+                        <p className="text-gray-300 text-sm">
+                          {job.price_frequency}
+                        </p>
                       )}
                     </div>
-                    {/* Only show deadline if it exists */}
                     {job.application_deadline && (
                       <div className="flex items-center gap-2">
                         <span className="text-gray-300">Deadline:</span>
-                        <span className="font-semibold">{job.application_deadline}</span>
+                        <span className="font-semibold">
+                          {job.application_deadline}
+                        </span>
                       </div>
                     )}
                   </div>
@@ -855,7 +1012,7 @@ export default function JobDetailPage() {
               </div>
             </motion.div>
 
-            {/* Tabs Section */}
+            {/* Tabs */}
             <div className="mb-8">
               <div className="border-b border-gray-200">
                 <nav className="flex space-x-8 overflow-x-auto">
@@ -901,22 +1058,30 @@ export default function JobDetailPage() {
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.4, delay: 0.3 }}
             >
-              <h3 className="text-2xl font-bold mb-6 text-gray-900">Similar Jobs</h3>
+              <h3 className="text-2xl font-bold mb-6 text-gray-900">
+                Similar Jobs
+              </h3>
               {similarJobs.length === 0 ? (
-                <p className="text-gray-500 text-center py-8">No similar jobs found.</p>
+                <p className="text-gray-500 text-center py-8">
+                  No similar jobs found.
+                </p>
               ) : (
-                <div className={`grid gap-4 ${
-                  isMobile
-                    ? 'grid-cols-2'
-                    : 'grid-cols-1 md:grid-cols-2'
-                }`}>
+                <div
+                  className={`grid gap-4 ${
+                    isMobile ? 'grid-cols-2' : 'grid-cols-1 md:grid-cols-2'
+                  }`}
+                >
                   {similarJobs.map((similarJob) => (
                     <motion.div
                       key={similarJob.id}
                       variants={cardHoverVariants}
                       whileHover="hover"
                     >
-                      <JobCard key={similarJob.id} job={similarJob} viewMode="list" />
+                      <JobCard
+                        key={similarJob.id}
+                        job={similarJob}
+                        viewMode="list"
+                      />
                     </motion.div>
                   ))}
                 </div>
@@ -942,7 +1107,161 @@ export default function JobDetailPage() {
 
       {!isMobile && <Footer />}
 
-      {/* Modal */}
+      {/* ============================================================
+          VERIFY PROMPT POPUP
+      ============================================================ */}
+      <AnimatePresence>
+        {showVerifyPopup && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[70] p-4"
+          >
+            <motion.div
+              initial={{ scale: 0.92, opacity: 0, y: 10 }}
+              animate={{ scale: 1, opacity: 1, y: 0 }}
+              exit={{ scale: 0.92, opacity: 0, y: 10 }}
+              transition={{ type: 'spring', damping: 24, stiffness: 280 }}
+              className="bg-white rounded-2xl shadow-2xl max-w-md w-full overflow-hidden"
+            >
+              <div className="relative bg-gradient-to-br from-black via-gray-900 to-gray-800 px-6 pt-6 pb-7 text-white">
+                <button
+                  onClick={handleVerifyLater}
+                  className="absolute top-4 right-4 p-1.5 rounded-full hover:bg-white/10 transition-colors"
+                  aria-label="Dismiss"
+                >
+                  <X className="w-4 h-4 text-white/70" />
+                </button>
+
+                <div className="flex items-center gap-3 mb-3">
+                  <div className="w-11 h-11 rounded-xl bg-orange-400/15 border border-orange-400/30 flex items-center justify-center">
+                    <ShieldCheck className="w-5 h-5 text-orange-400" />
+                  </div>
+                  <span className="text-xs font-semibold uppercase tracking-wider text-orange-400">
+                    Free · Under a minute
+                  </span>
+                </div>
+
+                <h3 className="text-xl font-bold leading-snug">
+                  Get verified for free
+                </h3>
+                <p className="text-sm text-white/60 mt-1">
+                  Verified profiles get hired faster
+                </p>
+              </div>
+
+              <div className="px-6 py-6 space-y-5">
+                <ul className="space-y-4">
+                  <li className="flex items-start gap-3">
+                    <div className="shrink-0 w-7 h-7 rounded-lg bg-green-50 border border-green-200 flex items-center justify-center mt-0.5">
+                      <CheckCircle2 className="w-3.5 h-3.5 text-green-600" />
+                    </div>
+                    <div className="pt-0.5">
+                      <p className="text-sm font-semibold text-gray-900">
+                        Green verified badge
+                      </p>
+                      <p className="text-xs text-gray-500 mt-0.5 leading-relaxed">
+                        Shows on your profile and applications
+                      </p>
+                    </div>
+                  </li>
+                  <li className="flex items-start gap-3">
+                    <div className="shrink-0 w-7 h-7 rounded-lg bg-orange-50 border border-orange-200 flex items-center justify-center mt-0.5">
+                      <TrendingUp className="w-3.5 h-3.5 text-orange-600" />
+                    </div>
+                    <div className="pt-0.5">
+                      <p className="text-sm font-semibold text-gray-900">
+                        Up to 3× more responses
+                      </p>
+                      <p className="text-xs text-gray-500 mt-0.5 leading-relaxed">
+                        Clients trust verified profiles faster
+                      </p>
+                    </div>
+                  </li>
+                  <li className="flex items-start gap-3">
+                    <div className="shrink-0 w-7 h-7 rounded-lg bg-blue-50 border border-blue-200 flex items-center justify-center mt-0.5">
+                      <Zap className="w-3.5 h-3.5 text-blue-600" />
+                    </div>
+                    <div className="pt-0.5">
+                      <p className="text-sm font-semibold text-gray-900">
+                        Priority in search
+                      </p>
+                      <p className="text-xs text-gray-500 mt-0.5 leading-relaxed">
+                        Rank above unverified profiles
+                      </p>
+                    </div>
+                  </li>
+                </ul>
+
+                <div className="rounded-xl bg-gradient-to-r from-orange-50 to-amber-50 border border-orange-100 p-3 flex items-start gap-2.5">
+                  <div className="shrink-0 w-8 h-8 rounded-lg bg-white border border-orange-200 flex items-center justify-center">
+                    <Timer className="w-4 h-4 text-orange-500" />
+                  </div>
+                  <div>
+                    <p className="text-xs font-semibold text-orange-900">
+                      Takes less than a minute
+                    </p>
+                    <p className="text-[11px] text-orange-800 mt-0.5 leading-relaxed">
+                      One selfie + a valid ID. That's it.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="px-6 pb-6">
+                <button
+                  onClick={handleVerifyNow}
+                  className="w-full flex items-center justify-center gap-2 bg-black text-white py-3.5 rounded-xl font-semibold text-sm hover:bg-orange-500 transition-colors shadow-sm"
+                >
+                  Verify now
+                  <ArrowRight className="w-4 h-4" />
+                </button>
+                <button
+                  onClick={handleVerifyLater}
+                  className="w-full mt-2 text-xs text-gray-400 hover:text-gray-600 py-2 transition-colors"
+                >
+                  I'll verify later
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* ============================================================
+          VERIFY COMPONENT MODAL
+      ============================================================ */}
+      <AnimatePresence>
+        {showVerifyModal && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-start justify-center z-[80] p-4 overflow-y-auto"
+          >
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0, y: 10 }}
+              animate={{ scale: 1, opacity: 1, y: 0 }}
+              exit={{ scale: 0.95, opacity: 0, y: 10 }}
+              transition={{ type: 'spring', damping: 24, stiffness: 280 }}
+              className="w-full max-w-lg my-8 relative"
+            >
+              <button
+                onClick={() => setShowVerifyModal(false)}
+                className="absolute -top-2 -right-2 z-10 bg-white rounded-full p-2 shadow-lg hover:bg-gray-100 transition-colors"
+                aria-label="Close"
+              >
+                <X className="w-5 h-5 text-gray-600" />
+              </button>
+
+              <Verify />
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Generic Modal */}
       <AnimatePresence>
         {showModal && (
           <motion.div
@@ -959,7 +1278,6 @@ export default function JobDetailPage() {
             >
               <p className="text-gray-700 mb-6 text-center">{modalMessage}</p>
 
-              {/* NEW: Auth buttons shown only when the user is not logged in */}
               {showAuthButtons ? (
                 <div className="flex flex-col gap-3">
                   <motion.button
@@ -1014,7 +1332,7 @@ export default function JobDetailPage() {
         )}
       </AnimatePresence>
 
-      {/* Top-up Prompt Modal */}
+      {/* Top-up Prompt */}
       <AnimatePresence>
         {showTopUpPrompt && (
           <motion.div
@@ -1033,7 +1351,8 @@ export default function JobDetailPage() {
                 Insufficient Token Balance
               </h3>
               <p className="text-gray-700 mb-6 text-center">
-                You need at least 3 tokens to apply for this job. Do you wish to top up your tokens now?
+                You need at least 3 tokens to apply for this job. Do you wish to
+                top up your tokens now?
               </p>
               <div className="flex gap-3">
                 <motion.button
@@ -1073,7 +1392,6 @@ export default function JobDetailPage() {
               exit={{ opacity: 0, scale: 0.9 }}
               className="bg-white rounded-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto relative"
             >
-              {/* Close Button */}
               <motion.button
                 onClick={() => setShowWalletComponent(false)}
                 className="absolute top-4 right-4 z-10 p-2 bg-gray-100 hover:bg-gray-200 rounded-full transition-colors duration-200"

@@ -1,8 +1,9 @@
 // components/profile/Profile.js
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
-import { motion } from 'framer-motion';
+import { useEffect, useState, useCallback, useRef } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { useRouter } from 'next/router';
 import Link from 'next/link';
 import {
   Eye,
@@ -13,6 +14,12 @@ import {
   Calendar,
   Edit3,
   X,
+  CheckCircle2,
+  ShieldCheck,
+  TrendingUp,
+  Zap,
+  Timer,
+  ArrowRight,
 } from 'lucide-react';
 import { supabase } from '../utils/supabaseClient';
 import WalletComponent from '../components/WalletComponent';
@@ -26,18 +33,17 @@ function HtmlPreview({ htmlContent, wordLimit = 50 }) {
   if (!htmlContent) return null;
 
   const cleanHtml = DOMPurify.sanitize(htmlContent, {
-    ALLOWED_TAGS: ["p", "strong", "em", "ul", "ol", "li", "br"],
+    ALLOWED_TAGS: ['p', 'strong', 'em', 'ul', 'ol', 'li', 'br'],
     ALLOWED_ATTR: [],
   });
 
-  // Strip tags for word counting
-  const textContent = cleanHtml.replace(/<[^>]+>/g, "");
+  const textContent = cleanHtml.replace(/<[^>]+>/g, '');
   const words = textContent.trim().split(/\s+/);
   const isLong = words.length > wordLimit;
 
   const displayContent = expanded
     ? cleanHtml
-    : `<p>${words.slice(0, wordLimit).join(" ")}${isLong ? "..." : ""}</p>`;
+    : `<p>${words.slice(0, wordLimit).join(' ')}${isLong ? '...' : ''}</p>`;
 
   return (
     <div>
@@ -50,7 +56,7 @@ function HtmlPreview({ htmlContent, wordLimit = 50 }) {
           onClick={() => setExpanded(!expanded)}
           className="text-orange-600 text-sm font-medium mt-2 hover:underline"
         >
-          {expanded ? "Read less" : "Read more"}
+          {expanded ? 'Read less' : 'Read more'}
         </button>
       )}
     </div>
@@ -58,28 +64,37 @@ function HtmlPreview({ htmlContent, wordLimit = 50 }) {
 }
 
 export default function Profile({ userId }) {
+  const router = useRouter();
+
   const [user, setUser] = useState(null);
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
   const [projects, setProjects] = useState([]);
   const [tokenBalance, setTokenBalance] = useState(0);
   const [showWallet, setShowWallet] = useState(false);
-  
+
+  // Verification status
+  const [verification, setVerification] = useState(null);
+
+  // Verify prompt popup
+  const [showVerifyPopup, setShowVerifyPopup] = useState(false);
+
   // Chat states
   const [chatOpen, setChatOpen] = useState(false);
   const [chatId, setChatId] = useState(null);
   const [chatLoading, setChatLoading] = useState(false);
 
-  // Check if current user is the profile owner
   const isProfileOwner = user?.id === userId;
 
-  // Load token balance for the profile owner - ONLY if profile owner
+  /* --------------------------------------------------------------
+     Load token balance for profile owner
+  -------------------------------------------------------------- */
   const loadTokenBalance = useCallback(async () => {
     if (!userId || !isProfileOwner) {
       setTokenBalance(0);
       return;
     }
-    
+
     try {
       const { data: wallet, error } = await supabase
         .from('token_wallets')
@@ -100,50 +115,58 @@ export default function Profile({ userId }) {
     }
   }, [userId, isProfileOwner]);
 
+  /* --------------------------------------------------------------
+     Load profile + projects + verification
+  -------------------------------------------------------------- */
   const loadProfileAndProjects = useCallback(async () => {
     setLoading(true);
 
-    // Get authenticated user
     const {
       data: { user: authUser },
       error: userError,
     } = await supabase.auth.getUser();
-    
+
     if (authUser) {
       setUser(authUser);
     }
 
-    // Determine role and table
+    const targetId = userId || authUser?.id;
+
     const { data: userMeta } = await supabase
       .from('users')
       .select('role')
-      .eq('id', userId || authUser?.id)
+      .eq('id', targetId)
       .single();
 
     const role = userMeta?.role;
     const table = role === 'employer' ? 'employers' : 'applicants';
 
-    // Fetch profile
     const { data: profileData } = await supabase
       .from(table)
       .select('*')
-      .eq('id', userId || authUser?.id)
+      .eq('id', targetId)
       .single();
 
     if (profileData) setProfile({ ...profileData, role, table });
 
-    // Fetch projects
     const { data: projectsData } = await supabase
       .from('projects')
       .select('*')
-      .eq('user_id', userId || authUser?.id)
+      .eq('user_id', targetId)
       .order('created_at', { ascending: false });
 
     if (projectsData) setProjects(projectsData);
 
-    // Load token balance only if user is profile owner
+    // Fetch verification status
+    const { data: verificationData } = await supabase
+      .from('verifications')
+      .select('approved')
+      .eq('user_id', targetId)
+      .maybeSingle();
+
+    setVerification(verificationData || null);
+
     await loadTokenBalance();
-    
     setLoading(false);
   }, [userId, loadTokenBalance]);
 
@@ -151,7 +174,48 @@ export default function Profile({ userId }) {
     loadProfileAndProjects();
   }, [loadProfileAndProjects]);
 
-  // Toggle DOB visibility
+  /* --------------------------------------------------------------
+     Show verify prompt — once per session, only if:
+       - viewer IS the profile owner
+       - verification row missing OR approved is rejected/unverified/null
+  -------------------------------------------------------------- */
+  useEffect(() => {
+    // Only when the profile owner is viewing their own profile
+    if (!isProfileOwner || !user?.id) return;
+
+    const sessionKey = `verifyPromptShown_${user.id}`;
+    if (sessionStorage.getItem(sessionKey)) return;
+
+    const approved = verification?.approved?.toLowerCase();
+    const needsVerification =
+      verification === null ||
+      !approved ||
+      approved === 'rejected' ||
+      approved === 'unverified' ||
+      approved === 'unverify';
+
+    if (needsVerification) {
+      sessionStorage.setItem(sessionKey, 'true');
+      setTimeout(() => setShowVerifyPopup(true), 1200);
+    }
+  }, [isProfileOwner, user?.id, verification]);
+
+  /* --------------------------------------------------------------
+     Verify prompt actions
+  -------------------------------------------------------------- */
+  const handleVerifyNow = () => {
+    setShowVerifyPopup(false);
+    // Route to the applicant dashboard and switch to the Verify tab
+    router.push('/dashboard/applicant?tab=verify');
+  };
+
+  const handleVerifyLater = () => {
+    setShowVerifyPopup(false);
+  };
+
+  /* --------------------------------------------------------------
+     Toggle DOB visibility
+  -------------------------------------------------------------- */
   const toggleDobVisibility = async () => {
     if (!profile) return;
 
@@ -171,46 +235,46 @@ export default function Profile({ userId }) {
     }
   };
 
-  // Get profile tag based on token balance - ONLY for profile owner
+  /* --------------------------------------------------------------
+     Profile tag based on token balance
+  -------------------------------------------------------------- */
   const getProfileTag = () => {
     if (!isProfileOwner) return null;
-    
+
     if (tokenBalance > 1) {
       return {
-        text: "Promoted",
-        color: "bg-green-500",
-        tooltip: `You have ${tokenBalance} tokens available`
+        text: 'Promoted',
+        color: 'bg-green-500',
+        tooltip: `You have ${tokenBalance} tokens available`,
       };
     } else {
       return {
-        text: "Your Profile",
-        color: "bg-orange-500",
-        tooltip: "Earn more tokens to get promoted"
+        text: 'Your Profile',
+        color: 'bg-orange-500',
+        tooltip: 'Earn more tokens to get promoted',
       };
     }
   };
 
-  // Handle chat button click - WITH PROPER AUTH HANDLING
+  /* --------------------------------------------------------------
+     Chat handler
+  -------------------------------------------------------------- */
   const handleChatClick = async () => {
-    // If user is not logged in, redirect to login
     if (!user) {
-      window.location.href = "/auth/login";
+      window.location.href = '/auth/login';
       return;
     }
 
-    // If current user is the profile owner, redirect to messages page
     if (isProfileOwner) {
-      window.location.href = "/messages";
+      window.location.href = '/messages';
       return;
     }
 
-    // If current user is viewing someone else's profile, open chat modal
     setChatLoading(true);
     try {
-      // Look for existing chat
       const { data: existingChats, error: fetchError } = await supabase
-        .from("chats")
-        .select("id")
+        .from('chats')
+        .select('id')
         .or(
           `and(client_id.eq.${user.id},applicant_id.eq.${userId}),and(client_id.eq.${userId},applicant_id.eq.${user.id})`
         )
@@ -220,10 +284,9 @@ export default function Profile({ userId }) {
 
       let cId = existingChats?.[0]?.id;
 
-      // If not found, create one
       if (!cId) {
         const { data: newChat, error: insertError } = await supabase
-          .from("chats")
+          .from('chats')
           .insert([{ client_id: user.id, applicant_id: userId }])
           .select()
           .single();
@@ -235,28 +298,32 @@ export default function Profile({ userId }) {
       setChatId(cId);
       setChatOpen(true);
     } catch (err) {
-      console.error("Error opening chat:", err.message || err);
-      alert("Cannot start chat. Please try again.");
+      console.error('Error opening chat:', err.message || err);
+      alert('Cannot start chat. Please try again.');
     } finally {
       setChatLoading(false);
     }
   };
 
-  // Get chat button tooltip text based on user scenario
   const getChatButtonTooltip = () => {
-    if (!user) return "Login to chat";
-    if (isProfileOwner) return "View your messages";
-    return "Start chat";
+    if (!user) return 'Login to chat';
+    if (isProfileOwner) return 'View your messages';
+    return 'Start chat';
   };
 
   const profileTag = getProfileTag();
+  const isVerified = verification?.approved?.toLowerCase() === 'verified';
 
   if (loading) {
-    return <div className="p-6 text-center text-gray-500">Loading profile...</div>;
+    return (
+      <div className="p-6 text-center text-gray-500">Loading profile...</div>
+    );
   }
 
   if (!profile) {
-    return <div className="p-6 text-center text-red-500">Profile not found</div>;
+    return (
+      <div className="p-6 text-center text-red-500">Profile not found</div>
+    );
   }
 
   return (
@@ -266,29 +333,184 @@ export default function Profile({ userId }) {
       transition={{ duration: 0.4 }}
       className="max-w-5xl mx-auto px-4 py-6 relative min-h-screen"
     >
+      {/* ============================================================
+          ✨ VERIFY PROMPT POPUP
+      ============================================================ */}
+      <AnimatePresence>
+        {showVerifyPopup && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[100] p-4"
+          >
+            <motion.div
+              initial={{ scale: 0.92, opacity: 0, y: 10 }}
+              animate={{ scale: 1, opacity: 1, y: 0 }}
+              exit={{ scale: 0.92, opacity: 0, y: 10 }}
+              transition={{ type: 'spring', damping: 24, stiffness: 280 }}
+              className="bg-white rounded-2xl shadow-2xl max-w-md w-full overflow-hidden"
+            >
+              {/* Header */}
+              <div className="relative bg-gradient-to-br from-black via-gray-900 to-gray-800 px-6 pt-6 pb-7 text-white">
+                <button
+                  onClick={handleVerifyLater}
+                  className="absolute top-4 right-4 p-1.5 rounded-full hover:bg-white/10 transition-colors"
+                  aria-label="Dismiss"
+                >
+                  <X className="w-4 h-4 text-white/70" />
+                </button>
+
+                <div className="flex items-center gap-3 mb-3">
+                  <div className="w-11 h-11 rounded-xl bg-orange-400/15 border border-orange-400/30 flex items-center justify-center">
+                    <ShieldCheck className="w-5 h-5 text-orange-400" />
+                  </div>
+                  <span className="text-xs font-semibold uppercase tracking-wider text-orange-400">
+                    Free · Under a minute
+                  </span>
+                </div>
+
+                <h3 className="text-xl font-bold leading-snug">
+                  Get verified for free
+                </h3>
+                <p className="text-sm text-white/60 mt-1">
+                  Unlock trust and reach more clients
+                </p>
+              </div>
+
+              {/* Body */}
+              <div className="px-6 py-6 space-y-5">
+                <ul className="space-y-4">
+                  <li className="flex items-start gap-3">
+                    <div className="shrink-0 w-7 h-7 rounded-lg bg-green-50 border border-green-200 flex items-center justify-center mt-0.5">
+                      <CheckCircle2 className="w-3.5 h-3.5 text-green-600" />
+                    </div>
+                    <div className="pt-0.5">
+                      <p className="text-sm font-semibold text-gray-900">
+                        Green verified badge
+                      </p>
+                      <p className="text-xs text-gray-500 mt-0.5 leading-relaxed">
+                        Shows on your profile and applications
+                      </p>
+                    </div>
+                  </li>
+                  <li className="flex items-start gap-3">
+                    <div className="shrink-0 w-7 h-7 rounded-lg bg-orange-50 border border-orange-200 flex items-center justify-center mt-0.5">
+                      <TrendingUp className="w-3.5 h-3.5 text-orange-600" />
+                    </div>
+                    <div className="pt-0.5">
+                      <p className="text-sm font-semibold text-gray-900">
+                        Up to 3× more responses
+                      </p>
+                      <p className="text-xs text-gray-500 mt-0.5 leading-relaxed">
+                        Clients trust verified profiles faster
+                      </p>
+                    </div>
+                  </li>
+                  <li className="flex items-start gap-3">
+                    <div className="shrink-0 w-7 h-7 rounded-lg bg-blue-50 border border-blue-200 flex items-center justify-center mt-0.5">
+                      <Zap className="w-3.5 h-3.5 text-blue-600" />
+                    </div>
+                    <div className="pt-0.5">
+                      <p className="text-sm font-semibold text-gray-900">
+                        Priority in search
+                      </p>
+                      <p className="text-xs text-gray-500 mt-0.5 leading-relaxed">
+                        Rank above unverified profiles
+                      </p>
+                    </div>
+                  </li>
+                </ul>
+
+                <div className="rounded-xl bg-gradient-to-r from-orange-50 to-amber-50 border border-orange-100 p-3 flex items-start gap-2.5">
+                  <div className="shrink-0 w-8 h-8 rounded-lg bg-white border border-orange-200 flex items-center justify-center">
+                    <Timer className="w-4 h-4 text-orange-500" />
+                  </div>
+                  <div>
+                    <p className="text-xs font-semibold text-orange-900">
+                      Takes less than a minute
+                    </p>
+                    <p className="text-[11px] text-orange-800 mt-0.5 leading-relaxed">
+                      One quick selfie + upload a valid ID. That's it.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Footer */}
+              <div className="px-6 pb-6">
+                <button
+                  onClick={handleVerifyNow}
+                  className="w-full flex items-center justify-center gap-2 bg-black text-white py-3.5 rounded-xl font-semibold text-sm hover:bg-orange-500 transition-colors shadow-sm"
+                >
+                  Verify now
+                  <ArrowRight className="w-4 h-4" />
+                </button>
+                <button
+                  onClick={handleVerifyLater}
+                  className="w-full mt-2 text-xs text-gray-400 hover:text-gray-600 py-2 transition-colors"
+                >
+                  I'll verify later
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       {/* Profile Header */}
       <div className="bg-gradient-to-r from-black to-orange-500 rounded-3xl p-6 text-white shadow-lg flex flex-col sm:flex-row gap-6 lg:mt-20 relative">
         <div className="flex-shrink-0">
-          <div className="relative w-24 h-24 rounded-full overflow-hidden border-4 border-white">
-            <img
-              src={profile.avatar_url || '/placeholder.png'}
-              alt="Avatar"
-              className="w-full h-full object-cover"
-            />
+          <div className="relative w-24 h-24">
+            <div className="w-24 h-24 rounded-full overflow-hidden border-4 border-white">
+              <img
+                src={profile.avatar_url || '/placeholder.png'}
+                alt="Avatar"
+                className="w-full h-full object-cover"
+              />
+            </div>
+
+            {isVerified && (
+              <motion.div
+                initial={{ scale: 0 }}
+                animate={{ scale: 1 }}
+                transition={{ type: 'spring', stiffness: 300, damping: 20 }}
+                className="absolute -bottom-0.5 -right-0.5"
+                title="Verified identity"
+              >
+                <CheckCircle2
+                  className="w-7 h-7 text-green-500 fill-green-500 drop-shadow-md"
+                  strokeWidth={2.5}
+                  stroke="white"
+                />
+              </motion.div>
+            )}
           </div>
         </div>
+
         <div className="flex-1 flex flex-col justify-center">
           <div className="flex items-center gap-2 flex-wrap">
             <h1 className="text-2xl font-bold leading-tight">
               {profile.full_name || profile.name}
             </h1>
+
+            {isVerified && (
+              <span
+                className="inline-flex items-center gap-1 text-[10px] uppercase tracking-wider bg-green-500 text-white px-2 py-0.5 rounded-full font-bold"
+                title="Identity verified by Gigzz"
+              >
+                <CheckCircle2 className="w-3 h-3" strokeWidth={3} />
+                Verified
+              </span>
+            )}
+
             {profile.role && (
               <span className="text-xs uppercase bg-white/20 px-3 py-1 rounded-full">
                 {profile.role === 'employer' ? 'Client' : 'Creative'}
               </span>
             )}
             {profileTag && (
-              <span 
+              <span
                 className={`text-xs uppercase ${profileTag.color} px-3 py-1 rounded-full text-white`}
                 title={profileTag.tooltip}
               >
@@ -304,8 +526,7 @@ export default function Profile({ userId }) {
             <MapPin className="w-4 h-4" />
             {`${profile.city || ''}, ${profile.state || ''}, ${profile.country || ''}`}
           </p>
-          
-          {/* Token balance display for profile owner ONLY */}
+
           {isProfileOwner && (
             <div className="mt-2 flex items-center gap-2">
               <span className="text-xs bg-black/30 px-2 py-1 rounded-full">
@@ -323,7 +544,6 @@ export default function Profile({ userId }) {
           )}
         </div>
 
-        {/* Actions (Edit + Chat) - Smaller on mobile */}
         <div className="absolute bottom-4 right-4 flex gap-2 sm:gap-3">
           {isProfileOwner && (
             <Link
@@ -334,8 +554,7 @@ export default function Profile({ userId }) {
               <Edit3 className="w-4 h-4 sm:w-6 sm:h-6 group-hover:rotate-12 transition-transform" />
             </Link>
           )}
-          
-          {/* Chat button - VISIBLE TO EVERYONE */}
+
           <button
             onClick={handleChatClick}
             className="bg-white text-black p-2 sm:p-3 rounded-full shadow-lg hover:scale-110 transition flex items-center justify-center"
@@ -344,7 +563,10 @@ export default function Profile({ userId }) {
             disabled={chatLoading}
           >
             {chatLoading ? (
-              <svg className="w-4 h-4 sm:w-6 sm:h-6 animate-spin text-black" viewBox="3 3 18 18">
+              <svg
+                className="w-4 h-4 sm:w-6 sm:h-6 animate-spin text-black"
+                viewBox="3 3 18 18"
+              >
                 <path className="fill-black" d="M12 3v3" />
               </svg>
             ) : (
@@ -425,13 +647,12 @@ export default function Profile({ userId }) {
         ) : (
           <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
             {projects.map((project, idx) => {
-              // Truncate description to first 15 words
               const truncateHTML = (html, wordLimit = 15) => {
-                if (!html) return "";
-                // Remove HTML tags for counting words
-                const text = html.replace(/<[^>]+>/g, "");
-                const words = text.split(" ").slice(0, wordLimit).join(" ");
-                const truncated = words + (text.split(" ").length > wordLimit ? "..." : "");
+                if (!html) return '';
+                const text = html.replace(/<[^>]+>/g, '');
+                const words = text.split(' ').slice(0, wordLimit).join(' ');
+                const truncated =
+                  words + (text.split(' ').length > wordLimit ? '...' : '');
                 return truncated;
               };
 
@@ -488,7 +709,6 @@ export default function Profile({ userId }) {
             exit={{ opacity: 0, scale: 0.9 }}
             className="bg-white rounded-2xl w-full max-w-md mx-4 max-h-[90vh] overflow-y-auto relative"
           >
-            {/* Close Button */}
             <button
               onClick={() => setShowWallet(false)}
               className="absolute top-4 right-4 z-10 bg-gray-100 hover:bg-gray-200 rounded-full p-2 transition-colors duration-200"
@@ -496,14 +716,13 @@ export default function Profile({ userId }) {
             >
               <X className="w-5 h-5 text-gray-600" />
             </button>
-            
-            {/* Wallet Component */}
+
             <WalletComponent onClose={() => setShowWallet(false)} />
           </motion.div>
         </motion.div>
       )}
 
-      {/* Chat Modal - Only show when viewing someone else's profile AND user is authenticated */}
+      {/* Chat Modal */}
       {chatOpen && chatId && !isProfileOwner && user && (
         <ChatModal
           chatId={chatId}
