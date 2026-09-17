@@ -216,17 +216,25 @@ export default function LoginPage() {
       // ✅ Use active_role first, fall back to primary role
       const role = userProfile.active_role || userProfile.role;
 
-      // ✅ Clean role-based redirect
-      if (role === 'admin') {
-        router.push('/dashboard/employer');
-      } else if (role === 'applicant') {
-        router.push('/dashboard/applicant');
-      } else if (role === 'employer') {
-        router.push('/dashboard/employer');
-      } else {
-        setErrorMsg('Invalid user role. Please contact support.');
-        setLoading(false);
-      }
+console.log('DEBUG role check:', {
+  rawRole: userProfile.role,
+  rawActiveRole: userProfile.active_role,
+  effectiveRole: role,
+  isAdmin: role === 'admin',
+  typeofRole: typeof role,
+  roleCharCodes: role ? role.split('').map(c => c.charCodeAt(0)) : null,
+});
+
+if (role === 'admin') {
+  router.push('/dashboard/employer');
+} else if (role === 'applicant') {
+  router.push('/dashboard/applicant');
+} else if (role === 'employer') {
+  router.push('/dashboard/employer');
+} else {
+  setErrorMsg('Invalid user role. Please contact support.');
+  setLoading(false);
+}
 
     } catch (error) {
       console.error('Login error:', error);
