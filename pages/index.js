@@ -453,7 +453,7 @@ export default function Home() {
         <div className="flex gap-4 overflow-x-auto scrollbar-hide pb-2">
           {[
             "https://www.youtube.com/embed/e6Fd_mFglo8?rel=0",
-            "https://www.youtube.com/embed/e6Fd_mFglo8?rel=0",
+            "https://www.youtube.com/embed/djycnGYV_70",
             "https://www.youtube.com/embed/e6Fd_mFglo8?rel=0",
           ].map((src, i) => (
             <div key={i} className="min-w-[300px] md:min-w-[500px] aspect-video">
