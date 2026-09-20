@@ -25,7 +25,6 @@ import {
   Bell,
   Sparkles,
   ArrowRight,
-  User,
   ShieldCheck,
   Shield,
   Clock,
@@ -72,10 +71,8 @@ export default function ApplicantDashboard() {
       const userId = userData.user.id;
       const sessionKey = `verifyPromptShown_${userId}`;
 
-      // Already shown this session? Skip.
       if (sessionStorage.getItem(sessionKey)) return;
 
-      // Fetch verification record
       const { data: v } = await supabase
         .from('verifications')
         .select('approved')
@@ -84,14 +81,13 @@ export default function ApplicantDashboard() {
 
       const approved = v?.approved?.toLowerCase();
       const needsVerification =
-        !v || // no row
-        !approved || // null approved
+        !v ||
+        !approved ||
         approved === 'rejected' ||
         approved === 'unverified' ||
         approved === 'unverify';
 
       if (needsVerification) {
-        // Mark as shown for this session, then display
         sessionStorage.setItem(sessionKey, 'true');
         setTimeout(() => setShowVerifyPopup(true), 1200);
       }
@@ -309,7 +305,6 @@ export default function ApplicantDashboard() {
     router.push('/dashboard/applicant/spotlight');
   };
 
-  /* ---------- Verify prompt actions ---------- */
   const handleVerifyNow = () => {
     setShowVerifyPopup(false);
     setActiveTab('verify');
@@ -365,7 +360,7 @@ export default function ApplicantDashboard() {
         sub: "We're reviewing your submission. Most reviews finish in 24–48h.",
         Icon: Clock,
         color: 'amber',
-        cta: 'View submission',
+        cta: 'View',
       };
     }
     return {
@@ -592,7 +587,7 @@ export default function ApplicantDashboard() {
       </AnimatePresence>
 
       {/* ============================================================
-          ✨ VERIFY PROMPT POPUP
+          VERIFY PROMPT POPUP
       ============================================================ */}
       <AnimatePresence>
         {showVerifyPopup && (
@@ -609,7 +604,6 @@ export default function ApplicantDashboard() {
               transition={{ type: 'spring', damping: 24, stiffness: 280 }}
               className="bg-white rounded-2xl shadow-2xl max-w-md w-full overflow-hidden"
             >
-              {/* Header */}
               <div className="relative bg-gradient-to-br from-black via-gray-900 to-gray-800 px-6 pt-6 pb-7 text-white">
                 <button
                   onClick={handleVerifyLater}
@@ -624,7 +618,7 @@ export default function ApplicantDashboard() {
                     <ShieldCheck className="w-5 h-5 text-orange-400" />
                   </div>
                   <span className="text-xs font-semibold uppercase tracking-wider text-orange-400">
-                    Free · Verified in under a minute
+                    Free · Under a minute
                   </span>
                 </div>
 
@@ -636,7 +630,6 @@ export default function ApplicantDashboard() {
                 </p>
               </div>
 
-              {/* Body */}
               <div className="px-6 py-6 space-y-5">
                 <ul className="space-y-4">
                   <li className="flex items-start gap-3">
@@ -661,7 +654,7 @@ export default function ApplicantDashboard() {
                         Up to 3× more responses
                       </p>
                       <p className="text-xs text-gray-500 mt-0.5 leading-relaxed">
-                        Verified profiles are trusted faster by clients
+                        Clients trust verified profiles faster
                       </p>
                     </div>
                   </li>
@@ -680,7 +673,6 @@ export default function ApplicantDashboard() {
                   </li>
                 </ul>
 
-                {/* Quick-time reassurance */}
                 <div className="rounded-xl bg-gradient-to-r from-orange-50 to-amber-50 border border-orange-100 p-3 flex items-start gap-2.5">
                   <div className="shrink-0 w-8 h-8 rounded-lg bg-white border border-orange-200 flex items-center justify-center">
                     <Timer className="w-4 h-4 text-orange-500" />
@@ -696,7 +688,6 @@ export default function ApplicantDashboard() {
                 </div>
               </div>
 
-              {/* Footer */}
               <div className="px-6 pb-6">
                 <button
                   onClick={handleVerifyNow}
@@ -725,24 +716,29 @@ export default function ApplicantDashboard() {
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.3 }}
-          className="space-y-6 md:pt-20 relative"
+          className="space-y-5 md:space-y-6 md:pt-20 relative"
         >
-          <div className="flex items-center justify-between flex-wrap gap-4">
-            <div>
-              <h2 className="text-2xl font-semibold">
+          {/* Header row: welcome + actions */}
+          <div className="flex items-start justify-between flex-wrap gap-4">
+            <div className="min-w-0 flex-1">
+              <h2 className="text-xl md:text-2xl font-semibold truncate">
                 Welcome back, {profile?.full_name || 'Creative'}
               </h2>
-              <p className="text-sm text-gray-500">
+              <p className="text-xs md:text-sm text-gray-500 mt-0.5">
                 Let's start making money today!
               </p>
             </div>
 
-            <div className="flex items-center gap-4">
-              <a href="/messages" title="Messages" className="relative">
-                <MessageSquare className="w-6 h-6 text-gray-700 hover:text-orange-600" />
+            <div className="flex items-center gap-3 md:gap-4">
+              <a
+                href="/messages"
+                title="Messages"
+                className="relative p-1"
+              >
+                <MessageSquare className="w-5 h-5 md:w-6 md:h-6 text-gray-700 hover:text-orange-600 transition-colors" />
                 {unreadMessagesCount > 0 && (
-                  <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs w-4 h-4 flex items-center justify-center rounded-full">
-                    {unreadMessagesCount}
+                  <span className="absolute -top-0.5 -right-0.5 bg-red-500 text-white text-[10px] min-w-[16px] h-4 px-1 flex items-center justify-center rounded-full font-bold">
+                    {unreadMessagesCount > 9 ? '9+' : unreadMessagesCount}
                   </span>
                 )}
               </a>
@@ -750,11 +746,11 @@ export default function ApplicantDashboard() {
               <button
                 onClick={() => setShowNotifications(true)}
                 title="Notifications"
-                className="relative"
+                className="relative p-1"
               >
-                <Bell className="w-6 h-6 text-gray-700 hover:text-orange-600 transition-colors" />
+                <Bell className="w-5 h-5 md:w-6 md:h-6 text-gray-700 hover:text-orange-600 transition-colors" />
                 {unreadCountNotifications > 0 && (
-                  <span className="absolute -top-1 -right-1 bg-orange-500 text-white text-[10px] min-w-[16px] h-4 px-1 flex items-center justify-center rounded-full font-bold">
+                  <span className="absolute -top-0.5 -right-0.5 bg-orange-500 text-white text-[10px] min-w-[16px] h-4 px-1 flex items-center justify-center rounded-full font-bold">
                     {unreadCountNotifications > 9
                       ? '9+'
                       : unreadCountNotifications}
@@ -769,13 +765,14 @@ export default function ApplicantDashboard() {
                     'https://xatxjdsppcjgplmrtjcs.supabase.co/storage/v1/object/public/avatars/icon.png'
                   }
                   alt="Avatar"
-                  className="w-10 h-10 min-w-[40px] min-h-[40px] rounded-full border-2 border-orange-500 object-cover"
+                  className="w-9 h-9 md:w-10 md:h-10 rounded-full border-2 border-orange-500 object-cover"
                 />
                 <button
                   onClick={() => fileInputRef.current.click()}
-                  className="absolute bottom-0 right-0 bg-white p-1 rounded-full shadow group-hover:flex hidden md:group-hover:flex md:flex hover:bg-orange-100"
+                  className="absolute bottom-0 right-0 bg-white p-0.5 md:p-1 rounded-full shadow hidden md:flex items-center justify-center hover:bg-orange-100"
+                  aria-label="Change avatar"
                 >
-                  <Pencil size={14} className="text-gray-700" />
+                  <Pencil size={12} className="text-gray-700" />
                 </button>
                 <input
                   type="file"
@@ -789,21 +786,19 @@ export default function ApplicantDashboard() {
           </div>
 
           {/* Stats */}
-          <div className="grid grid-cols-3 gap-1 md:gap-4">
-            <MobileStatCard
-              icon={<Coins className="text-orange-500 w-4 h-4 md:w-5 md:h-5" />}
+          <div className="grid grid-cols-3 gap-2 md:gap-4">
+            <StatCard
+              icon={<Coins className="w-4 h-4 md:w-5 md:h-5" />}
               label="Tokens"
               value={tokens}
             />
-            <MobileStatCard
-              icon={
-                <Briefcase className="text-orange-500 w-4 h-4 md:w-5 md:h-5" />
-              }
+            <StatCard
+              icon={<Briefcase className="w-4 h-4 md:w-5 md:h-5" />}
               label="Apps"
               value={applicationsCount}
             />
-            <MobileStatCard
-              icon={<Layers className="text-orange-500 w-4 h-4 md:w-5 md:h-5" />}
+            <StatCard
+              icon={<Layers className="w-4 h-4 md:w-5 md:h-5" />}
               label="Projects"
               value={projectsCount}
             />
@@ -816,15 +811,19 @@ export default function ApplicantDashboard() {
             const themeMap = {
               orange: {
                 chip: 'bg-orange-100 text-orange-600 border-orange-200',
+                btn: 'bg-black text-white hover:bg-orange-500',
               },
               green: {
                 chip: 'bg-green-100 text-green-600 border-green-200',
+                btn: 'bg-black text-white hover:bg-orange-500',
               },
               amber: {
                 chip: 'bg-amber-100 text-amber-600 border-amber-200',
+                btn: 'bg-black text-white hover:bg-orange-500',
               },
               red: {
                 chip: 'bg-red-100 text-red-600 border-red-200',
+                btn: 'bg-black text-white hover:bg-orange-500',
               },
             };
             const t = themeMap[color];
@@ -836,11 +835,11 @@ export default function ApplicantDashboard() {
                 transition={{ delay: 0.05 }}
                 className="rounded-2xl bg-white border border-gray-100 shadow-sm overflow-hidden"
               >
-                <div className="flex flex-col sm:flex-row sm:items-center gap-4 p-4 md:p-5">
+                <div className="flex items-start sm:items-center gap-3 p-4 md:p-5">
                   <div
-                    className={`shrink-0 w-11 h-11 rounded-xl border flex items-center justify-center ${t.chip}`}
+                    className={`shrink-0 w-10 h-10 md:w-11 md:h-11 rounded-xl border flex items-center justify-center ${t.chip}`}
                   >
-                    <Icon className="w-5 h-5" />
+                    <Icon className="w-4 h-4 md:w-5 md:h-5" />
                   </div>
 
                   <div className="flex-1 min-w-0">
@@ -854,37 +853,40 @@ export default function ApplicantDashboard() {
                         </span>
                       )}
                     </div>
-                    <p className="text-xs text-gray-500 mt-0.5 leading-relaxed">
+                    <p className="text-[11px] md:text-xs text-gray-500 mt-0.5 leading-relaxed">
                       {sub}
                     </p>
                   </div>
 
                   <button
                     onClick={() => setActiveTab('verify')}
-                    className="shrink-0 inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-semibold transition-colors bg-black text-white hover:bg-orange-500"
+                    className={`shrink-0 inline-flex items-center gap-1.5 px-3 md:px-4 py-2 rounded-xl text-[11px] md:text-xs font-semibold transition-colors ${t.btn}`}
                   >
                     <ShieldCheck className="w-3.5 h-3.5" />
-                    {cta}
+                    <span>{cta}</span>
                   </button>
                 </div>
               </motion.div>
             );
           })()}
 
-          {/* Profile buttons */}
-          <div className="flex flex-wrap gap-4 mt-6">
+          {/* Action buttons — Promote + Edit side by side */}
+          <div className="grid grid-cols-2 gap-3 mt-2">
             {profile && (
-              <ProfilePromotion
-                profile={profile}
-                refreshProfile={fetchProfile}
-              />
+              <div className="[&>*]:!mt-0 [&>*]:!w-full [&_button]:!w-full [&_button]:!px-3 [&_button]:!py-2.5 [&_button]:!text-[11px] sm:[&_button]:!text-sm [&_button]:!rounded-xl [&_button]:!font-semibold [&_button]:!shadow-sm [&_button]:!h-full [&_button]:!flex [&_button]:!items-center [&_button]:!justify-center">
+                <ProfilePromotion
+                  profile={profile}
+                  refreshProfile={fetchProfile}
+                />
+              </div>
             )}
 
             <a
               href="/dashboard/applicant/edit"
-              className="mt-6 px-6 py-3 bg-orange-500 text-white rounded-xl shadow hover:bg-orange-600 transition"
+              className="inline-flex items-center justify-center gap-1.5 px-3 py-2.5 sm:px-6 sm:py-3 bg-orange-500 text-white text-[11px] sm:text-sm font-semibold rounded-xl shadow-sm hover:bg-orange-600 transition h-full"
             >
-              Edit Profile
+              <Edit3 className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+              <span>Edit Profile</span>
             </a>
           </div>
         </motion.div>
@@ -922,18 +924,21 @@ export default function ApplicantDashboard() {
   );
 }
 
-function MobileStatCard({ icon, label, value }) {
+/* --------------------------------------------------------------
+   Stat card — compact, responsive
+-------------------------------------------------------------- */
+function StatCard({ icon, label, value }) {
   return (
-    <div className="flex flex-col items-center justify-center bg-gray-100 p-2 md:p-3 rounded-lg md:rounded-xl shadow-sm text-center min-h-[80px] md:min-h-[100px]">
-      <div className="p-1.5 md:p-2 bg-white rounded-full shadow mb-1 md:mb-2">
+    <div className="flex flex-col items-center justify-center bg-white border border-gray-100 rounded-xl md:rounded-2xl shadow-sm p-3 md:p-4 text-center min-h-[78px] md:min-h-[100px]">
+      <div className="w-8 h-8 md:w-10 md:h-10 rounded-full bg-orange-50 flex items-center justify-center text-orange-500 mb-1.5 md:mb-2">
         {icon}
       </div>
-      <div>
-        <p className="text-gray-600 text-[10px] md:text-xs font-medium">
-          {label}
-        </p>
-        <p className="text-xs md:text-sm font-bold">{value}</p>
-      </div>
+      <p className="text-gray-500 text-[10px] md:text-xs font-medium uppercase tracking-wider">
+        {label}
+      </p>
+      <p className="text-sm md:text-lg font-bold text-gray-900 mt-0.5">
+        {value}
+      </p>
     </div>
   );
 }
