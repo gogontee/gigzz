@@ -6,7 +6,14 @@ import Image from 'next/image';
 
 // Helper function to convert base64 back to file
 const base64ToFile = (base64, fileName, fileType) => {
-  const byteString = atob(base64.split(',')[1]);
+  if (!base64 || typeof base64 !== 'string') {
+    throw new Error('Invalid base64 data');
+  }
+  const parts = base64.split(',');
+  if (parts.length < 2) {
+    throw new Error('Malformed data URL');
+  }
+  const byteString = atob(parts[1]);
   const ab = new ArrayBuffer(byteString.length);
   const ia = new Uint8Array(ab);
   for (let i = 0; i < byteString.length; i++) {
@@ -32,7 +39,11 @@ export default function LoginPage() {
       setSuccessMsg('Email verified successfully! You can now log in to your account.');
       const newQuery = { ...router.query };
       delete newQuery.verified;
-      router.replace({ pathname: router.pathname, query: newQuery }, undefined, { shallow: true });
+      router.replace(
+        { pathname: router.pathname, query: newQuery },
+        undefined,
+        { shallow: true }
+      );
     }
 
     if (router.query.error) {
@@ -40,26 +51,34 @@ export default function LoginPage() {
 
       switch (router.query.error) {
         case 'verification_failed':
-          errorMessage = 'Email verification failed. Please try again or request a new verification email.';
+          errorMessage =
+            'Email verification failed. Please try again or request a new verification email.';
           break;
         case 'invalid_confirmation_link':
-          errorMessage = 'Invalid confirmation link. Please request a new verification email.';
+          errorMessage =
+            'Invalid confirmation link. Please request a new verification email.';
           break;
         case 'session_error':
           errorMessage = 'Session error. Please try logging in again.';
           break;
         case 'auth_failed':
-          errorMessage = router.query.message || 'Authentication failed. Please try again.';
+          errorMessage =
+            router.query.message || 'Authentication failed. Please try again.';
           break;
         default:
-          errorMessage = router.query.message || 'An error occurred. Please try again.';
+          errorMessage =
+            router.query.message || 'An error occurred. Please try again.';
       }
 
       setErrorMsg(errorMessage);
       const newQuery = { ...router.query };
       delete newQuery.error;
       delete newQuery.message;
-      router.replace({ pathname: router.pathname, query: newQuery }, undefined, { shallow: true });
+      router.replace(
+        { pathname: router.pathname, query: newQuery },
+        undefined,
+        { shallow: true }
+      );
     }
   }, [router.query, router]);
 
@@ -78,81 +97,94 @@ export default function LoginPage() {
     }
   }, [errorMsg]);
 
-  // Function to handle pending photo upload
+  /* --------------------------------------------------------------
+     Handle pending photo upload — awaited before navigation
+  -------------------------------------------------------------- */
   const handlePendingPhotoUpload = async (user) => {
     const pendingPhotoKey = `pending_photo_${user.id}`;
     const pendingPhotoData = localStorage.getItem(pendingPhotoKey);
 
-    if (pendingPhotoData && user.email_confirmed_at) {
-      try {
-        setUploadingPhoto(true);
-        const { fileData, fileName, fileType } = JSON.parse(pendingPhotoData);
+    if (!pendingPhotoData || !user.email_confirmed_at) return;
 
-        const file = base64ToFile(fileData, fileName, fileType);
+    try {
+      setUploadingPhoto(true);
+      const { fileData, fileName, fileType } = JSON.parse(pendingPhotoData);
 
-        // Store at the root of the bucket under the user's own folder.
-        // e.g. avatars/<userId>-<timestamp>-avatar.jpg
-        const ext = fileName.split('.').pop();
-        const filePath = `${user.id}-${Date.now()}.${ext}`;
+      console.log('📸 Starting pending photo upload for user:', user.id);
 
-        // ✅ Upload to the avatars bucket (has correct RLS policies)
-        const { error: uploadError } = await supabase.storage
-          .from('avatars')
-          .upload(filePath, file, { upsert: true, contentType: fileType });
+      const file = base64ToFile(fileData, fileName, fileType);
 
-        if (uploadError) {
-          console.error('Photo upload failed:', uploadError);
-          return;
-        }
+      const ext = fileName.split('.').pop();
+      const filePath = `${user.id}-${Date.now()}.${ext}`;
 
-        const { data: publicUrlData } = supabase.storage
-          .from('avatars')
-          .getPublicUrl(filePath);
+      // Upload to avatars bucket
+      const { error: uploadError } = await supabase.storage
+        .from('avatars')
+        .upload(filePath, file, { upsert: true, contentType: fileType });
 
-        // Fetch the user's role to know which profile table to update
-        const { data: userProfile } = await supabase
-          .from('users')
-          .select('role, active_role')
-          .eq('id', user.id)
-          .single();
-
-        if (userProfile) {
-          const effectiveRole = userProfile.active_role || userProfile.role;
-          const profileTable = effectiveRole === 'applicant' ? 'applicants' : 'employers';
-
-          const { error: updateError } = await supabase
-            .from(profileTable)
-            .update({ avatar_url: publicUrlData.publicUrl })
-            .eq('id', user.id);
-
-          if (!updateError) {
-            // Mirror to the other role's table if it exists
-            const otherTable = effectiveRole === 'applicant' ? 'employers' : 'applicants';
-            await supabase
-              .from(otherTable)
-              .update({ avatar_url: publicUrlData.publicUrl })
-              .eq('id', user.id);
-            // Silent — the other row might not exist yet
-
-            await supabase.auth.refreshSession();
-
-            localStorage.removeItem(pendingPhotoKey);
-            setHasPendingPhoto(false);
-            setSuccessMsg('Profile photo uploaded successfully!');
-
-            setTimeout(() => {
-              window.location.reload();
-            }, 1000);
-          }
-        }
-      } catch (error) {
-        console.error('Pending photo upload failed:', error);
-      } finally {
-        setUploadingPhoto(false);
+      if (uploadError) {
+        console.error('❌ Photo upload failed:', uploadError);
+        return;
       }
+
+      const { data: publicUrlData } = supabase.storage
+        .from('avatars')
+        .getPublicUrl(filePath);
+
+      // Fetch user role
+      const { data: userProfile, error: profileFetchError } = await supabase
+        .from('users')
+        .select('role, active_role')
+        .eq('id', user.id)
+        .maybeSingle();
+
+      if (profileFetchError || !userProfile) {
+        console.error('❌ Could not fetch user profile:', profileFetchError);
+        return;
+      }
+
+      const effectiveRole = userProfile.active_role || userProfile.role;
+      const profileTable = effectiveRole === 'applicant' ? 'applicants' : 'employers';
+
+      console.log('📸 Updating avatar in:', profileTable);
+
+      const { error: updateError } = await supabase
+        .from(profileTable)
+        .update({ avatar_url: publicUrlData.publicUrl })
+        .eq('id', user.id);
+
+      if (updateError) {
+        console.error(`❌ Failed to update ${profileTable}.avatar_url:`, updateError);
+        return;
+      }
+
+      console.log('✅ Avatar updated in', profileTable);
+
+      // Mirror to the other role's table (if it exists)
+      const otherTable = effectiveRole === 'applicant' ? 'employers' : 'applicants';
+      await supabase
+        .from(otherTable)
+        .update({ avatar_url: publicUrlData.publicUrl })
+        .eq('id', user.id);
+
+      await supabase.auth.refreshSession();
+
+      localStorage.removeItem(pendingPhotoKey);
+      setHasPendingPhoto(false);
+      setSuccessMsg('Profile photo uploaded successfully!');
+
+      // Small delay so the success state is visible before navigation
+      await new Promise((resolve) => setTimeout(resolve, 800));
+    } catch (error) {
+      console.error('❌ Pending photo upload failed:', error);
+    } finally {
+      setUploadingPhoto(false);
     }
   };
 
+  /* --------------------------------------------------------------
+     Login handler
+  -------------------------------------------------------------- */
   const handleLogin = async (e) => {
     e.preventDefault();
     setErrorMsg(null);
@@ -160,16 +192,19 @@ export default function LoginPage() {
     setLoading(true);
 
     try {
-      const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
-        email,
-        password,
-      });
+      const { data: authData, error: authError } =
+        await supabase.auth.signInWithPassword({
+          email,
+          password,
+        });
 
       if (authError) {
         if (authError.message.includes('Invalid login credentials')) {
           setErrorMsg('Invalid email or password. Please try again.');
         } else if (authError.message.includes('Email not confirmed')) {
-          setErrorMsg('Please verify your email address before logging in. Check your inbox for the verification link.');
+          setErrorMsg(
+            'Please verify your email address before logging in. Check your inbox for the verification link.'
+          );
         } else {
           setErrorMsg(authError.message);
         }
@@ -187,12 +222,14 @@ export default function LoginPage() {
 
       // Check if email is verified
       if (!user.email_confirmed_at) {
-        setErrorMsg('Please verify your email address before logging in. Check your inbox for the verification link.');
+        setErrorMsg(
+          'Please verify your email address before logging in. Check your inbox for the verification link.'
+        );
         setLoading(false);
         return;
       }
 
-      // ✅ Fetch BOTH role and active_role
+      // Fetch user role
       const { data: userProfile, error: profileError } = await supabase
         .from('users')
         .select('role, active_role')
@@ -205,37 +242,27 @@ export default function LoginPage() {
         return;
       }
 
-      // Check for pending photo upload
+      // ✅ AWAIT pending photo upload BEFORE navigating
       const pendingPhotoKey = `pending_photo_${user.id}`;
       const pendingPhotoData = localStorage.getItem(pendingPhotoKey);
       if (pendingPhotoData) {
         setHasPendingPhoto(true);
-        handlePendingPhotoUpload(user);
+        await handlePendingPhotoUpload(user);
       }
 
-      // ✅ Use active_role first, fall back to primary role
+      // Role-based redirect
       const role = userProfile.active_role || userProfile.role;
 
-console.log('DEBUG role check:', {
-  rawRole: userProfile.role,
-  rawActiveRole: userProfile.active_role,
-  effectiveRole: role,
-  isAdmin: role === 'admin',
-  typeofRole: typeof role,
-  roleCharCodes: role ? role.split('').map(c => c.charCodeAt(0)) : null,
-});
-
-if (role === 'admin') {
-  router.push('/dashboard/employer');
-} else if (role === 'applicant') {
-  router.push('/dashboard/applicant');
-} else if (role === 'employer') {
-  router.push('/dashboard/employer');
-} else {
-  setErrorMsg('Invalid user role. Please contact support.');
-  setLoading(false);
-}
-
+      if (role === 'admin') {
+        router.push('/dashboard/employer');
+      } else if (role === 'applicant') {
+        router.push('/dashboard/applicant');
+      } else if (role === 'employer') {
+        router.push('/dashboard/employer');
+      } else {
+        setErrorMsg('Invalid user role. Please contact support.');
+        setLoading(false);
+      }
     } catch (error) {
       console.error('Login error:', error);
       setErrorMsg('An unexpected error occurred. Please try again.');
@@ -243,6 +270,9 @@ if (role === 'admin') {
     }
   };
 
+  /* --------------------------------------------------------------
+     Resend verification
+  -------------------------------------------------------------- */
   const handleResendVerification = async () => {
     if (!email) {
       setErrorMsg('Please enter your email address to resend verification.');
@@ -255,8 +285,8 @@ if (role === 'admin') {
         type: 'signup',
         email: email,
         options: {
-          emailRedirectTo: `${window.location.origin}/auth/callback`
-        }
+          emailRedirectTo: `${window.location.origin}/auth/callback`,
+        },
       });
 
       if (error) {
@@ -271,6 +301,9 @@ if (role === 'admin') {
     }
   };
 
+  /* --------------------------------------------------------------
+     Render
+  -------------------------------------------------------------- */
   return (
     <div className="min-h-screen flex flex-col items-center justify-start bg-white px-4 pt-20 pb-10">
       {/* Logo */}
@@ -293,8 +326,12 @@ if (role === 'admin') {
             <div className="flex items-center gap-3">
               <div className="w-4 h-4 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
               <div>
-                <p className="text-blue-800 font-medium">Uploading Profile Photo...</p>
-                <p className="text-blue-700 text-sm mt-1">Please wait while we upload your profile photo.</p>
+                <p className="text-blue-800 font-medium">
+                  Uploading Profile Photo...
+                </p>
+                <p className="text-blue-700 text-sm mt-1">
+                  Please wait while we upload your profile photo.
+                </p>
               </div>
             </div>
           </div>
@@ -322,7 +359,8 @@ if (role === 'admin') {
                 <p className="text-red-800 font-medium">Error</p>
                 <p className="text-red-700 text-sm mt-1">{errorMsg}</p>
 
-                {(errorMsg.includes('verify your email') || errorMsg.includes('Email not confirmed')) && (
+                {(errorMsg.includes('verify your email') ||
+                  errorMsg.includes('Email not confirmed')) && (
                   <button
                     onClick={handleResendVerification}
                     disabled={loading}
@@ -399,9 +437,12 @@ if (role === 'admin') {
             <div className="flex items-start gap-3">
               <Upload className="w-5 h-5 text-orange-500 mt-0.5 flex-shrink-0" />
               <div>
-                <p className="text-orange-800 font-medium">Profile Photo Pending</p>
+                <p className="text-orange-800 font-medium">
+                  Profile Photo Pending
+                </p>
                 <p className="text-orange-700 text-sm mt-1">
-                  Your profile photo will be uploaded automatically. You can also update it later in your profile settings.
+                  Your profile photo will be uploaded automatically. You can
+                  also update it later in your profile settings.
                 </p>
               </div>
             </div>
@@ -411,13 +452,19 @@ if (role === 'admin') {
         <div className="text-center space-y-3 pt-4 border-t border-gray-200">
           <p className="text-sm text-gray-600">
             Forgot password?{' '}
-            <a href="/auth/reset" className="text-orange-600 hover:text-black font-semibold">
+            <a
+              href="/auth/reset"
+              className="text-orange-600 hover:text-black font-semibold"
+            >
               Reset here
             </a>
           </p>
           <p className="text-sm text-gray-600">
             Don't have an account?{' '}
-            <a href="/auth/signup" className="text-orange-600 hover:text-black font-semibold">
+            <a
+              href="/auth/signup"
+              className="text-orange-600 hover:text-black font-semibold"
+            >
               Sign up
             </a>
           </p>
@@ -426,7 +473,10 @@ if (role === 'admin') {
         <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mt-4">
           <p className="text-blue-800 text-sm text-center">
             💡 <strong>Need help?</strong> Contact{' '}
-            <a href="mailto:support@gigzz.com" className="underline hover:text-blue-900">
+            <a
+              href="mailto:support@gigzz.com"
+              className="underline hover:text-blue-900"
+            >
               support@gigzz.com
             </a>
           </p>
